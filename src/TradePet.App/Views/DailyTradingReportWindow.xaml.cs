@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Media;
+using TradePet.Application.Review;
 using TradePet.Core.Domain;
 using WpfBrush = System.Windows.Media.Brush;
 using WpfColor = System.Windows.Media.Color;
@@ -30,7 +31,8 @@ public sealed record DailyTradingReport(
     int BehaviorAlertCount,
     int CooldownViolationCount,
     string Markdown,
-    string? ArchivePath = null);
+    string? ArchivePath = null,
+    DailyReportAnalysis? Analysis = null);
 
 public partial class DailyTradingReportWindow : Window
 {
@@ -58,12 +60,18 @@ public partial class DailyTradingReportWindow : Window
         PlanText.Text = $"计划内 {report.InsidePlanCount} · 计划外 {report.OutsidePlanCount} · 未分类 {report.UnclassifiedPlanCount}";
         ReviewText.Text = $"已完成 {report.ReviewedCount} · 待复盘 {report.PendingReviewCount}";
         BehaviorText.Text = report.BehaviorAlertCount == 0
-            ? "未发现高风险行为"
-            : $"{report.BehaviorAlertCount} 条风险提醒，其中冷静期违规 {report.CooldownViolationCount} 条";
+            ? "没有记录到风险提醒；不代表全天没有风险"
+            : $"{report.BehaviorAlertCount} 条风险提醒，其中冷静期触发 {report.CooldownViolationCount} 条（不含正常检查）";
         ArchivePathText.Text = string.IsNullOrWhiteSpace(report.ArchivePath)
             ? "Markdown 尚未归档。"
             : $"已归档：{report.ArchivePath}";
         ArchivePathText.ToolTip = report.ArchivePath;
+        AnalysisSections.ItemsSource = report.Analysis?.Sections;
+        TradeDetailsGrid.ItemsSource = report.Analysis?.Trades;
+        FullReportText.Text = report.Markdown;
+        TradeDetailHint.Text = report.Analysis?.Trades.Count > 0
+            ? $"共 {report.Analysis.Trades.Count} 笔完整平仓交易；横向滚动可查看费用、风险和退出原因。金额单位：{report.Currency}。"
+            : "没有完整平仓交易；当日成交和未结交易请查看完整日报。";
     }
 
     public DateOnly ServerDate => _report.ServerDate;

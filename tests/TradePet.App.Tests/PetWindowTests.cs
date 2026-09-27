@@ -140,6 +140,7 @@ public sealed class PetWindowTests
                 Assert.False(bubble.IsOpen);
                 VerifySetupFlow();
                 VerifyQuickReview();
+                VerifyDailyTradingReport();
             }
             catch (Exception exception)
             {
@@ -184,6 +185,58 @@ public sealed class PetWindowTests
             Assert.Contains("回吐 25", review.AnalysisSummary);
         }
         finally { review.Close(); }
+    }
+
+    private static void VerifyDailyTradingReport()
+    {
+        var analysis = new DailyReportAnalysis(
+            [new("风险、回撤与持仓", ["采样内净值回撤 50 USD；历史未覆盖时段不补算。", "可靠初始风险覆盖 1/2 笔；缺失记录不当作零风险。"]),
+             new("下一交易日行动清单", ["补齐 #42 的入场风险与退出原因，并确认计划执行分类。"])],
+            [new(42, "TEST", "买入", "2026-09-25 10:00:00", "2026-09-25 10:20:00", "0小时 20分 0秒",
+                "0.1", "0.2", "12 USD", "-2 USD", "10 USD", "1.2 R", "-5 USD", "20 USD", "8 USD",
+                "100% · 可靠", "计划内", "按记录中的退出条件平仓", "核对计划执行")], "## 风险分析\n\n完整事实。\n");
+        var report = new DailyTradingReport("测试账户", "USD", new(2026, 9, 25), true,
+            12, -2, 1, 1, 0, 0, 100, null, null, 1, 0, 0, 0, 1, 19, 5,
+            "# 2026-09-25 交易日报\n\n" + analysis.Markdown, Analysis: analysis);
+        var window = new DailyTradingReportWindow(report);
+        try
+        {
+            Assert.False(window.Topmost);
+            Assert.False(window.ShowActivated);
+            Assert.Equal(ResizeMode.CanResize, window.ResizeMode);
+            window.Show();
+            window.UpdateLayout();
+            Assert.Equal(analysis.Sections, ((ItemsControl)window.FindName("AnalysisSections")).ItemsSource);
+            var grid = (DataGrid)window.FindName("TradeDetailsGrid");
+            Assert.Single(grid.Items);
+            Assert.Equal(analysis.Trades[0], grid.Items[0]);
+            Assert.Equal(report.Markdown, ((TextBox)window.FindName("FullReportText")).Text);
+            Assert.Equal("19 条风险提醒，其中冷静期触发 5 条（不含正常检查）",
+                ((TextBlock)window.FindName("BehaviorText")).Text);
+            var tabs = (TabControl)window.FindName("ReportTabs");
+            for (var index = 0; index < tabs.Items.Count; index++)
+            {
+                tabs.SelectedIndex = index;
+                window.UpdateLayout();
+                Assert.True(tabs.ActualHeight > 200);
+                if (Environment.GetEnvironmentVariable("TRADEPET_REPORT_PREVIEW_DIR") is { Length: > 0 } directory)
+                {
+                    System.IO.Directory.CreateDirectory(directory);
+                    var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap((int)window.ActualWidth,
+                        (int)window.ActualHeight, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+                    bitmap.Render(window);
+                    var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+                    encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
+                    using var stream = System.IO.File.Create(System.IO.Path.Combine(directory, $"daily-report-{index}.png"));
+                    encoder.Save(stream);
+                }
+            }
+            window.Width = window.MinWidth;
+            window.Height = window.MinHeight;
+            window.UpdateLayout();
+            Assert.True(tabs.ActualHeight > 200);
+        }
+        finally { window.Close(); }
     }
 
     private static void VerifySetupFlow()

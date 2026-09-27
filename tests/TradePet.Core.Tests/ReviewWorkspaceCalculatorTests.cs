@@ -153,6 +153,29 @@ public sealed class ReviewWorkspaceCalculatorTests
     }
 
     [Fact]
+    public void DailyFacts_CooldownCountExcludesNormalChecksOtherRulesAccountsAndDates()
+    {
+        var date = new DateOnly(2026, 9, 1);
+        var alert = Occurrence("attention", BehaviorRuleKind.CooldownViolation, new("Broker|1", 1));
+        var behaviors = new[]
+        {
+            alert,
+            alert with { Id = "critical", Level = BehaviorRiskLevel.Critical },
+            alert with { Id = "normal", Level = BehaviorRiskLevel.Normal },
+            alert with { Id = "observing", Level = BehaviorRiskLevel.Observing },
+            alert with { Id = "other-rule", Rule = BehaviorRuleKind.RevengeScore },
+            alert with { Id = "other-account", AccountKey = "Other|1" },
+            alert with { Id = "other-day", ServerDate = date.AddDays(-1) },
+        };
+
+        var facts = _calculator.BuildDailyFacts("Broker|1", date, date, [], [],
+            new Dictionary<long, TradeReviewDocument>(), behaviors,
+            new Dictionary<DateOnly, DailyState>(), 0)[date];
+
+        Assert.Equal(2, facts.CooldownViolationCount);
+    }
+
+    [Fact]
     public void Analysis_SeparatesRawFeesUnallocatedCostsDailyCashAndMissingRiskPoints()
     {
         var date = new DateOnly(2026, 9, 1);

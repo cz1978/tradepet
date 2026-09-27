@@ -8,7 +8,8 @@ public sealed record Mt5SnapshotBatch(
     IReadOnlyList<PositionSnapshot> Positions,
     IReadOnlyList<OrderSnapshot> Orders,
     int? ServerUtcOffsetSeconds,
-    IReadOnlyList<SymbolSpecification> SymbolSpecifications);
+    IReadOnlyList<SymbolSpecification> SymbolSpecifications,
+    bool SupportsOrderHistory = false);
 
 public sealed record Mt5HistoryProgress(
     int RangeYear,
@@ -22,7 +23,8 @@ public sealed record Mt5DealBatch(
     IReadOnlyList<AccountCashFlow> CashFlows,
     Mt5HistoryProgress? HistoryProgress,
     DateOnly? ServerDate,
-    IReadOnlyList<SymbolSpecification> SymbolSpecifications);
+    IReadOnlyList<SymbolSpecification> SymbolSpecifications,
+    bool IsRecovery = false);
 
 public static class Mt5PayloadMapper
 {
@@ -76,7 +78,8 @@ public static class Mt5PayloadMapper
         int? serverUtcOffsetSeconds = payload.TryGetProperty("serverUtcOffsetSeconds", out var offset)
             ? offset.GetInt32()
             : null;
-        return new Mt5SnapshotBatch(account, positions, orders, serverUtcOffsetSeconds, MapSymbolSpecifications(payload));
+        return new Mt5SnapshotBatch(account, positions, orders, serverUtcOffsetSeconds, MapSymbolSpecifications(payload),
+            payload.TryGetProperty("historyAvailable", out var history) && history.GetBoolean());
     }
 
     public static IReadOnlyList<DealRecord> MapDeals(ProtocolEnvelope envelope)
@@ -123,7 +126,8 @@ public static class Mt5PayloadMapper
                 sync.GetProperty("rangeToUtc").GetDateTimeOffset());
         }
 
-        return new Mt5DealBatch(deals, cashFlows, progress, envelope.ServerDate, MapSymbolSpecifications(envelope.Payload));
+        return new Mt5DealBatch(deals, cashFlows, progress, envelope.ServerDate, MapSymbolSpecifications(envelope.Payload),
+            envelope.Payload.TryGetProperty("isRecovery", out var recovery) && recovery.GetBoolean());
     }
 
     private static IReadOnlyList<SymbolSpecification> MapSymbolSpecifications(System.Text.Json.JsonElement payload)

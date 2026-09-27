@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using TradePet.Core.Domain;
 using TradePet.Core.Protocol;
 using TradePet.Infrastructure.Mt4;
 using TradePet.Infrastructure.Mt5;
@@ -8,6 +10,25 @@ namespace TradePet.Infrastructure.Tests;
 
 public sealed class Mt4AdapterTests
 {
+    [Fact]
+    public void VersionTwo_RiskUsesBrokerTickValueAndPriceStepAndRequiresValidInputs()
+    {
+        var now = DateTimeOffset.UtcNow;
+        const string terminal = @"C:\BrokerMT4\terminal.exe";
+        var json = JsonNode.Parse(Frame(terminal, now))!;
+        json["version"] = 2;
+        json["positions"]![0]!["tickSize"] = .00001m;
+        json["positions"]![0]!["tickValue"] = 1m;
+        Mt5SnapshotBatch Map() => Mt5PayloadMapper.MapSnapshot(ProtocolEnvelope.Create("test", 1, "snapshot",
+            Mt4FileClient.ReadFrame(json.ToJsonString(), terminal, now).Payload, "MT4:Broker|42"));
+        Assert.Equal(400m, Assert.Single(Map().Positions).InitialRiskAmount);
+        json["positions"]![0]!["tickValue"] = 0m;
+        Assert.Null(Assert.Single(Map().Positions).InitialRiskAmount);
+        json["positions"]![0]!["tickValue"] = 1m;
+        json["positions"]![0]!["stopLoss"] = 0m;
+        Assert.Null(Assert.Single(Map().Positions).InitialRiskAmount);
+    }
+
     private static string Frame(string terminal, DateTimeOffset captured, long sequence = 1, long login = 42) =>
         JsonSerializer.Serialize(new
         {
@@ -108,5 +129,93 @@ public sealed class Mt4AdapterTests
             Assert.Equal(terminal, new Mt5TerminalDiscovery().FindPreferred(terminal, TradingPlatform.Mt4)?.TerminalPath);
         }
         finally { Directory.Delete(root, true); }
+    }
+
+    [Fact]
+    public void VersionTwo_EnablesHistoryOnlyWithAValidatedClockAndRejectsForeignCharts()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var terminal = @"C:\BrokerMT4\terminal.exe";
+        var json = JsonNode.Parse(Frame(terminal, now))!;
+        json["version"] = 2;
+        var frame = Mt4FileClient.ReadFrame(json.ToJsonString(), terminal, now);
+        Assert.True(Mt5PayloadMapper.MapSnapshot(ProtocolEnvelope.Create("test", 1, "snapshot", frame.Payload, frame.AccountKey)).SupportsOrderHistory);
+        json.AsObject().Remove("serverUtcOffsetSeconds");
+        Assert.False(Mt4FileClient.ReadFrame(json.ToJsonString(), terminal, now).Payload.GetProperty("historyAvailable").GetBoolean());
+        json["charts"] = JsonSerializer.SerializeToNode(new { terminalPath = @"C:\OtherMT4", hostChartId = 1L, objects = Array.Empty<object>() });
+        Assert.Throws<InvalidDataException>(() => Mt4FileClient.ReadFrame(json.ToJsonString(), terminal, now));
+    }
+
+    [Fact]
+    public async Task Client_EmitsOrderLedgerAndRefreshesItWithoutChangingOriginalTickets()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "TradePetMt4Tests", Guid.NewGuid().ToString("N"));
+        var terminal = Path.Combine(root, "terminal.exe");
+        var path = Path.Combine(root, "MQL4", "Files", Mt4FileClient.SnapshotFileName);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var now = DateTimeOffset.UtcNow;
+        var snapshot = JsonNode.Parse(Frame(terminal, now))!;
+        snapshot["version"] = 2;
+        var history = JsonSerializer.Serialize(new
+        {
+            version = 2, platform = "mt4", sourceInstanceId = "ea-test", accountKey = "MT4:Broker|42",
+            terminalPath = root, capturedAtUtc = now, serverUtcOffsetSeconds = 7200, scanComplete = true,
+            orders = new[] { new { ticket = 51L, type = 1, symbol = "EURUSD", volume = .2m,
+                openTime = now.AddHours(-2).ToUnixTimeSeconds() + 7200, closeTime = now.AddHours(-1).ToUnixTimeSeconds() + 7200,
+                openPrice = 1.1m, closePrice = 1.09m, profit = 20m, commission = -2m, swap = -1m } },
+        });
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        await using var client = new Mt4FileClient(terminal, root);
+        await File.WriteAllTextAsync(path, snapshot.ToJsonString(), cancellation.Token);
+        await File.WriteAllTextAsync(Path.Combine(root, "MQL4", "Files", Mt4FileClient.HistoryFileName), history, cancellation.Token);
+        var running = client.RunAsync(cancellation.Token);
+        try
+        {
+            var envelope = await ReadDeals();
+            var batch = Mt5PayloadMapper.MapDealBatch(envelope);
+            Assert.Equal("MT4:Broker|42", envelope.AccountKey);
+            Assert.True(batch.IsRecovery);
+            Assert.Equal(17m, batch.Deals.Sum(d => d.NetPnl));
+            Assert.All(batch.Deals, d => Assert.Equal(51L, d.OrderTicket));
+            Assert.Null(batch.HistoryProgress);
+            await client.RefreshHistoryAsync([2026], 7200, new(2026, 9, 27), cancellation.Token);
+            snapshot["sequence"] = 2;
+            snapshot["capturedAtUtc"] = DateTimeOffset.UtcNow;
+            await File.WriteAllTextAsync(path, snapshot.ToJsonString(), cancellation.Token);
+            var refreshed = Mt5PayloadMapper.MapDealBatch(await ReadDeals());
+            Assert.Equal(batch.Deals, refreshed.Deals);
+            await client.SetLossZonesAsync("MT4:Broker|42", new(2026, 9, 27),
+                [new("zone", "EURUSD", 1, 1.1m, 1.2m, 2, 2, -10)], cancellation.Token);
+            var zones = JsonSerializer.Deserialize<ProtocolEnvelope>(await File.ReadAllTextAsync(
+                Path.Combine(root, "MQL4", "Files", "TradePet", "loss-zones.json"), cancellation.Token), ProtocolJson.Options);
+            Assert.Equal("MT4:Broker|42", zones!.AccountKey);
+            File.Delete(Path.Combine(root, "MQL4", "Files", Mt4FileClient.HistoryFileName));
+            await client.RefreshAsync(7200, new(2026, 9, 27), cancellation.Token);
+            snapshot["sequence"] = 3;
+            snapshot["capturedAtUtc"] = DateTimeOffset.UtcNow;
+            await File.WriteAllTextAsync(path, snapshot.ToJsonString(), cancellation.Token);
+            while (true)
+            {
+                var status = await client.Events.ReadAsync(cancellation.Token);
+                if (status.Kind != "history_status") continue;
+                Assert.False(status.Payload.GetProperty("ready").GetBoolean());
+                break;
+            }
+        }
+        finally
+        {
+            await cancellation.CancelAsync();
+            try { await running; } catch (OperationCanceledException) { }
+            Directory.Delete(root, true);
+        }
+
+        async Task<ProtocolEnvelope> ReadDeals()
+        {
+            while (true)
+            {
+                var item = await client.Events.ReadAsync(cancellation.Token);
+                if (item.Kind == "deals") return item;
+            }
+        }
     }
 }

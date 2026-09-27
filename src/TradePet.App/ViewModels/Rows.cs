@@ -89,7 +89,7 @@ public sealed class PlanItemRowViewModel : ObservableObject
     }
 }
 
-public sealed class LossZoneRowViewModel(LossZoneState zone)
+public sealed class LossZoneRowViewModel(LossZoneState zone, int serverUtcOffsetSeconds = 0)
 {
     private readonly decimal _low = zone.CenterPrice - zone.Tolerance;
     private readonly decimal _high = zone.CenterPrice + zone.Tolerance;
@@ -102,12 +102,12 @@ public sealed class LossZoneRowViewModel(LossZoneState zone)
     public string Attempts { get; } = $"尝试 {zone.AttemptCount} 次 / 亏损 {zone.LossCount} 次";
     public string Loss { get; } = $"累计 {zone.CumulativeLoss:0.##}";
     public string LossColor { get; } = FinancialPalette.Loss;
-    public string LastTime { get; } = zone.LastAttemptAtUtc.ToLocalTime().ToString("HH:mm:ss");
+    public string LastTime { get; } = zone.LastAttemptAtUtc.ToOffset(TimeSpan.FromSeconds(serverUtcOffsetSeconds)).ToString("HH:mm:ss");
 }
 
-public sealed class TimelineRowViewModel(TimelineEvent timelineEvent)
+public sealed class TimelineRowViewModel(TimelineEvent timelineEvent, int serverUtcOffsetSeconds = 0)
 {
-    public string Time { get; } = timelineEvent.OccurredAtUtc.ToLocalTime().ToString("HH:mm:ss");
+    public string Time { get; } = timelineEvent.OccurredAtUtc.ToOffset(TimeSpan.FromSeconds(serverUtcOffsetSeconds)).ToString("HH:mm:ss");
     public string Kind { get; } = timelineEvent.Kind switch
     {
         TimelineKind.Connected => "已连接",
@@ -223,9 +223,10 @@ public sealed class ReviewTradeRowViewModel : ObservableObject
     public ReviewTradeRowViewModel(
         TradeRecord trade,
         TradeReviewMetadata? metadata,
-        Func<TradeReviewMetadata, Task> save)
+        Func<TradeReviewMetadata, Task> save, int serverUtcOffsetSeconds = 0)
     {
         Trade = trade;
+        Time = trade.OpenedAtUtc.ToOffset(TimeSpan.FromSeconds(serverUtcOffsetSeconds)).ToString("MM-dd HH:mm");
         Metadata = metadata;
         _save = save;
         _complianceStatus = metadata?.ComplianceStatus ?? PlanComplianceStatus.Unclassified;
@@ -238,7 +239,7 @@ public sealed class ReviewTradeRowViewModel : ObservableObject
     public TradeRecord Trade { get; }
     public TradeReviewMetadata? Metadata { get; private set; }
     public long PositionId => Trade.PositionId;
-    public string Time => Trade.OpenedAtUtc.ToLocalTime().ToString("MM-dd HH:mm");
+    public string Time { get; }
     public string Symbol => Trade.Symbol;
     public string Side => Trade.Side == TradeSide.Buy ? "买入" : "卖出";
     public string Pnl => $"{(Trade.NetPnl >= 0m ? "+" : string.Empty)}{Trade.NetPnl:0.##}";

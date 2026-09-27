@@ -69,6 +69,9 @@ public sealed class MainViewModel : ObservableObject
     private string? _selectedTerminalPath;
     private TradingPlatform _selectedPlatform;
     private bool _supportsTradeHistory = true;
+    private bool _isMt4;
+    public bool IsMt4 { get => _isMt4; set => SetProperty(ref _isMt4, value); }
+    public int ServerUtcOffsetSeconds { get; set; }
     public bool SupportsTradeHistory { get => _supportsTradeHistory; set { if (SetProperty(ref _supportsTradeHistory, value)) RaisePropertyChanged(nameof(MonitoringOnly)); } }
     public bool MonitoringOnly => !SupportsTradeHistory;
     public bool NeedsSetup { get; set; } = true;
@@ -495,7 +498,7 @@ public sealed class MainViewModel : ObservableObject
         foreach (var trade in trades.OrderByDescending(item => item.OpenedAtUtc))
         {
             metadata.TryGetValue(trade.PositionId, out var item);
-            ReviewTrades.Add(new ReviewTradeRowViewModel(trade, item, save));
+            ReviewTrades.Add(new ReviewTradeRowViewModel(trade, item, save, ServerUtcOffsetSeconds));
         }
     }
 

@@ -21,7 +21,7 @@
             <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
             <StackPanel>
                 <TextBlock Text="宏观日历" Foreground="#F2F5F4" FontSize="24" FontWeight="Bold" />
-                <TextBlock Text="来自 MT5 内置经济日历 · 时间按当前交易服务器显示" Style="{StaticResource Muted}" Margin="0,5,0,0" />
+                <TextBlock x:Name="SourceText" Text="来自 MT5 内置经济日历 · 时间按当前交易服务器显示" Style="{StaticResource Muted}" Margin="0,5,0,0" />
             </StackPanel>
             <Border Grid.Column="1" Background="#1A2A39" CornerRadius="12" Padding="11,6" VerticalAlignment="Top">
                 <TextBlock x:Name="SummaryText" Foreground="#65D9BE" FontWeight="SemiBold" />
@@ -64,7 +64,7 @@
         </Border>
 
         <Grid Grid.Row="2">
-            <TextBlock Text="高重要度事件会在 30 分钟和 5 分钟前由宠物提醒；公布值更新后再提醒一次。" Style="{StaticResource Muted}" VerticalAlignment="Center" />
+            <TextBlock x:Name="ReminderText" Text="高重要度事件会在 30 分钟和 5 分钟前由宠物提醒；公布值更新后再提醒一次。" Style="{StaticResource Muted}" VerticalAlignment="Center" />
             <Button Content="关闭" HorizontalAlignment="Right" Padding="18,7" Click="Close_Click" />
         </Grid>
     </Grid>

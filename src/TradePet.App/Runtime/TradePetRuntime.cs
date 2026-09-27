@@ -108,6 +108,9 @@ public sealed class TradePetRuntime : IAsyncDisposable
     private readonly Queue<string> _recentPetAdviceKeys = new();
     private ITradingWorkerClient? _worker;
     private TradingPlatform _activePlatform;
+    private bool _mt4HistoryAvailable;
+    private bool _mt4HistoryReady;
+    private string? _mt4CalendarStatus;
     private int _setupVersion;
     private Mt5TerminalInstallation? _terminal;
     private AccountSnapshot? _account;
@@ -345,7 +348,11 @@ public sealed class TradePetRuntime : IAsyncDisposable
         StartBackgroundTask("宏观事件提醒", RunMacroCalendarMonitorAsync);
 
         _activePlatform = _viewModel.SelectedPlatform;
-        await OnUiAsync(() => _viewModel.SupportsTradeHistory = _activePlatform != TradingPlatform.Mt4);
+        await OnUiAsync(() =>
+        {
+            _viewModel.IsMt4 = _activePlatform == TradingPlatform.Mt4;
+            _viewModel.SupportsTradeHistory = !_viewModel.IsMt4;
+        });
         var selectedTerminalPath = _viewModel.SelectedTerminalPath;
         var terminals = _terminalDiscovery.Discover(selectedTerminalPath, _activePlatform);
         await OnUiAsync(() =>
@@ -386,8 +393,9 @@ public sealed class TradePetRuntime : IAsyncDisposable
             {
                 _viewModel.ConnectionText = "等待 MT4 只读插件";
                 _viewModel.BridgeText = "MT4 插件等待挂图";
-                _viewModel.ReviewSyncText = "MT4 当前仅支持实时监控，未接入成交历史";
+                _viewModel.ReviewSyncText = "等待 MT4 历史快照；请在终端账户历史中选择全部历史";
             });
+            StartBackgroundTask("MT4 公开经济周历", RunMt4CalendarAsync);
             return;
         }
 
@@ -533,11 +541,6 @@ public sealed class TradePetRuntime : IAsyncDisposable
 
     public async Task TogglePlanRecordingAsync()
     {
-        if (_activePlatform == TradingPlatform.Mt4)
-        {
-            await ShowSpeechAsync("MT4 暂不支持图表计划。", "当前可使用实时持仓与浮亏监控。", TimeSpan.FromSeconds(6));
-            return;
-        }
         await using var operationLease = await EnterRuntimeOperationAsync(
             MaintenanceOperationKind.Read, _cancellation.Token);
         await _stateGate.WaitAsync(_cancellation.Token);
@@ -571,11 +574,6 @@ public sealed class TradePetRuntime : IAsyncDisposable
 
     public async Task ImportCurrentChartAsync()
     {
-        if (_activePlatform == TradingPlatform.Mt4)
-        {
-            await ShowSpeechAsync("MT4 暂不支持图表导入。", "当前可使用实时持仓与浮亏监控。", TimeSpan.FromSeconds(6));
-            return;
-        }
         await using var operationLease = await EnterRuntimeOperationAsync(
             MaintenanceOperationKind.Write, _cancellation.Token);
         await _stateGate.WaitAsync(_cancellation.Token);
@@ -935,6 +933,17 @@ public sealed class TradePetRuntime : IAsyncDisposable
                             case "deals":
                                 await HandleDealsAsync(Mt5PayloadMapper.MapDealBatch(envelope));
                                 break;
+                            case "chart_snapshot" when _activePlatform == TradingPlatform.Mt4:
+                                await HandleChartSnapshotAsync(BridgePayloadMapper.MapChartSnapshot(envelope));
+                                break;
+                            case "history_status" when _activePlatform == TradingPlatform.Mt4:
+                                _mt4HistoryReady = envelope.Payload.GetProperty("ready").GetBoolean() && _hasInitialDeals;
+                                await OnUiAsync(() =>
+                                {
+                                    _viewModel.SupportsTradeHistory = _mt4HistoryAvailable && _mt4HistoryReady;
+                                    _viewModel.ReviewSyncText = envelope.Payload.GetProperty("message").GetString() ?? "";
+                                });
+                                break;
                             case "error":
                                 AppLog.Write($"Worker error: {envelope.Payload}");
                                 UpdateDiagnostic("数据采集发生错误，正在尝试恢复。");
@@ -1043,7 +1052,7 @@ public sealed class TradePetRuntime : IAsyncDisposable
     {
         var transient = envelope.Kind is "hello" or "connection" or "snapshot" or "deals" or "error" or
             "heartbeat" or "trade_dirty" or "chart_snapshot" or "chart_upsert" or "chart_delete" or
-            "calendar_snapshot";
+            "calendar_snapshot" or "history_status";
         if (!transient && _persistenceAvailable)
         {
             return await _database.TryMarkEventProcessedAsync(
@@ -1069,13 +1078,18 @@ public sealed class TradePetRuntime : IAsyncDisposable
                                      connectionError.ValueKind == JsonValueKind.String &&
                                      connectionError.GetString() == "terminal_not_running";
             _workerSession.Disconnect();
+            _mt4HistoryReady = false;
             _suppressNextFloatingLossNotification = true;
             _historySyncTracker.Reset();
             _petState = _petBehavior.ApplySignal(_petState, PetSignal.Disconnected, _timeProvider.GetUtcNow());
             await OnUiAsync(() =>
             {
                 _viewModel.ConnectionText = waitingForTerminal ? "等待手动启动交易终端" : "交易终端已断开";
-                if (_activePlatform == TradingPlatform.Mt4) _viewModel.BridgeText = "MT4 插件未连接或数据已过期";
+                if (_activePlatform == TradingPlatform.Mt4)
+                {
+                    _viewModel.SupportsTradeHistory = false;
+                    _viewModel.BridgeText = "MT4 插件未连接或数据已过期";
+                }
                 _viewModel.PositionDataStale = true;
                 _viewModel.RiskText = _viewModel.ConnectionText;
                 _viewModel.PetActivity = _petState.Current.Activity;
@@ -1100,17 +1114,34 @@ public sealed class TradePetRuntime : IAsyncDisposable
 
     private async Task HandleSnapshotAsync(Mt5SnapshotBatch batch)
     {
+        if (_activePlatform == TradingPlatform.Mt4)
+        {
+            _mt4HistoryAvailable = batch.SupportsOrderHistory;
+            await OnUiAsync(() =>
+            {
+                _viewModel.SupportsTradeHistory = _mt4HistoryAvailable && _mt4HistoryReady;
+                _viewModel.BridgeText = _mt4HistoryAvailable ? "MT4 历史与图表插件已连接" : "MT4 插件待升级或等待报价校时";
+            });
+        }
         ServerClockUpdate? clockUpdate = null;
         if (batch.ServerUtcOffsetSeconds is { } detectedOffset)
         {
             clockUpdate = _serverClock.ApplyWorkerOffset(detectedOffset);
         }
+        await OnUiAsync(() =>
+        {
+            _viewModel.ServerUtcOffsetSeconds = _serverUtcOffsetSeconds;
+            _viewModel.ReviewWorkspace.ServerUtcOffsetSeconds = _serverUtcOffsetSeconds;
+        });
         var accountChanged = _account?.Scope.AccountKey != batch.Account.Scope.AccountKey;
         var suppressFloatingLossNotification =
             _suppressNextFloatingLossNotification || accountChanged || !_hasInitialSnapshot ||
             _workerSessionPhase != WorkerSessionPhase.Live;
         if (accountChanged)
         {
+            _mt4HistoryReady = false;
+            _chartObjects.Clear();
+            if (_activePlatform == TradingPlatform.Mt4) await OnUiAsync(() => _viewModel.SupportsTradeHistory = false);
             await OnUiAsync(() => _viewModel.ResetReviewForAccountChange(
                 "账户已切换，正在读取对应复盘数据。"));
             _tradeDetailCancellation?.Cancel();
@@ -1162,10 +1193,10 @@ public sealed class TradePetRuntime : IAsyncDisposable
                 _viewModel.ConnectionText = "交易终端已连接 · 当前仅监控持仓";
                 _viewModel.DiagnosticText =
                     _activePlatform == TradingPlatform.Mt4
-                        ? "MT4 已接入账户、持仓、挂单与浮亏监控；成交历史、完整复盘、日历和日报暂不支持。"
+                        ? "MT4 实时监控已连接；请更新桥接插件并等待报价校时后启用历史、复盘和日报。"
                         : "完整交易复盘目前只支持 MT5 对冲账户；当前账户继续提供持仓和账户浮亏监控。";
                 _viewModel.ClearReview(_activePlatform == TradingPlatform.Mt4
-                    ? "MT4 成交历史尚未接入，不生成完整交易统计。"
+                    ? "等待 MT4 历史插件与服务器时间就绪。"
                     : "当前账户不是对冲模式，完整交易复盘已停用，避免生成错误统计。");
                 if (_activePlatform == TradingPlatform.Mt4) _viewModel.BridgeText = "MT4 只读插件已连接";
             });
@@ -1189,7 +1220,7 @@ public sealed class TradePetRuntime : IAsyncDisposable
         if ((accountChanged || clockUpdate?.ContextChanged == true) && batch.ServerUtcOffsetSeconds is not null)
         {
             await PersistServerTimeSegmentAsync(ReviewTimeBasis.EstimatedBrokerServer,
-                _activePlatform == TradingPlatform.Mt4 ? "mt4-ea-snapshot-v1" : "mt5-python-worker-v1");
+                _activePlatform == TradingPlatform.Mt4 ? "mt4-ea-snapshot-v2" : "mt5-python-worker-v1");
         }
         if (_serverDateAuthoritative || _activePlatform == TradingPlatform.Mt4)
         {
@@ -1223,14 +1254,14 @@ public sealed class TradePetRuntime : IAsyncDisposable
             }
         }
 
-        _workerSession.MarkSnapshotReceived(requiresDealHistory: _activePlatform != TradingPlatform.Mt4);
-        if (_activePlatform == TradingPlatform.Mt4)
+        _workerSession.MarkSnapshotReceived(requiresDealHistory: _activePlatform != TradingPlatform.Mt4 || _mt4HistoryAvailable);
+        if (_activePlatform == TradingPlatform.Mt4 && !_mt4HistoryAvailable)
         {
             await OnUiAsync(() =>
             {
                 _viewModel.FloatingPnl = batch.Account.FloatingPnl;
                 _viewModel.RiskText = "MT4 · 实时持仓监控";
-                _viewModel.ReviewSyncText = "MT4 · 成交历史暂未接入";
+                _viewModel.ReviewSyncText = "MT4 · 更新插件并等待报价校时后读取历史";
                 _viewModel.ServerDateText = batch.ServerUtcOffsetSeconds is null ? "等待 MT4 报价校时" : _serverDate.ToString("yyyy-MM-dd");
             });
             await EvaluateFloatingLossAlertsAsync(batch.Account, suppressFloatingLossNotification);
@@ -1261,7 +1292,7 @@ public sealed class TradePetRuntime : IAsyncDisposable
 
         await UpdateSymbolSpecificationsAsync(_account.Scope.AccountKey, batch.SymbolSpecifications);
 
-        var recovery = _workerSessionPhase != WorkerSessionPhase.Live || !_hasInitialDeals ||
+        var recovery = batch.IsRecovery || _workerSessionPhase != WorkerSessionPhase.Live || !_hasInitialDeals ||
                        batch.HistoryProgress is not null;
         HistorySyncState? historyState = null;
         if (batch.HistoryProgress is not null)
@@ -1372,6 +1403,11 @@ public sealed class TradePetRuntime : IAsyncDisposable
         }
 
         _workerSession.MarkDealsReceived();
+        if (_activePlatform == TradingPlatform.Mt4)
+        {
+            _mt4HistoryReady = true;
+            await OnUiAsync(() => _viewModel.SupportsTradeHistory = _mt4HistoryAvailable);
+        }
         if (projection.AffectsCurrentServerDate)
         {
             await SampleEquityAsync(_account, _positions.Count > 0, force: true);
@@ -1651,7 +1687,7 @@ public sealed class TradePetRuntime : IAsyncDisposable
             await OnUiAsync(() =>
             {
                 if (_account?.Scope.AccountKey != accountKey || _cancellation.IsCancellationRequested) return;
-                var window = new QuickReviewWindow(detail);
+                var window = new QuickReviewWindow(detail, _serverUtcOffsetSeconds);
                 _quickReviewWindow = window;
                 window.Completed += response =>
                 {
@@ -1694,7 +1730,7 @@ public sealed class TradePetRuntime : IAsyncDisposable
 
     private async Task RecalculateDailyAsync(bool isRecovery)
     {
-        if (_activePlatform == TradingPlatform.Mt4) return;
+        if (_activePlatform == TradingPlatform.Mt4 && (!_mt4HistoryAvailable || !_mt4HistoryReady || !_hasInitialDeals)) return;
         if (_account is null)
         {
             return;
@@ -1980,6 +2016,8 @@ public sealed class TradePetRuntime : IAsyncDisposable
         await OnUiAsync(() =>
         {
             _viewModel.BridgeText = "桥接插件已连接";
+            _viewModel.ServerUtcOffsetSeconds = _serverUtcOffsetSeconds;
+            _viewModel.ReviewWorkspace.ServerUtcOffsetSeconds = _serverUtcOffsetSeconds;
             _viewModel.ServerDateText = _serverDate.ToString("yyyy-MM-dd");
         });
         if (dateChanged && previousDateWasAuthoritative && previousServerDate < _serverDate)
@@ -2041,6 +2079,8 @@ public sealed class TradePetRuntime : IAsyncDisposable
     private async Task HandleChartSnapshotAsync(BridgeChartSnapshot snapshot)
     {
         _hostChartId = snapshot.HostChartId;
+        var previousHashes = _chartObjects.Values.Where(item => item.TerminalId == snapshot.TerminalId)
+            .ToDictionary(item => item.ObjectKey, BridgePayloadMapper.ComputeContentHash, StringComparer.Ordinal);
         var nextKeys = snapshot.Objects.Select(item => item.ObjectKey).ToHashSet(StringComparer.Ordinal);
         var removed = _chartObjects.Values
             .Where(item => item.TerminalId == snapshot.TerminalId &&
@@ -2061,7 +2101,10 @@ public sealed class TradePetRuntime : IAsyncDisposable
         foreach (var chartObject in snapshot.Objects)
         {
             _chartObjects[chartObject.ObjectKey] = chartObject;
-            if (_planItems.ContainsKey(chartObject.ObjectKey))
+            if ((_planItems.ContainsKey(chartObject.ObjectKey) || _viewModel.IsPlanRecording) &&
+                (!previousHashes.TryGetValue(chartObject.ObjectKey, out var previousHash) ||
+                 previousHash != BridgePayloadMapper.ComputeContentHash(chartObject) ||
+                 !_planItems.ContainsKey(chartObject.ObjectKey)))
             {
                 await HandleChartObjectAsync(chartObject);
             }
@@ -2077,7 +2120,7 @@ public sealed class TradePetRuntime : IAsyncDisposable
     {
         if (!_macroCalendarSnapshotReceived)
         {
-            AppLog.Write($"MT5 economic calendar snapshot received: {snapshot.Events.Count} events.");
+            AppLog.Write($"Economic calendar snapshot received: {snapshot.Events.Count} events.");
             _macroCalendarSnapshotReceived = true;
         }
         var previous = _economicCalendarEvents.ToDictionary(item => item.ValueId);
@@ -2109,19 +2152,15 @@ public sealed class TradePetRuntime : IAsyncDisposable
 
     public void ShowMacroCalendar()
     {
-        if (_activePlatform == TradingPlatform.Mt4)
-        {
-            _viewModel.DiagnosticText = "MT4 暂不提供经济日历。";
-            _viewModel.ShowMainWindow?.Invoke();
-            return;
-        }
         if (_macroCalendarWindow is { IsVisible: true })
         {
             _macroCalendarWindow.Activate();
             return;
         }
 
-        var window = new MacroCalendarWindow(_economicCalendarEvents, _serverUtcOffsetSeconds);
+        var window = new MacroCalendarWindow(_economicCalendarEvents, _serverUtcOffsetSeconds,
+            weeklyCalendar: _activePlatform == TradingPlatform.Mt4);
+        if (_activePlatform == TradingPlatform.Mt4 && _mt4CalendarStatus is not null) window.SetLoadStatus(_mt4CalendarStatus);
         _macroCalendarWindow = window;
         window.Closed += (_, _) =>
         {
@@ -2280,7 +2319,7 @@ public sealed class TradePetRuntime : IAsyncDisposable
             _viewModel.Timeline.Clear();
             foreach (var item in timeline)
             {
-                _viewModel.Timeline.Add(new TimelineRowViewModel(item));
+                _viewModel.Timeline.Add(new TimelineRowViewModel(item, _serverUtcOffsetSeconds));
             }
         });
         await UpdateLossZoneUiAsync();
@@ -3663,7 +3702,7 @@ public sealed class TradePetRuntime : IAsyncDisposable
                 saved =>
                 {
                     review.DailyRevision = saved.Revision;
-                    review.DailyStatus = $"已完成 · {saved.ReviewedAtUtc:yyyy-MM-dd HH:mm}";
+                    review.DailyStatus = $"已完成 · {saved.ReviewedAtUtc?.ToOffset(TimeSpan.FromSeconds(_serverUtcOffsetSeconds)):yyyy-MM-dd HH:mm} 服务器";
                 });
             review.StatusText = acknowledged
                 ? $"{date:yyyy-MM-dd} 日总结已完成并冻结当前数据版本。"
@@ -4368,20 +4407,27 @@ public sealed class TradePetRuntime : IAsyncDisposable
             return;
         }
         var paths = RuntimePaths.Resolve();
-        if (!File.Exists(paths.HistoryWorkerScript))
+        if (_activePlatform != TradingPlatform.Mt4 && !File.Exists(paths.HistoryWorkerScript))
         {
             review.ReplayStatus = "历史行情脚本缺失，请重新构建或安装应用。";
             return;
         }
-        review.ReplayStatus = "正在从指定 MT5 终端读取历史行情…";
+        if (_activePlatform == TradingPlatform.Mt4 && review.ReplayPrecision == "Tick")
+        {
+            review.ReplayStatus = "MT4 不提供历史 Tick，请选择 K 线回放。";
+            return;
+        }
+        review.ReplayStatus = "正在从所选交易终端读取历史行情…";
         var from = detail.Trade.OpenedAtUtc.AddHours(-1);
         var to = (detail.Trade.ClosedAtUtc ?? detail.Trade.OpenedAtUtc.AddHours(4)).AddHours(1);
         var precision = review.ReplayPrecision == "Tick" ? MarketDataPrecision.Ticks : MarketDataPrecision.Bars;
         var request = new MarketHistoryRequest(
             Guid.NewGuid().ToString("N"), _terminal.TerminalId, accountKey, detail.Trade.Symbol, "M5",
             from, to, precision);
-        var client = new Mt5HistoryClient(new Mt5HistoryOptions(
-            paths.PythonExecutable, paths.HistoryWorkerScript, _terminal.TerminalPath, _terminal.TerminalId));
+        IMarketHistorySource client = _activePlatform == TradingPlatform.Mt4
+            ? new TradePet.Infrastructure.Mt4.Mt4MarketHistoryClient(_terminal.TerminalPath, _terminal.DataDirectory!, _serverUtcOffsetSeconds)
+            : new Mt5HistoryClient(new Mt5HistoryOptions(
+                paths.PythonExecutable, paths.HistoryWorkerScript, _terminal.TerminalPath, _terminal.TerminalId));
         var service = new TradeReplayService(_database, client);
         var history = await service.LoadAsync(request, _cancellation.Token);
         _lastReplayHistory = history;
@@ -5047,7 +5093,7 @@ public sealed class TradePetRuntime : IAsyncDisposable
             kind,
             summary,
             "{}");
-        await OnUiAsync(() => _viewModel.Timeline.Insert(0, new TimelineRowViewModel(item)));
+        await OnUiAsync(() => _viewModel.Timeline.Insert(0, new TimelineRowViewModel(item, _serverUtcOffsetSeconds)));
         await TryPersistLiveAsync(
             () => _database.AddTimelineEventAsync(item, _cancellation.Token),
             "保存时间线");
@@ -5060,7 +5106,7 @@ public sealed class TradePetRuntime : IAsyncDisposable
             _viewModel.Positions.Clear();
             foreach (var position in positions.OrderBy(item => item.OpenedAtUtc))
             {
-                _viewModel.Positions.Add(new PositionRowViewModel(position, showDuration: _activePlatform != TradingPlatform.Mt4));
+                _viewModel.Positions.Add(new PositionRowViewModel(position, showDuration: _serverDateAuthoritative));
             }
             _viewModel.HasPositions = positions.Count > 0;
             _viewModel.OpenPositionCount = positions.Count;
@@ -5274,24 +5320,24 @@ public sealed class TradePetRuntime : IAsyncDisposable
             _viewModel.LossZones.Clear();
             foreach (var zone in visibleZones)
             {
-                _viewModel.LossZones.Add(new LossZoneRowViewModel(zone));
+                _viewModel.LossZones.Add(new LossZoneRowViewModel(zone, _serverUtcOffsetSeconds));
             }
         });
         if (_account is not null)
         {
+            var chartZones = visibleZones.Select(zone => new BridgeLossZone(
+                zone.Id, zone.Symbol, zone.CenterPrice - zone.Tolerance, zone.CenterPrice,
+                zone.CenterPrice + zone.Tolerance, zone.AttemptCount, zone.LossCount, zone.CumulativeLoss)).ToArray();
+            if (_worker is TradePet.Infrastructure.Mt4.Mt4FileClient mt4)
+            {
+                await mt4.SetLossZonesAsync(_account.Scope.AccountKey, _serverDate, chartZones, _cancellation.Token);
+                return;
+            }
             _bridge.SetLossZones(
                 _terminal?.TerminalPath ?? string.Empty,
                 _account.Scope.AccountKey,
                 _serverDate,
-                visibleZones.Select(zone => new BridgeLossZone(
-                    zone.Id,
-                    zone.Symbol,
-                    zone.CenterPrice - zone.Tolerance,
-                    zone.CenterPrice,
-                    zone.CenterPrice + zone.Tolerance,
-                    zone.AttemptCount,
-                    zone.LossCount,
-                    zone.CumulativeLoss)).ToArray());
+                chartZones);
         }
     }
 
@@ -5519,7 +5565,8 @@ public sealed class TradePetRuntime : IAsyncDisposable
         while (!cancellationToken.IsCancellationRequested)
         {
             await _scheduler.DelayAsync(TimeSpan.FromSeconds(30), cancellationToken);
-            if (_activePlatform == TradingPlatform.Mt4 || !_viewModel.DailyReportEnabled || !_serverDateAuthoritative || _account is null ||
+            if (!_viewModel.DailyReportEnabled || !_serverDateAuthoritative || _account is null ||
+                (_activePlatform == TradingPlatform.Mt4 && (!_mt4HistoryAvailable || !_mt4HistoryReady || !_hasInitialDeals)) ||
                 !TryParseDailyReportTime(_viewModel.DailyReportTimeText, out var reportTime))
             {
                 continue;
@@ -5533,6 +5580,37 @@ public sealed class TradePetRuntime : IAsyncDisposable
             }
 
             await OfferDailyTradingReportAsync(_serverDate);
+        }
+    }
+
+    private async Task RunMt4CalendarAsync(CancellationToken cancellationToken)
+    {
+        using var http = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(20) };
+        var calendar = new TradePet.Infrastructure.Mt4.WeeklyCalendarClient(http);
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                var events = await calendar.FetchAsync(cancellationToken);
+                await using var operationLease = await EnterRuntimeOperationAsync(MaintenanceOperationKind.Write, cancellationToken);
+                await _stateGate.WaitAsync(cancellationToken);
+                try
+                {
+                    if (_activePlatform != TradingPlatform.Mt4) return;
+                    await HandleEconomicCalendarAsync(new(_terminal?.TerminalId ?? "", _serverUtcOffsetSeconds, events));
+                    _mt4CalendarStatus = null;
+                }
+                finally { _stateGate.Release(); }
+            }
+            catch (Exception exception) when (!cancellationToken.IsCancellationRequested &&
+                exception is System.Net.Http.HttpRequestException or TaskCanceledException or System.Text.Json.JsonException
+                    or InvalidDataException or InvalidOperationException or KeyNotFoundException or FormatException or OverflowException)
+            {
+                AppLog.Write($"MT4 weekly calendar could not refresh: {exception.Message}");
+                _mt4CalendarStatus = "公开周历更新失败；已有数据可能过期，稍后自动重试";
+                await OnUiAsync(() => _macroCalendarWindow?.SetLoadStatus(_mt4CalendarStatus));
+            }
+            await _scheduler.DelayAsync(TimeSpan.FromMinutes(15), cancellationToken);
         }
     }
 
@@ -5596,14 +5674,14 @@ public sealed class TradePetRuntime : IAsyncDisposable
 
     private async Task ShowDailyTradingReportAsync(DateOnly date, bool automatic)
     {
-        if (_activePlatform == TradingPlatform.Mt4)
+        if (_activePlatform == TradingPlatform.Mt4 && (!_mt4HistoryAvailable || !_mt4HistoryReady || !_hasInitialDeals))
         {
-            if (!automatic) await ShowSpeechAsync("MT4 日报暂不可用。", "成交历史尚未接入，当前提供实时持仓与浮亏监控。", TimeSpan.FromSeconds(7));
+            if (!automatic) await ShowSpeechAsync("MT4 日报正在等待历史数据。", "请更新桥接插件并选择全部账户历史；首次运行需等待报价校时。", TimeSpan.FromSeconds(7));
             return;
         }
         if (_account is null || !_serverDateAuthoritative)
         {
-            await ShowSpeechAsync("日报还不能生成。", "等待 MT5 账户和服务器时间连接完成。", TimeSpan.FromSeconds(7));
+            await ShowSpeechAsync("日报还不能生成。", "等待交易账户和服务器时间连接完成。", TimeSpan.FromSeconds(7));
             return;
         }
 
@@ -5636,8 +5714,15 @@ public sealed class TradePetRuntime : IAsyncDisposable
                 }
             }
 
+            var reportOffsetSeconds = _serverUtcOffsetSeconds;
+            // Include adjacent stored dates so a corrected server offset cannot
+            // omit trades or observations that belong to this report day.
             var data = await _reviewRepository.LoadWorkspaceAsync(
-                accountKey, date, date, _cancellation.Token);
+                accountKey,
+                date == DateOnly.MinValue ? date : date.AddDays(-1),
+                date == DateOnly.MaxValue ? date : date.AddDays(1),
+                _cancellation.Token);
+            data = DailyReportAnalyzer.NormalizeServerDates(data, reportOffsetSeconds);
             if (_account?.Scope.AccountKey != accountKey)
             {
                 return;
@@ -5652,7 +5737,7 @@ public sealed class TradePetRuntime : IAsyncDisposable
                 data.Documents,
                 data.Behaviors,
                 data.DailyStates ?? new Dictionary<DateOnly, DailyState>(),
-                _serverUtcOffsetSeconds)[date];
+                reportOffsetSeconds)[date];
             var completed = data.Trades
                 .Where(item => item.AccountKey == accountKey && item.IsComplete && item.CloseServerDate == date)
                 .OrderBy(item => item.ClosedAtUtc)
@@ -5695,11 +5780,12 @@ public sealed class TradePetRuntime : IAsyncDisposable
                 behaviorAlerts,
                 facts.CooldownViolationCount,
                 string.Empty);
+            report = report with { Analysis = DailyReportAnalyzer.Analyze(data with { Currency = report.Currency }, facts, report.IsLive) };
             var markdown = BuildDailyReportMarkdown(data, facts, report);
             var archivePath = await ArchiveDailyReportAsync(report, markdown);
             report = report with { Markdown = markdown, ArchivePath = archivePath };
 
-            await OnUiAsync(() => ShowDailyReportWindow(report));
+            await OnUiAsync(() => ShowDailyReportWindow(report, activate: !automatic));
             _dailyReportsShownThisRun.Add(runKey);
             if (automatic && _persistenceAvailable)
             {
@@ -5727,7 +5813,7 @@ public sealed class TradePetRuntime : IAsyncDisposable
         }
     }
 
-    private void ShowDailyReportWindow(DailyTradingReport report)
+    private void ShowDailyReportWindow(DailyTradingReport report, bool activate)
     {
         var previous = _dailyReportWindow;
         _dailyReportWindow = null;
@@ -5744,7 +5830,7 @@ public sealed class TradePetRuntime : IAsyncDisposable
         };
         window.OpenReviewRequested += (_, _) => _ = OpenDailyReportReviewAsync(report.ServerDate);
         window.Show();
-        window.Activate();
+        if (activate) window.Activate();
     }
 
     private async Task OpenDailyReportReviewAsync(DateOnly date)
@@ -5836,6 +5922,7 @@ public sealed class TradePetRuntime : IAsyncDisposable
         builder.AppendLine($"> 生成时间（服务器）：{FormatServerTime(_timeProvider.GetUtcNow(), offset)}  ");
         builder.AppendLine($"> 数据版本：{facts.SourceVersion}");
         builder.AppendLine();
+        if (report.Analysis is not null) builder.Append(report.Analysis.Markdown);
         builder.AppendLine("## 一、核心结果");
         builder.AppendLine();
         builder.AppendLine("| 指标 | 数值 |");
@@ -5849,7 +5936,7 @@ public sealed class TradePetRuntime : IAsyncDisposable
         builder.AppendLine($"| 胜率 | {(report.WinRate is null ? "—" : $"{report.WinRate:0.##}%")} |");
         builder.AppendLine($"| 复盘完成率 | {facts.ReviewCompletionPercentage:0.##}% |");
         builder.AppendLine($"| 连续亏损 | {facts.ConsecutiveLosses} |");
-        builder.AppendLine($"| 冷静期违规 | {facts.CooldownViolationCount} |");
+        builder.AppendLine($"| 冷静期违规提醒（仅注意 / 严重） | {facts.CooldownViolationCount} |");
         builder.AppendLine($"| 行为风险提醒 | {report.BehaviorAlertCount} |");
         builder.AppendLine();
 
@@ -5972,7 +6059,7 @@ public sealed class TradePetRuntime : IAsyncDisposable
         builder.AppendLine("## 八、规则评估");
         builder.AppendLine();
         var assessments = data.Assessments
-            .Where(item => completed.Any(trade => trade.PositionId == item.TradeKey.PositionId))
+            .Where(item => item.TradeKey.AccountKey == report.AccountKey && completed.Any(trade => trade.PositionId == item.TradeKey.PositionId))
             .OrderBy(item => item.TradeKey.PositionId)
             .ThenBy(item => item.RuleId)
             .ToArray();
@@ -6060,7 +6147,7 @@ public sealed class TradePetRuntime : IAsyncDisposable
         builder.AppendLine();
         if (macroEvents.Length == 0)
         {
-            builder.AppendLine("_当前未收到该日的 MT5 宏观事件数据。_");
+            builder.AppendLine("_当前未收到该日的宏观事件数据。MT4 公开周历不回补历史公布值。_");
         }
         else
         {
@@ -6078,7 +6165,9 @@ public sealed class TradePetRuntime : IAsyncDisposable
         builder.AppendLine($"- 服务器 UTC 偏移：{facts.ServerUtcOffsetSeconds} 秒");
         builder.AppendLine($"- 当日是否标记数据缺口：{YesNo(data.DataGapDates.Contains(date))}");
         builder.AppendLine($"- 工作区版本：来源 {data.Version.SourceVersion}，元数据 {data.Version.MetadataVersion}，观察 {data.Version.ObservationVersion}，规则 {data.Version.RuleVersion}，时间 {data.Version.TimeVersion}");
-        builder.AppendLine("- 金额以 MT5 成交和费用记录为准；胜率只统计当日完整平仓的 position；尚未平仓的持仓不会计入胜率。\n");
+        builder.AppendLine(report.AccountKey.StartsWith("MT4:", StringComparison.Ordinal)
+            ? "- MT4 金额以已加载订单的利润、佣金、隔夜费为准；一张已平仓票据计一笔。成交明细的入/出场记账行由订单派生，Deal 列是内部编号，Order/Position 保留原票据。部分平仓不推测合并；历史覆盖未确认。\n"
+            : "- 金额以 MT5 成交和费用记录为准；胜率只统计当日完整平仓的 position；尚未平仓的持仓不会计入胜率。\n");
 
         builder.AppendLine("## 给 AI 的分析任务");
         builder.AppendLine();
@@ -6409,7 +6498,8 @@ public sealed class TradePetRuntime : IAsyncDisposable
         .Where(deal => ResolveServerDate(deal.OccurredAtUtc) == _serverDate)
         .Sum(deal => deal.NetPnl);
 
-    private bool SupportsCompleteTradeProjection => _account?.MarginMode == 2;
+    private bool SupportsCompleteTradeProjection => _account is not null &&
+        (_account.MarginMode == 2 || (_activePlatform == TradingPlatform.Mt4 && _mt4HistoryAvailable));
 
     private decimal ResolveLossZoneTolerance(TradeRecord trade)
     {

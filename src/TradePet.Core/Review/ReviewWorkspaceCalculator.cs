@@ -190,7 +190,8 @@ public sealed class ReviewWorkspaceCalculator
             var openingsAfterLoss = lossThresholdAt is null
                 ? (int?)null
                 : opened.Count(item => item.OpenedAtUtc > lossThresholdAt.Value);
-            var cooldown = dailyBehaviors.Where(item => item.Rule == BehaviorRuleKind.CooldownViolation).ToArray();
+            var cooldown = dailyBehaviors.Where(item => item.Rule == BehaviorRuleKind.CooldownViolation &&
+                item.Level is BehaviorRiskLevel.Attention or BehaviorRiskLevel.Critical).ToArray();
             var timeline = BuildDailyTimeline(
                 date, offset, accountKey, activeDuringDay, opened, completed, dailyDeals, dailyBehaviors);
 

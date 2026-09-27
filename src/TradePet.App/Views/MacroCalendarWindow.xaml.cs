@@ -7,15 +7,24 @@ namespace TradePet.App.Views;
 public partial class MacroCalendarWindow : Window
 {
     private TimeSpan _serverOffset;
+    private readonly bool _weeklyCalendar;
 
-    public MacroCalendarWindow(IReadOnlyList<EconomicCalendarEvent> events, int serverUtcOffsetSeconds)
+    public MacroCalendarWindow(IReadOnlyList<EconomicCalendarEvent> events, int serverUtcOffsetSeconds, bool weeklyCalendar = false)
     {
         InitializeComponent();
+        _weeklyCalendar = weeklyCalendar;
+        if (weeklyCalendar)
+        {
+            SourceText.Text = "Forex Factory 公开周历 · 时间按当前服务器偏移显示 · 不提供实时公布值";
+            ReminderText.Text = "高重要度事件在 30 分钟和 5 分钟前提醒；数值缺失显示 —，周历约每 15 分钟更新。";
+        }
         EventList.ItemsSource = Rows;
         ApplyEvents(events, serverUtcOffsetSeconds);
     }
 
     public ObservableCollection<MacroCalendarRow> Rows { get; } = [];
+
+    public void SetLoadStatus(string status) => SummaryText.Text = status;
 
     public void ApplyEvents(IReadOnlyList<EconomicCalendarEvent> events, int serverUtcOffsetSeconds)
     {
@@ -36,7 +45,7 @@ public partial class MacroCalendarWindow : Window
         var status = item.ActualValue is not null
             ? "已公布"
             : item.ScheduledAtUtc <= now
-                ? "等待公布值"
+                ? _weeklyCalendar ? "周历未提供公布值" : "等待公布值"
                 : $"还有 {FormatRemaining(item.ScheduledAtUtc - now)}";
         return new MacroCalendarRow(
             serverTime.ToString("MM-dd HH:mm"),

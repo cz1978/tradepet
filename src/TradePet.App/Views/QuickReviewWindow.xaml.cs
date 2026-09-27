@@ -8,11 +8,11 @@ namespace TradePet.App.Views;
 public partial class QuickReviewWindow : Window
 {
     private bool _completed;
-    public QuickReviewWindow(TradeDetailData detail)
+    public QuickReviewWindow(TradeDetailData detail, int serverUtcOffsetSeconds = 0)
     {
         InitializeComponent();
         var trade = detail.Trade;
-        TradeText.Text = $"{trade.Symbol} · {trade.NetPnl:+0.##;-0.##;0} · {trade.ClosedAtUtc:yyyy-MM-dd HH:mm}";
+        TradeText.Text = $"{trade.Symbol} · {trade.NetPnl:+0.##;-0.##;0} · {trade.ClosedAtUtc?.ToOffset(TimeSpan.FromSeconds(serverUtcOffsetSeconds)):yyyy-MM-dd HH:mm} 服务器";
         PlanBox.SelectedIndex = detail.Metadata?.ComplianceStatus switch
         {
             PlanComplianceStatus.Matched or PlanComplianceStatus.ManualInside => 0,

@@ -266,9 +266,12 @@
                 <TabItem Header="今日概览">
                     <ScrollViewer VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
                         <StackPanel>
-                            <TextBlock Text="MT4 实时监控 · 持仓与浮亏可用；成交历史尚未接入，今日合计、已实现盈亏与交易统计显示为 —。"
+                            <TextBlock Text="正在等待订单历史和服务器时间。请更新桥接插件；MT4 账户历史请选择全部历史。数据就绪前依赖历史的指标显示为 —。"
                                        TextWrapping="Wrap" Foreground="{StaticResource AccentBrush}" Margin="0,0,0,12"
                                        Visibility="{Binding MonitoringOnly, Converter={StaticResource BoolToVisibility}}" />
+                            <TextBlock Text="MT4 · 时间及交易日以 broker 服务器为准。订单历史、复盘、日报、图表计划和 M5 回放已接入；历史范围取决于终端已加载记录。部分平仓按票据统计；原生历史 Tick 不可回补；公开周历不含实时公布值。"
+                                       TextWrapping="Wrap" Style="{StaticResource MutedTextStyle}" Margin="0,0,0,12"
+                                       Visibility="{Binding IsMt4, Converter={StaticResource BoolToVisibility}}" />
                             <UniformGrid Columns="4" Margin="0,0,0,12">
                                 <Border Style="{StaticResource MetricCardStyle}" Background="{Binding TotalPnlBackground}">
                                     <StackPanel>

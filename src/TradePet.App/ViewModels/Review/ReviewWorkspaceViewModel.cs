@@ -13,6 +13,9 @@ namespace TradePet.App.ViewModels.Review;
 
 public sealed class ReviewWorkspaceViewModel : ObservableObject
 {
+    public int ServerUtcOffsetSeconds { get; set; }
+    private DateTimeOffset BrokerTime(DateTimeOffset value) => value.ToOffset(TimeSpan.FromSeconds(ServerUtcOffsetSeconds));
+    private DateTimeOffset? BrokerTime(DateTimeOffset? value) => value?.ToOffset(TimeSpan.FromSeconds(ServerUtcOffsetSeconds));
     private string _search = string.Empty;
     private string _strategy = string.Empty;
     private string _setup = string.Empty;
@@ -542,6 +545,8 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
         var latestTime = data.ServerTimeSegments?.OrderByDescending(item => item.FromUtc).FirstOrDefault();
         var timeLabel = latestTime is null
             ? "服务器时间来源未知"
+            : data.AccountKey.StartsWith("MT4:", StringComparison.Ordinal)
+                ? $"MT4 服务器时间 UTC{FormatOffset(latestTime.UtcOffsetSeconds)}（历史 UTC 按当前偏移换算）"
             : latestTime.TimeBasis == ReviewTimeBasis.BrokerServer
                 ? $"Bridge 精确服务器时间 UTC{FormatOffset(latestTime.UtcOffsetSeconds)}"
                 : $"worker 推断服务器时间 UTC{FormatOffset(latestTime.UtcOffsetSeconds)}";
@@ -588,7 +593,7 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
                 _ => "待复盘",
             };
             data.Metadata.TryGetValue(trade.PositionId, out var metadata);
-            var row = new WorkspaceTradeRow(trade.PositionId, trade.ClosedAtUtc?.ToString("MM-dd HH:mm") ?? "持仓中",
+            var row = new WorkspaceTradeRow(trade.PositionId, BrokerTime(trade.ClosedAtUtc)?.ToString("MM-dd HH:mm") ?? "持仓中",
                 trade.Symbol, trade.Side == TradeSide.Buy ? "买" : "卖", Signed(trade.NetPnl), status,
                 metadata?.Strategy ?? "未归类", string.Join("、", metadata?.Tags ?? []),
                 FinancialPalette.For(trade.NetPnl), new AsyncRelayCommand(() => OpenTradeAsync?.Invoke(trade.PositionId) ?? Task.CompletedTask));
@@ -642,7 +647,7 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
         EquityCurve.ReplaceWith(equityPoints
             .Where((_, index) => index % equityStride == 0 || index == equityPoints.Count - 1)
             .Select(point => new ReviewEquityRow(
-                point.AtUtc.ToLocalTime().ToString("MM-dd HH:mm:ss"),
+                BrokerTime(point.AtUtc).ToString("MM-dd HH:mm:ss"),
                 point.Equity.ToString("0.##"),
                 point.ObservedDrawdownAmount.ToString("0.##"),
                 point.ObservedDrawdownPercentage?.ToString("0.##") ?? "未知",
@@ -652,7 +657,7 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
         Behaviors.Clear();
         foreach (var item in data.Behaviors.OrderByDescending(item => item.EventAtUtc))
         {
-            Behaviors.Add(new BehaviorOccurrenceRow(item.EventAtUtc.ToString("MM-dd HH:mm"), item.Rule.ToString(),
+            Behaviors.Add(new BehaviorOccurrenceRow(BrokerTime(item.EventAtUtc).ToString("MM-dd HH:mm"), item.Rule.ToString(),
                 item.Level.ToString(), FormatBehaviorSource(item.Source), item.Summary,
                 item.TradeLinks.Count, item.NotificationDisposition,
                 new RelayCommand(() => SelectBehavior(item, data))));
@@ -910,7 +915,7 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
             SelectedPositionId = detail.Trade.PositionId;
             SelectedTradeTitle = $"#{detail.Trade.PositionId} · {detail.Trade.Symbol} · {(detail.Trade.Side == TradeSide.Buy ? "买入" : "卖出")}";
             TradeIdentity = $"账户 {detail.Trade.AccountKey} · 币种 {(string.IsNullOrWhiteSpace(currency) ? "未知" : currency)} · position {detail.Trade.PositionId}";
-            TradeFacts = $"{detail.Trade.OpenedAtUtc:yyyy-MM-dd HH:mm} → {detail.Trade.ClosedAtUtc:yyyy-MM-dd HH:mm} · 入场 {detail.Trade.EntryPrice} · 出场 {detail.Trade.ExitPrice} · 净盈亏 {Signed(detail.Trade.NetPnl)}";
+            TradeFacts = $"{BrokerTime(detail.Trade.OpenedAtUtc):yyyy-MM-dd HH:mm} → {BrokerTime(detail.Trade.ClosedAtUtc):yyyy-MM-dd HH:mm} 服务器 · 入场 {detail.Trade.EntryPrice} · 出场 {detail.Trade.ExitPrice} · 净盈亏 {Signed(detail.Trade.NetPnl)}";
             var plan = detail.Plan;
             var planTiming = plan is null ? string.Empty : plan.CreatedAtUtc <= detail.Trade.OpenedAtUtc ? "盘前记录" : "事后补录";
             PlanFacts = plan is null
@@ -936,12 +941,12 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
             };
             Attachments.ReplaceWith(detail.Attachments.Select(CreateAttachmentRow));
             TradeDeals.ReplaceWith(detail.Deals.OrderBy(item => item.OccurredAtUtc).Select(item => new TradeDealRow(
-                item.OccurredAtUtc.ToString("MM-dd HH:mm:ss"), item.Ticket.ToString(CultureInfo.InvariantCulture),
+                BrokerTime(item.OccurredAtUtc).ToString("MM-dd HH:mm:ss"), item.Ticket.ToString(CultureInfo.InvariantCulture),
                 FormatDealKind(item.EntryKind), item.Volume.ToString("0.#####"), item.Price.ToString("0.#####"),
                 Signed(item.Profit), Signed(item.Commission), Signed(item.Swap), Signed(item.Fee), Signed(item.NetPnl))));
             var process = detail.Deals.Select(item => new TradeProcessRow(
                     item.OccurredAtUtc, FormatDealKind(item.EntryKind),
-                    $"{item.Volume:0.#####} @ {item.Price:0.#####} · 净额 {Signed(item.NetPnl)}", "MT5 成交"))
+                    $"{item.Volume:0.#####} @ {item.Price:0.#####} · 净额 {Signed(item.NetPnl)}", detail.Trade.AccountKey.StartsWith("MT4:", StringComparison.Ordinal) ? "MT4 订单记账" : "MT5 成交"))
                 .Concat(detail.PnlSamples.Select(item => new TradeProcessRow(
                     item.CapturedAtUtc, "持仓观测",
                     $"数量 {item.Volume:0.#####} · 浮动 {Signed(item.FloatingPnl)} · SL {item.StopLoss?.ToString() ?? "未知"} · TP {item.TakeProfit?.ToString() ?? "未知"} · 间隔 {item.GapMilliseconds}ms",
@@ -951,7 +956,7 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
                     $"{item.Summary} · 提醒 {item.NotificationDisposition} · {item.MissingData}", item.Source.ToString())))
                 .OrderBy(item => item.OccurredAtUtc)
                 .ToArray();
-            TradeProcess.ReplaceWith(process);
+            TradeProcess.ReplaceWith(process.Select(item => item with { ServerUtcOffsetSeconds = ServerUtcOffsetSeconds }));
             TagSuggestions.ReplaceWith((tagSuggestions ?? [])
                 .Select(item => new ReviewTagSuggestionRow(
                     item.Tag,
@@ -1244,27 +1249,27 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
         ReplayEvents.Clear();
         foreach (var bar in frame.VisibleBars.TakeLast(80))
         {
-            ReplayEvents.Add($"{bar.OpenedAtUtc:HH:mm} K线已完成 O {bar.Open} H {bar.High} L {bar.Low} C {bar.Close}");
+            ReplayEvents.Add($"{BrokerTime(bar.OpenedAtUtc):HH:mm} K线已完成 O {bar.Open} H {bar.High} L {bar.Low} C {bar.Close}");
         }
         foreach (var tick in frame.VisibleTicks.TakeLast(60))
         {
-            ReplayEvents.Add($"{tick.OccurredAtUtc:HH:mm:ss.fff} 报价 Bid {tick.Bid} Ask {tick.Ask} Last {tick.Last}");
+            ReplayEvents.Add($"{BrokerTime(tick.OccurredAtUtc):HH:mm:ss.fff} 报价 Bid {tick.Bid} Ask {tick.Ask} Last {tick.Last}");
         }
         foreach (var deal in frame.VisibleDeals)
         {
-            ReplayEvents.Add($"{deal.OccurredAtUtc:HH:mm:ss} 成交 #{deal.Ticket} {deal.EntryKind} {deal.Volume}");
+            ReplayEvents.Add($"{BrokerTime(deal.OccurredAtUtc):HH:mm:ss} 成交 #{deal.Ticket} {deal.EntryKind} {deal.Volume}");
         }
         foreach (var behavior in frame.VisibleBehaviors)
         {
-            ReplayEvents.Add($"{behavior.EventAtUtc:HH:mm:ss} 行为 {behavior.Rule} · {behavior.Summary}");
+            ReplayEvents.Add($"{BrokerTime(behavior.EventAtUtc):HH:mm:ss} 行为 {behavior.Rule} · {behavior.Summary}");
         }
         foreach (var note in frame.VisibleNotes)
         {
-            ReplayEvents.Add($"{note.EventAtUtc:HH:mm:ss} 笔记证据 · {note.Source}（记录 {note.RecordedAtUtc:HH:mm:ss}）");
+            ReplayEvents.Add($"{BrokerTime(note.EventAtUtc):HH:mm:ss} 笔记证据 · {note.Source}（记录 {BrokerTime(note.RecordedAtUtc):HH:mm:ss}）");
         }
         if (frame.VisiblePlan is not null)
         {
-            ReplayEvents.Add($"计划可见 · {frame.VisiblePlan.Strategy}/{frame.VisiblePlan.Setup} · 创建 {frame.VisiblePlan.CreatedAtUtc:HH:mm:ss}");
+            ReplayEvents.Add($"计划可见 · {frame.VisiblePlan.Strategy}/{frame.VisiblePlan.Setup} · 创建 {BrokerTime(frame.VisiblePlan.CreatedAtUtc):HH:mm:ss}");
         }
         if (frame.VisibleFinalNetPnl is { } pnl)
         {
@@ -1276,7 +1281,7 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
         }
         var mode = frame.IsFullReviewVisible ? "完整复盘已展开" : "未来结果与事后记录隐藏";
         var gap = string.IsNullOrWhiteSpace(frame.Message) ? string.Empty : $" · {frame.Message}";
-        ReplayStatus = $"{history.Range.Coverage} · K线 {history.Bars.Count} · ticks {history.Ticks.Count} · 游标 {frame.CursorUtc:yyyy-MM-dd HH:mm:ss} · {mode}{gap}";
+        ReplayStatus = $"{history.Range.Coverage} · K线 {history.Bars.Count} · ticks {history.Ticks.Count} · 服务器游标 {BrokerTime(frame.CursorUtc):yyyy-MM-dd HH:mm:ss} · {mode}{gap}";
     }
 
     public void ApplySavedOpportunity(OpportunityRecord opportunity)
@@ -1417,7 +1422,7 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
             : null;
         return new AttachmentRow(
             attachment.Id, attachment.Title, attachment.FileName, attachment.Evidence.Source.ToString(),
-            attachment.CreatedAtUtc.ToString("yyyy-MM-dd HH:mm"), attachment.EventReference, thumbnail,
+            BrokerTime(attachment.CreatedAtUtc).ToString("yyyy-MM-dd HH:mm"), attachment.EventReference, thumbnail,
             new AsyncRelayCommand(() => OpenAttachmentAsync?.Invoke(attachment) ?? Task.CompletedTask),
             new AsyncRelayCommand(() => DeleteAttachmentAsync?.Invoke(attachment) ?? Task.CompletedTask));
     }
@@ -1526,7 +1531,7 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
                 null => "尚未记录",
                 { Status: ReviewCompletionStatus.Reviewed } when
                     (journal.ReviewedSourceVersion ?? journal.SourceVersion) != currentSourceVersion => "日数据更新，需要重审",
-                { Status: ReviewCompletionStatus.Reviewed } => $"已完成 · {journal.ReviewedAtUtc:yyyy-MM-dd HH:mm}",
+                { Status: ReviewCompletionStatus.Reviewed } => $"已完成 · {BrokerTime(journal.ReviewedAtUtc):yyyy-MM-dd HH:mm} 服务器",
                 { Status: ReviewCompletionStatus.NeedsReview } => "日数据更新，需要重审",
                 _ => "草稿",
             };
@@ -1609,7 +1614,7 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
             .OrderByDescending(item => item.ClosedAtUtc)
             .Select(item => new AnalysisTradeRow(
                 item.PositionId,
-                item.ClosedAtUtc?.ToString("yyyy-MM-dd HH:mm") ?? "持仓中",
+                BrokerTime(item.ClosedAtUtc)?.ToString("yyyy-MM-dd HH:mm") ?? "持仓中",
                 item.Symbol,
                 item.Side == TradeSide.Buy ? "买" : "卖",
                 Signed(item.NetPnl),
@@ -1643,11 +1648,11 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
         BehaviorFacts =
             $"事件日 {occurrence.ServerDate:yyyy-MM-dd} · 来源 {FormatBehaviorSource(occurrence.Source)} · 规则版本 {occurrence.RuleVersion}\n" +
             $"事实值 {occurrence.Value:0.####} · 基线 {(occurrence.Baseline is null ? "未知" : occurrence.Baseline.Value.ToString("0.####"))} · 阈值 {occurrence.Threshold:0.####} · {delivery}\n" +
-            $"事件时间 {occurrence.EventAtUtc:O} · 观察时间 {occurrence.ObservedAtUtc:O}\n" +
+            $"服务器事件时间 {BrokerTime(occurrence.EventAtUtc):yyyy-MM-dd HH:mm:ss} · 观察时间 {BrokerTime(occurrence.ObservedAtUtc):yyyy-MM-dd HH:mm:ss}\n" +
             $"证据：{occurrence.Summary}\n缺失：{(string.IsNullOrWhiteSpace(occurrence.MissingData) ? "无" : occurrence.MissingData)}";
         BehaviorReviewStatus = occurrence.HumanReviewedAtUtc is null
             ? "尚未填写人工解释。"
-            : $"人工结论修订 {occurrence.Revision} · {occurrence.HumanReviewedAtUtc:yyyy-MM-dd HH:mm:ss} UTC";
+            : $"人工结论修订 {occurrence.Revision} · {BrokerTime(occurrence.HumanReviewedAtUtc):yyyy-MM-dd HH:mm:ss} 服务器";
         BehaviorTradeLinks.ReplaceWith(occurrence.TradeLinks.Select(link =>
         {
             var trade = data.Trades.FirstOrDefault(item =>
@@ -2623,7 +2628,8 @@ public sealed record TradeDealRow(
     string Commission, string Swap, string Fee, string NetPnl);
 public sealed record TradeProcessRow(DateTimeOffset OccurredAtUtc, string Kind, string Summary, string Source)
 {
-    public string Time => OccurredAtUtc.ToString("MM-dd HH:mm:ss");
+    public int ServerUtcOffsetSeconds { get; init; }
+    public string Time => OccurredAtUtc.ToOffset(TimeSpan.FromSeconds(ServerUtcOffsetSeconds)).ToString("MM-dd HH:mm:ss");
 }
 
 public sealed class ReviewRuleRowViewModel : ObservableObject

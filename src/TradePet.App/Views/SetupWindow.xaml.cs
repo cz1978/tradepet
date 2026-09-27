@@ -42,11 +42,11 @@ public partial class SetupWindow : Window
         _viewModel.SelectedTerminalPath = selected ?? terminals.FirstOrDefault()?.TerminalPath;
         var mt4 = _viewModel.SelectedPlatform == TradingPlatform.Mt4;
         PlatformDescription.Text = mt4
-            ? "MT4 · 只读监控：账户、持仓、挂单和浮亏提醒。成交历史、完整复盘、图表计划、日历与日报暂不支持。无需 Python。"
+            ? "MT4 · 账户、持仓、订单历史复盘、日报、图表计划与亏损区域；经济日历使用公开周历。无需 Python。"
             : "MT5 · 账户与持仓监控；对冲账户支持完整复盘。图表计划和经济日历需要桥接插件。";
         PythonPanel.Visibility = mt4 ? Visibility.Collapsed : Visibility.Visible;
         BridgeInstructions.Text = mt4
-            ? "安装后，在 MT4 导航器的 EA 列表右键刷新，将 TradePet / TradePetBridge 拖到一个图表，并保持该图表打开。\n\n不需要 DLL 权限，不需要允许实盘交易。只在一个图表上运行此插件。"
+            ? "安装或升级后，将新版 TradePet / TradePetBridge 重新挂到一个图表，并保持运行。账户历史中右键选择“全部历史”。\n\n首次运行等待报价校时；休市时可在插件参数填写经纪商当前 UTC 偏移分钟数。无需 DLL 或实盘交易权限。"
             : "安装后，在 MT5 导航器的 EA 列表右键刷新，将 TradePet / TradePetBridge 拖到一个图表。\n\n保持终端和图表打开，看到“桥接插件已连接”即完成。";
     }
 
