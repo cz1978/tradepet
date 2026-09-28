@@ -87,7 +87,7 @@ TradePet 会把完整亏损交易投影为可追溯的价格区域，记录进�
 ### 运行环境
 
 - Windows 10/11 x64
-- MetaTrader 5，或 MetaTrader 4（仅实时监控）
+- MetaTrader 5，或 MetaTrader 4（需挂载对应的只读桥接插件，能力差异见上表）
 - 从源码构建完整发布包时需要 .NET 8 SDK、MT4 和 MT5 自带的 MetaEditor；MT5 采集另需 64 位 Python 3.13，MT4 不需要 Python
 
 ### 从源码构建
