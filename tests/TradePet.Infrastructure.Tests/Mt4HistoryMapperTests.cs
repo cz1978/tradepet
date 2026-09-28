@@ -90,6 +90,8 @@ public sealed class Mt4HistoryMapperTests
         Assert.Throws<InvalidDataException>(() => Mt4HistoryMapper.Read(clock.ToJsonString(), Frame, Terminal, Now));
         Assert.Throws<InvalidDataException>(() => Mt4HistoryMapper.Read(History(Order(51, 0, true), Order(51, 0, false)), Frame, Terminal, Now));
         Assert.Throws<InvalidDataException>(() => Mt4HistoryMapper.Read(History(Order(51, 0, true) with { Volume = -1 }), Frame, Terminal, Now));
+        var updatedFrame = Frame with { Payload = JsonSerializer.SerializeToElement(new { serverUtcOffsetSeconds = 10800, liveOrderSignature = "52:0.2;" }) };
+        Assert.Throws<InvalidDataException>(() => Mt4HistoryMapper.Read(History(Order(51, 0, true)), updatedFrame, Terminal, Now));
     }
 
     private static string History(params RawOrder[] orders) => JsonSerializer.Serialize(new
@@ -104,5 +106,69 @@ public sealed class Mt4HistoryMapperTests
         1.1m, closed ? 1.101m : 0, 0, 0, 0);
 
     private sealed record RawOrder(long Ticket, int Type, string Symbol, decimal Volume, long OpenTime,
-        long CloseTime, decimal OpenPrice, decimal ClosePrice, decimal Profit, decimal Commission, decimal Swap);
+        long CloseTime, decimal OpenPrice, decimal ClosePrice, decimal Profit, decimal Commission, decimal Swap,
+        string Comment = "", int Magic = 0);
+
+    [Fact]
+    public void LinkedPartialClosures_ProjectOnePositionAndPreserveEveryExitTicket()
+    {
+        var batch = Mt4HistoryMapper.Read(History(
+            Order(51, 0, true) with { Volume = .1m, Profit = 10, Comment = "to #52" },
+            Order(52, 0, true) with { Volume = .1m, Profit = -4, Comment = "from #51 to #53" },
+            Order(53, 0, false) with { Volume = .1m, Comment = "from #52" }), Frame, Terminal, Now);
+        var trade = Assert.Single(new TradeProjector().Project(Account, batch.Deals, at => DateOnly.FromDateTime(at.UtcDateTime)));
+        Assert.Equal(51, trade.PositionId);
+        Assert.Equal(.3m, trade.OpeningVolume);
+        Assert.Equal(.3m, trade.MaximumVolume);
+        Assert.Equal(.1m, trade.RemainingVolume);
+        Assert.False(trade.IsComplete);
+        Assert.Equal(6m, trade.NetPnl);
+        Assert.Equal(new long[] { 51, 52 }, batch.Deals.Where(d => d.EntryKind == DealEntryKind.Out).Select(d => d.OrderTicket).Order());
+        Assert.Equal(51, batch.Mt4PositionAliases![53]);
+        var before = new PositionSnapshot(51, 51, "EURUSD", TradeSide.Buy, .3m, 1.1m, 1.11m, 10, 1.09m, 1.12m, Now.AddHours(-2), Now);
+        var after = before with { Ticket = 53, Volume = .1m, StopLoss = 1.1m };
+        var changes = new PositionSnapshotDiffer().Diff([before], [after], Now, usePositionIdentity: true);
+        Assert.DoesNotContain(changes, c => c.Kind is TradeDomainEventKind.Opened or TradeDomainEventKind.Closed);
+        Assert.Contains(changes, c => c.Kind == TradeDomainEventKind.Reduced);
+        Assert.Contains(changes, c => c.Kind == TradeDomainEventKind.StopLossModified);
+    }
+
+    [Theory]
+    [InlineData("from #51", 1)]
+    [InlineData("", 0)]
+    public void MissingLinkOrDifferentMagicDoesNotMergeIndependentOrders(string comment, int magic)
+    {
+        var batch = Mt4HistoryMapper.Read(History(Order(51, 0, true),
+            Order(52, 0, false) with { Comment = comment, Magic = magic }), Frame, Terminal, Now);
+        Assert.Empty(batch.Mt4PositionAliases!);
+    }
+
+    [Fact]
+    public async Task Archive_PreservesFilteredHistoryAndLineageAcrossRestartAndBrokerOffsetChange()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "mt4-archive-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var archive = new Mt4OrderArchive(directory);
+            await archive.MergeAsync(History(Order(51, 0, true) with { Volume = .1m, Profit = 10 },
+                Order(52, 0, false) with { Volume = .2m, Comment = "from #51" }), Frame, Terminal, Now);
+            var updated = await new Mt4OrderArchive(directory).MergeAsync(History(
+                Order(52, 0, true) with { Volume = .2m, Profit = -4, Comment = "[sl]" }), Frame, Terminal, Now);
+            var trade = Assert.Single(new TradeProjector().Project(Account, updated.Deals, at => DateOnly.FromDateTime(at.UtcDateTime)));
+            Assert.True(trade.IsComplete);
+            Assert.Equal(6m, trade.NetPnl);
+            var narrow = JsonNode.Parse(History())!;
+            narrow["serverUtcOffsetSeconds"] = 7200;
+            var frame = Frame with { Payload = JsonSerializer.SerializeToElement(new { serverUtcOffsetSeconds = 7200 }) };
+            var rebased = await archive.MergeAsync(narrow.ToJsonString(), frame, Terminal, Now);
+            Assert.Equal(updated.Deals.Count, rebased.Deals.Count);
+            Assert.Equal(updated.Deals[0].OccurredAtUtc.AddHours(1), rebased.Deals[0].OccurredAtUtc);
+            Assert.Equal(51, rebased.Mt4PositionAliases![52]);
+            var otherJson = JsonNode.Parse(History())!;
+            otherJson["accountKey"] = "MT4:Broker|99";
+            var other = await archive.MergeAsync(otherJson.ToJsonString(), Frame with { AccountKey = "MT4:Broker|99" }, Terminal, Now);
+            Assert.Empty(other.Deals);
+        }
+        finally { Directory.Delete(directory, true); }
+    }
 }

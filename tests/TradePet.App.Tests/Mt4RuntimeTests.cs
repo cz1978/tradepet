@@ -89,6 +89,27 @@ public sealed class Mt4RuntimeTests
         await Call("HandleChartSnapshotAsync", new BridgeChartSnapshot("mt4-test", 1, []));
         Assert.False(Assert.Single(plans).Value.IsActive);
 
+        // Upgrade an old independent ticket projection to a broker-linked partial close.
+        var originalEntry = batch.Deals.Single(d => d.EntryKind == DealEntryKind.In);
+        var remaining = originalEntry with { Ticket = 104, OrderTicket = 52, PositionId = 52, Volume = .2m };
+        await Call("HandleDealsAsync", batch with { Deals = [remaining], IsRecovery = true });
+        var linked = batch with
+        {
+            Deals = [originalEntry with { Volume = .3m }, batch.Deals.Single(d => d.EntryKind == DealEntryKind.Out)],
+            Mt4PositionAliases = new Dictionary<long, long> { [52] = 51 }, IsRecovery = true,
+        };
+        var wire = ProtocolEnvelope.Create("test", 2, "deals", new { deals = linked.Deals, isRecovery = true,
+            mt4PositionAliases = linked.Mt4PositionAliases }, account.Scope.AccountKey);
+        await Call("HandleDealsAsync", Mt5PayloadMapper.MapDealBatch(wire));
+        await Call("HandleDealsAsync", linked);
+        var partialData = await database.LoadWorkspaceAsync(account.Scope.AccountKey, date.AddDays(-1), date);
+        var partial = Assert.Single(partialData.Trades);
+        Assert.Equal(.3m, partial.MaximumVolume);
+        Assert.Equal(.2m, partial.RemainingVolume);
+        Assert.False(partial.IsComplete);
+        Assert.Equal(12.5m, partial.NetPnl);
+        Assert.Equal(2, partialData.Deals.Count);
+
         await Call("HandleSnapshotAsync", new Mt5SnapshotBatch(account with { Scope = new("MT4:Broker", 43) }, [], [], offset, [], true));
         Assert.False(viewModel.SupportsTradeHistory); // Account changes cannot carry over ready totals.
     }

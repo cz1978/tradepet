@@ -1206,7 +1206,7 @@ public sealed class TradePetRuntime : IAsyncDisposable
 
         var previous = _positions.Values.ToArray();
         var changes = _hasInitialSnapshot
-            ? _positionDiffer.Diff(previous, batch.Positions, batch.Account.CapturedAtUtc)
+            ? _positionDiffer.Diff(previous, batch.Positions, batch.Account.CapturedAtUtc, usePositionIdentity: _activePlatform == TradingPlatform.Mt4)
             : [];
         var persistSnapshot = accountChanged || !_hasInitialSnapshot || changes.Count > 0 ||
                               batch.Account.CapturedAtUtc - _lastSnapshotPersistedAtUtc >= TimeSpan.FromSeconds(1);
@@ -1313,8 +1313,24 @@ public sealed class TradePetRuntime : IAsyncDisposable
                 batch.Deals,
                 batch.CashFlows,
                 historyState,
-                _cancellation.Token),
+                _cancellation.Token,
+                batch.Mt4PositionAliases),
             "保存成交批次");
+        if (!batchPersisted && batch.Mt4PositionAliases is { Count: > 0 }) return;
+        if (batch.Mt4PositionAliases is { Count: > 0 } aliases)
+        {
+            foreach (var (child, parent) in aliases)
+            {
+                _deals.Remove(child * 2);
+                foreach (var deal in _deals.Values.Where(d => d.PositionId == child).ToArray())
+                    _deals[deal.Ticket] = deal with { PositionId = parent };
+                _trades.Remove(child);
+                _reviewMetadata.Remove(child);
+                _exactCloseServerDates.Remove(child);
+                foreach (var position in _positions.Values.Where(p => p.PositionId == child).ToArray())
+                    _positions[position.Ticket] = position with { PositionId = parent };
+            }
+        }
         var historyBatchResult = batch.HistoryProgress is null
             ? null
             : _historySyncTracker.RecordBatch(
@@ -4412,11 +4428,6 @@ public sealed class TradePetRuntime : IAsyncDisposable
             review.ReplayStatus = "历史行情脚本缺失，请重新构建或安装应用。";
             return;
         }
-        if (_activePlatform == TradingPlatform.Mt4 && review.ReplayPrecision == "Tick")
-        {
-            review.ReplayStatus = "MT4 不提供历史 Tick，请选择 K 线回放。";
-            return;
-        }
         review.ReplayStatus = "正在从所选交易终端读取历史行情…";
         var from = detail.Trade.OpenedAtUtc.AddHours(-1);
         var to = (detail.Trade.ClosedAtUtc ?? detail.Trade.OpenedAtUtc.AddHours(4)).AddHours(1);
@@ -6166,7 +6177,7 @@ public sealed class TradePetRuntime : IAsyncDisposable
         builder.AppendLine($"- 当日是否标记数据缺口：{YesNo(data.DataGapDates.Contains(date))}");
         builder.AppendLine($"- 工作区版本：来源 {data.Version.SourceVersion}，元数据 {data.Version.MetadataVersion}，观察 {data.Version.ObservationVersion}，规则 {data.Version.RuleVersion}，时间 {data.Version.TimeVersion}");
         builder.AppendLine(report.AccountKey.StartsWith("MT4:", StringComparison.Ordinal)
-            ? "- MT4 金额以已加载订单的利润、佣金、隔夜费为准；一张已平仓票据计一笔。成交明细的入/出场记账行由订单派生，Deal 列是内部编号，Order/Position 保留原票据。部分平仓不推测合并；历史覆盖未确认。\n"
+            ? "- MT4 金额以已存档订单的利润、佣金、隔夜费为准；有 broker 关联证据的部分平仓合为同一持仓。Deal 为内部记账编号，Order 保留原票号，Position 为最初票号；缺少关联证据的订单保持独立。未读取过的历史覆盖仍需确认。\n"
             : "- 金额以 MT5 成交和费用记录为准；胜率只统计当日完整平仓的 position；尚未平仓的持仓不会计入胜率。\n");
 
         builder.AppendLine("## 给 AI 的分析任务");

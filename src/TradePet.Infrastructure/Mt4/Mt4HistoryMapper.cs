@@ -26,6 +26,9 @@ public static class Mt4HistoryMapper
         if (offset is < -50400 or > 50400 ||
             !frame.Payload.TryGetProperty("serverUtcOffsetSeconds", out var frameOffset) || frameOffset.GetInt32() != offset)
             throw new InvalidDataException("MT4 history clock differs from the live snapshot.");
+        if (frame.Payload.TryGetProperty("liveOrderSignature", out var liveSignature) &&
+            (!root.TryGetProperty("liveOrderSignature", out var signature) || signature.GetString() != liveSignature.GetString()))
+            throw new InvalidDataException("MT4 history does not match current open orders.");
         var orders = root.GetProperty("orders");
         if (orders.GetArrayLength() > 100_000) throw new InvalidDataException("MT4 history exceeds order limit.");
         var tickets = new HashSet<long>();
@@ -75,8 +78,20 @@ public static class Mt4HistoryMapper
                     volume, exit, profit, commission, swap, 0, Time("closeTime")));
             }
         }
+        var aliases = Mt4OrderLinks.Resolve(orders);
+        if (aliases.Count > 0)
+        {
+            // One original entry and each real partial exit, just like a hedging position.
+            deals = deals.GroupBy(d => aliases.GetValueOrDefault(d.PositionId, d.PositionId)).SelectMany(group =>
+            {
+                var entries = group.Where(d => d.EntryKind == DealEntryKind.In).ToArray();
+                var first = entries.Single(d => d.OrderTicket == group.Key);
+                return new[] { first with { Volume = entries.Sum(d => d.Volume) } }
+                    .Concat(group.Where(d => d.EntryKind == DealEntryKind.Out).Select(d => d with { PositionId = group.Key }));
+            }).ToList();
+        }
         // The terminal's history filter cannot be verified programmatically.
         // Never claim complete yearly coverage from a successful export.
-        return new(deals, cashFlows, null, null, specifications.Values.ToArray());
+        return new(deals, cashFlows, null, null, specifications.Values.ToArray(), Mt4PositionAliases: aliases);
     }
 }

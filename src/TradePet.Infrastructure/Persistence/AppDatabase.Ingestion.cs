@@ -69,7 +69,8 @@ public sealed partial class AppDatabase
         IReadOnlyCollection<DealRecord> deals,
         IReadOnlyCollection<AccountCashFlow> cashFlows,
         HistorySyncState? historyState = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IReadOnlyDictionary<long, long>? mt4PositionAliases = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(accountKey);
         if (cashFlows.Any(item => item.AccountKey != accountKey) ||
@@ -80,6 +81,9 @@ public sealed partial class AppDatabase
 
         await using var connection = await OpenConnectionAsync(cancellationToken);
         await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken);
+
+        if (mt4PositionAliases is { Count: > 0 })
+            await ReconcileMt4PositionsAsync(connection, transaction, accountKey, mt4PositionAliases, deals, cancellationToken);
 
         foreach (var deal in deals)
         {

@@ -32,8 +32,8 @@ public sealed class AppDatabaseRecoveryTests : IDisposable
 
         Assert.False(firstInitialization.Recovered);
         Assert.False(secondInitialization.Recovered);
-        Assert.Equal(10, firstInitialization.SchemaVersion);
-        Assert.Equal(10, secondInitialization.SchemaVersion);
+        Assert.Equal(11, firstInitialization.SchemaVersion);
+        Assert.Equal(11, secondInitialization.SchemaVersion);
         Assert.Empty(Directory.GetFileSystemEntries(backupRoot));
         Assert.Equal(147m, loaded?.State.RealizedPnl);
     }
@@ -136,7 +136,7 @@ public sealed class AppDatabaseRecoveryTests : IDisposable
         var result = await new AppDatabase(databasePath).InitializeWithRecoveryAsync(
             Path.Combine(_testDirectory, "backups"));
         Assert.False(result.Recovered);
-        Assert.Equal(10, result.SchemaVersion);
+        Assert.Equal(11, result.SchemaVersion);
     }
 
     [Theory]
@@ -180,8 +180,8 @@ public sealed class AppDatabaseRecoveryTests : IDisposable
         var repeated = await new AppDatabase(databasePath).InitializeWithRecoveryAsync(
             Path.Combine(_testDirectory, "backups"));
 
-        Assert.Equal(10, first.SchemaVersion);
-        Assert.Equal(10, repeated.SchemaVersion);
+        Assert.Equal(11, first.SchemaVersion);
+        Assert.Equal(11, repeated.SchemaVersion);
         await using var verified = await database.OpenConnectionAsync();
         await using var query = verified.CreateCommand();
         query.CommandText = "SELECT COUNT(*) FROM accounts WHERE account_key='Legacy|1';";
@@ -306,7 +306,7 @@ public sealed class AppDatabaseRecoveryTests : IDisposable
 
         var repeated = await new AppDatabase(databasePath).InitializeWithRecoveryAsync(
             Path.Combine(_testDirectory, "backups"));
-        Assert.Equal(10, repeated.SchemaVersion);
+        Assert.Equal(11, repeated.SchemaVersion);
     }
 
     public void Dispose()

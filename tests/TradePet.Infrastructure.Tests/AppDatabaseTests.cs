@@ -585,6 +585,42 @@ public sealed class AppDatabaseTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Mt4LinkedTickets_ReconcileOldRowsAtomicallyAndPreserveReviewNotesIdempotently()
+    {
+        const string account = "MT4:Broker|42";
+        var at = new DateTimeOffset(2026, 9, 27, 10, 0, 0, TimeSpan.Zero);
+        DealRecord Entry(long ticket, decimal volume) => new(ticket * 2, ticket, ticket, "EURUSD", TradeSide.Buy,
+            DealEntryKind.In, volume, 1.1m, 0, 0, 0, 0, at);
+        DealRecord Exit(long ticket, decimal volume, decimal profit) => new(ticket * 2 + 1, ticket, ticket, "EURUSD", TradeSide.Sell,
+            DealEntryKind.Out, volume, 1.11m, profit, -1, 0, 0, at.AddMinutes(10));
+        DealRecord[] old = [Entry(51, .1m), Exit(51, .1m, 10), Entry(52, .2m), Exit(52, .2m, -4)];
+        var projector = new TradePet.Core.Trading.TradeProjector();
+        DateOnly Date(DateTimeOffset time) => DateOnly.FromDateTime(time.UtcDateTime);
+        await _database.SaveDealBatchAsync(account, old, []);
+        await _database.SaveTradesAsync(projector.Project(account, old, Date));
+        Assert.True((await _database.SaveTradeReviewDocumentAsync(ReviewDocument(account, 51, at) with { Summary = "首次入场" }, 0)).IsSaved);
+        Assert.True((await _database.SaveTradeReviewDocumentAsync(ReviewDocument(account, 52, at) with { Summary = "剩余仓位", NextAction = "遵守止损" }, 0)).IsSaved);
+        DealRecord[] linked = [Entry(51, .3m), Exit(51, .1m, 10), Exit(52, .2m, -4) with { PositionId = 51 }];
+        var aliases = new Dictionary<long, long> { [52] = 51 };
+        await _database.SaveDealBatchAsync(account, linked, [], mt4PositionAliases: aliases);
+        await _database.SaveTradesAsync(projector.Project(account, linked, Date));
+        await _database.SaveDealBatchAsync(account, linked, [], mt4PositionAliases: aliases);
+        var workspace = await _database.LoadWorkspaceAsync(account, Date(at), Date(at));
+        var trade = Assert.Single(workspace.Trades);
+        Assert.Equal(51, trade.PositionId);
+        Assert.Equal(.3m, trade.OpeningVolume);
+        Assert.Equal(4m, trade.NetPnl);
+        Assert.Equal(3, (await _database.LoadDealsAsync(account)).Count);
+        var document = (await _database.LoadTradeReviewDocumentAsync(new(account, 51)))!;
+        Assert.Equal(2, document.Revision);
+        Assert.Contains("首次入场", document.Summary);
+        Assert.Contains("[MT4 原票号 #52] 剩余仓位", document.Summary);
+        Assert.Contains("遵守止损", document.NextAction);
+        Assert.Equal(ReviewCompletionStatus.NeedsReview, document.Status);
+        Assert.Equal("剩余仓位", (await _database.LoadTradeReviewDocumentAsync(new(account, 52)))!.Summary);
+    }
+
+    [Fact]
     public async Task TradeReviewDocument_RejectsOrphanAndIncompleteTrade()
     {
         var now = new DateTimeOffset(2026, 9, 7, 2, 0, 0, TimeSpan.Zero);

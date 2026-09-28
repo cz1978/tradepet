@@ -79,8 +79,10 @@ public sealed class Mt4AdapterTests
         Assert.Throws<InvalidDataException>(() => Mt4FileClient.ReadFrame(Frame(terminal, now, login: 0), terminal, now));
     }
 
-    [Fact]
-    public async Task Client_DisconnectsOnBrokenFileAndRecoversForAnotherAccount()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Client_DisconnectsOnBrokenFileAndRecoversForAnotherAccount(bool stale)
     {
         var root = Path.Combine(Path.GetTempPath(), "TradePetMt4Tests", Guid.NewGuid().ToString("N"));
         var terminal = Path.Combine(root, "terminal.exe");
@@ -94,7 +96,7 @@ public sealed class Mt4AdapterTests
         {
             Assert.True((await client.Events.ReadAsync(cancellation.Token)).Payload.GetProperty("connected").GetBoolean());
             Assert.Equal("snapshot", (await client.Events.ReadAsync(cancellation.Token)).Kind);
-            await File.WriteAllTextAsync(path, "{broken", cancellation.Token);
+            await File.WriteAllTextAsync(path, stale ? Frame(terminal, DateTimeOffset.UtcNow.AddMinutes(-1)) : "{broken", cancellation.Token);
             Assert.False((await client.Events.ReadAsync(cancellation.Token)).Payload.GetProperty("connected").GetBoolean());
             await File.WriteAllTextAsync(path, Frame(terminal, DateTimeOffset.UtcNow, 2, 88), cancellation.Token);
             var connected = await client.Events.ReadAsync(cancellation.Token);

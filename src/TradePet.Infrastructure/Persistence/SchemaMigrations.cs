@@ -19,7 +19,15 @@ internal static class SchemaMigrations
         new SchemaMigration(8, ExcursionAlgorithmSchema),
         new SchemaMigration(9, ReviewReadIndexesSchema),
         new SchemaMigration(10, MigrationChecksumsSchema),
+        new SchemaMigration(11, Mt4PositionLinksSchema),
     ];
+
+    private const string Mt4PositionLinksSchema = """
+        CREATE TABLE mt4_position_links (
+            account_key TEXT NOT NULL, ticket INTEGER NOT NULL, position_id INTEGER NOT NULL,
+            PRIMARY KEY(account_key,ticket)
+        );
+        """;
 
     public static string Checksum(SchemaMigration migration) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(migration.Sql))).ToLowerInvariant();

@@ -24,7 +24,8 @@ public sealed record Mt5DealBatch(
     Mt5HistoryProgress? HistoryProgress,
     DateOnly? ServerDate,
     IReadOnlyList<SymbolSpecification> SymbolSpecifications,
-    bool IsRecovery = false);
+    bool IsRecovery = false,
+    IReadOnlyDictionary<long, long>? Mt4PositionAliases = null);
 
 public static class Mt5PayloadMapper
 {
@@ -127,7 +128,9 @@ public static class Mt5PayloadMapper
         }
 
         return new Mt5DealBatch(deals, cashFlows, progress, envelope.ServerDate, MapSymbolSpecifications(envelope.Payload),
-            envelope.Payload.TryGetProperty("isRecovery", out var recovery) && recovery.GetBoolean());
+            envelope.Payload.TryGetProperty("isRecovery", out var recovery) && recovery.GetBoolean(),
+            accountKey.StartsWith("MT4:", StringComparison.Ordinal) && envelope.Payload.TryGetProperty("mt4PositionAliases", out var aliases)
+                ? System.Text.Json.JsonSerializer.Deserialize<Dictionary<long, long>>(aliases) : null);
     }
 
     private static IReadOnlyList<SymbolSpecification> MapSymbolSpecifications(System.Text.Json.JsonElement payload)

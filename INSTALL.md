@@ -1,14 +1,14 @@
 # TradePet 安装与升级说明
 
-适用于 **1.0.0-rc.4 / Windows 10、11 x64**。当前是候选版，支持 MT5 与 MT4；MT4 历史按订单票据统计。TradePet 不执行下单、平仓或改单。
+适用于 **1.0.0-rc.5 / Windows 10、11 x64**。当前是候选版，支持 MT5 与 MT4；MT4 支持订单存档、有证据的部分平仓归集及实际报价回放。TradePet 不执行下单、平仓或改单。
 
-`rc.4` 便携包包含本次 MT4 功能与日报优化。升级后需安装并重新挂载新版 MT4 桥接插件，旧的 `rc.3` 包不含这些改进。
+`rc.5` 便携包包含本次 MT4 功能与日报优化。升级后需安装并重新挂载新版 MT4 桥接插件，旧的 `rc.3` 包不含这些改进。
 
 ## 下载并启动
 
-1. 打开 [GitHub 发布页](https://github.com/cz1978/tradepet/releases/tag/v1.0.0-rc.4)。
-2. 在 Assets 中下载 `TradePet-1.0.0-rc.4-win-x64.zip`。`Source code` 是开发用源码，不是可运行安装包。
-3. 将 ZIP **完整解压**到自己的应用目录，例如 `D:\Apps\TradePet-1.0.0-rc.4`。
+1. 打开 [GitHub 发布页](https://github.com/cz1978/tradepet/releases/tag/v1.0.0-rc.5)。
+2. 在 Assets 中下载 `TradePet-1.0.0-rc.5-win-x64.zip`。`Source code` 是开发用源码，不是可运行安装包。
+3. 将 ZIP **完整解压**到自己的应用目录，例如 `D:\Apps\TradePet-1.0.0-rc.5`。
 4. 运行解压目录内的 `TradePet.exe`，跟随四步设置向导完成配置。不要在压缩包内直接运行，也不要只复制 EXE。
 
 便携包已包含 .NET 8 运行时，无需安装 .NET SDK。保留同目录的 DLL、`Runtime` 和 `Assets` 文件夹。
@@ -16,7 +16,7 @@
 发布页还提供 `SHA256SUMS.txt`。需要核对下载完整性时，在 ZIP 所在目录执行并与该文件比较：
 
 ```powershell
-Get-FileHash .\TradePet-1.0.0-rc.4-win-x64.zip -Algorithm SHA256
+Get-FileHash .\TradePet-1.0.0-rc.5-win-x64.zip -Algorithm SHA256
 ```
 
 该校验用于确认文件一致性，不代替数字签名。当前包未做代码签名；遇到 Windows 提示时先核对来源及哈希，不要关闭系统防护。
@@ -70,7 +70,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\Runtime\setup-python.ps1 -
 
 MT4 插件位于终端数据目录的 `MQL4\Experts\TradePet`，通过 `MQL4\Files` 中的本地快照传递数据，无需 DLL 或“允许实盘交易”。不要在多个图表同时运行本插件，以免重复写入快照。
 
-MT4 支持账户、持仓、挂单、浮亏监控、订单历史复盘、M5 K 线回放、图表计划、亏损区域和日报。升级后须重新挂载新版插件，并在账户历史中选择“全部历史”。历史覆盖不能自动确认为完整；每张已平仓票据计一笔，部分平仓不推测合并，佣金和隔夜费归入平仓日。历史 UTC 按当前服务器偏移估计，历史 Tick 和未采集的初始风险不补造。经济日历使用 Forex Factory 公开周历（需联网），支持事前提醒，不提供实时公布值。实时数据超过 10 秒未更新、终端断线或插件被移除时显示过期状态。
+MT4 支持账户、持仓、挂单、浮亏监控、订单历史复盘、M5 K 线及本地实际报价回放、图表计划、亏损区域和日报。升级后须重新挂载新版插件，并在账户历史中选择“全部历史”。已经读到的订单会持续存档；有 broker 票号关联证据的部分平仓按整笔持仓归集，全部平完后才计入完整交易，原票号及各次费用保留。缺少关联证据时保持独立；尚未读取的历史仍受终端加载范围影响。
+
+Tick 回放需要同时运行 TradePet 和新版插件。挂图品种采集 Tick，其他打开图表和持仓品种每秒采样；只有真实秒级报价，没有采集到的时段不会补造。订单与报价存档保存在终端 `MQL4\Files\TradePet` 的 `order-archive.db` 和 `tick-archive.db` 中，迁移终端时一并复制；助手的复盘备份 ZIP 不包含这两份采集存档。历史 UTC 按当前服务器偏移换算，跨夏令时的实际持仓时长仍不能保证精确。经济日历使用 Forex Factory 公开周历（需联网），支持事前提醒，不提供实时公布值。实时数据超过 10 秒未更新、终端断线或插件被移除时显示过期状态。
 
 首次运行需收到新报价以确定服务器时区；休市时可在 EA 参数 `InpServerUtcOffsetMinutes` 填入经纪商当前 UTC 偏移分钟数（例如 UTC+3 填 180），默认 10000 表示自动。已自动校准的偏移会在本机保留最多 7 天。
 

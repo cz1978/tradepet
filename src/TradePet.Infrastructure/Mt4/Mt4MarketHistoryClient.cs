@@ -14,8 +14,10 @@ public sealed class Mt4MarketHistoryClient(string terminalPath, string dataDirec
             !request.ExpectedAccountKey.StartsWith("MT4:", StringComparison.Ordinal) ||
             !Guid.TryParseExact(request.RequestId, "N", out _) || request.ToUtc <= request.FromUtc ||
             request.ToUtc - request.FromUtc > TimeSpan.FromDays(366) || request.Timeframe != "M5" ||
-            request.Precision != MarketDataPrecision.Bars || offsetSeconds is < -50400 or > 50400)
-            throw new InvalidOperationException("MT4 支持一年以内的 M5 K 线回放；不提供历史 Tick。");
+            offsetSeconds is < -50400 or > 50400)
+            throw new InvalidOperationException("MT4 行情请求身份、服务器时间或范围无效（单次最多一年）。");
+        if (request.Precision == MarketDataPrecision.Ticks)
+            return await new Mt4TickArchive(dataDirectory).LoadAsync(request, offsetSeconds, cancellationToken);
         var directory = Path.Combine(dataDirectory, "MQL4", "Files", "TradePet");
         Directory.CreateDirectory(directory);
         var path = Path.Combine(directory, $"market-request-{request.RequestId}.json");
@@ -69,6 +71,8 @@ public sealed class Mt4MarketHistoryClient(string terminalPath, string dataDirec
             root.GetProperty("symbol").GetString() != request.Symbol || root.GetProperty("timeframe").GetString() != request.Timeframe ||
             root.GetProperty("serverUtcOffsetSeconds").GetInt32() != offsetSeconds)
             throw new InvalidDataException("MT4 K 线响应身份或时区不匹配。");
+        if (root.TryGetProperty("error", out var error) && !string.IsNullOrWhiteSpace(error.GetString()))
+            return Empty(request, error.GetString()!);
         var bars = root.GetProperty("bars").EnumerateArray().Select(bar => new MarketBar(
             request.TerminalId, request.ExpectedAccountKey, request.Symbol, request.Timeframe,
             DateTimeOffset.FromUnixTimeSeconds(bar.GetProperty("time").GetInt64() - offsetSeconds),
@@ -82,7 +86,7 @@ public sealed class Mt4MarketHistoryClient(string terminalPath, string dataDirec
         return new(new(request.RequestId, request.TerminalId, request.ExpectedAccountKey, request.Symbol, request.Timeframe,
             request.FromUtc, request.ToUtc, bars.FirstOrDefault()?.OpenedAtUtc, bars.LastOrDefault()?.OpenedAtUtc,
             MarketDataPrecision.Bars, bars.Length == 0 ? MarketCoverageStatus.Empty : MarketCoverageStatus.Partial,
-            "mt4-bars-v1", "MT4 终端已加载 K 线；历史 UTC 按当前服务器偏移估计，缺口不补齐，不提供历史 Tick。", DateTimeOffset.UtcNow), bars, []);
+            "mt4-bars-v1", "MT4 终端 K 线，按服务器时间显示；历史 UTC 按当前服务器偏移换算，缺口不补齐。Tick 回放使用本地实际报价存档。", DateTimeOffset.UtcNow), bars, []);
     }
 
     private static MarketHistoryResult Empty(MarketHistoryRequest request, string message) => new(

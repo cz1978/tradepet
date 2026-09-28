@@ -16,6 +16,11 @@ string last_server = "";
 uint last_history_scan = 0;
 string last_zone_command = "";
 string offset_key = "";
+string last_live_signature = "";
+string quote_ring[1024];
+int quote_head = 0, quote_count = 0;
+long quote_sequence = 0;
+string quote_symbols[], quote_values[];
 
 string Quote(string value)
 {
@@ -46,6 +51,69 @@ int OnInit()
 
 void OnDeinit(const int reason) { EventKillTimer(); DeleteManagedLossZones(); }
 
+void RecordQuote(string symbol, bool tick_event = false)
+{
+   if(!have_offset || !IsConnected() || last_login != AccountNumber() || last_server != AccountServer()) return;
+   MqlTick tick;
+   if(!SymbolInfoTick(symbol, tick) || tick.bid <= 0 || tick.ask < tick.bid || MathAbs((double)(TimeCurrent()-tick.time)) > 120) return;
+   string value = IntegerToString((long)tick.time) + ":" + Number(tick.bid) + ":" + Number(tick.ask) + ":" + Number(tick.last) + ":" + IntegerToString((long)tick.volume);
+   int index = -1;
+   for(int i=0; i<ArraySize(quote_symbols); i++) if(quote_symbols[i] == symbol) { index=i; break; }
+   if(index < 0)
+   {
+      index=ArraySize(quote_symbols);
+      if(index >= 512) return;
+      ArrayResize(quote_symbols,index+1); ArrayResize(quote_values,index+1); quote_symbols[index]=symbol;
+   }
+   if(!tick_event && quote_values[index] == value) return;
+   quote_values[index] = value;
+   quote_ring[quote_head] = "{\"sequence\":" + IntegerToString(++quote_sequence) + ",\"symbol\":" + Quote(symbol)
+      + ",\"time\":" + IntegerToString((long)tick.time) + ",\"bid\":" + Number(tick.bid) + ",\"ask\":" + Number(tick.ask)
+      + ",\"last\":" + Number(tick.last) + ",\"volume\":" + IntegerToString((long)tick.volume) + "}";
+   quote_head=(quote_head+1)%1024; if(quote_count<1024) quote_count++;
+}
+
+void OnTick() { RecordQuote(Symbol(),true); }
+
+string QuotesSnapshot()
+{
+   long chart=ChartFirst();
+   while(chart>=0) { RecordQuote(ChartSymbol(chart)); chart=ChartNext(chart); }
+   string result="";
+   for(int i=0; i<quote_count; i++)
+   {
+      if(i>0) result+=",";
+      result+=quote_ring[(quote_head-quote_count+i+1024)%1024];
+   }
+   return "["+result+"]";
+}
+
+string RiskFields(string symbol, int side, double entry, double stop)
+{
+   string profit=SymbolInfoString(symbol,SYMBOL_CURRENCY_PROFIT);
+   string deposit=AccountCurrency();
+   double conversion=0;
+   bool loss=(stop-entry)*(side==OP_BUY ? 1 : -1)<0;
+   if(profit==deposit) conversion=1;
+   else
+   {
+      for(int i=0; i<SymbolsTotal(true); i++)
+      {
+         string fx=SymbolName(i,true);
+         string base=SymbolInfoString(fx,SYMBOL_CURRENCY_BASE), quote=SymbolInfoString(fx,SYMBOL_CURRENCY_PROFIT);
+         if(!((base==profit && quote==deposit)||(base==deposit && quote==profit))) continue;
+         MqlTick tick;
+         if(!SymbolInfoTick(fx,tick) || tick.bid<=0 || tick.ask<tick.bid || MathAbs((double)(TimeCurrent()-tick.time))>120) continue;
+         conversion=base==profit ? (loss ? tick.ask : tick.bid) : 1.0/(loss ? tick.bid : tick.ask);
+         break;
+      }
+   }
+   return ",\"calculationMode\":"+IntegerToString((int)MarketInfo(symbol,MODE_PROFITCALCMODE))
+      +",\"contractSize\":"+Number(MarketInfo(symbol,MODE_LOTSIZE))
+      +",\"baseCurrency\":"+Quote(SymbolInfoString(symbol,SYMBOL_CURRENCY_BASE))
+      +",\"profitCurrency\":"+Quote(profit)+",\"conversionRate\":"+Number(conversion);
+}
+
 void OnTimer()
 {
    datetime utc = TimeGMT();
@@ -57,6 +125,9 @@ void OnTimer()
       have_offset = false;
       last_history_scan = 0;
       last_zone_command = "";
+      last_live_signature = "";
+      quote_count=0; quote_head=0;
+      ArrayResize(quote_symbols,0); ArrayResize(quote_values,0);
       DeleteManagedLossZones();
       offset_key = StringSubstr("TradePet.Offset." + IntegerToString(last_login) + "." + last_server, 0, 63);
       if(GlobalVariableCheck(offset_key) && utc - GlobalVariableTime(offset_key) < 7 * 86400)
@@ -85,14 +156,16 @@ void OnTimer()
    }
    last_server_time = server_time;
    int offset = server_offset;
-   string positions = "", orders = "", specs = "";
+   string positions = "", orders = "", specs = "", live_signature = "";
    int total = OrdersTotal();
    for(int index = 0; index < total; index++)
    {
       if(!OrderSelect(index, SELECT_BY_POS, MODE_TRADES)) return;
       string symbol = OrderSymbol();
+      RecordQuote(symbol);
       int kind = OrderType();
       string ticket = IntegerToString(OrderTicket());
+      live_signature += ticket + ":" + Number(OrderLots()) + ";";
       if(kind == OP_BUY || kind == OP_SELL)
       {
          if(StringLen(positions) > 0) positions += ",";
@@ -104,6 +177,7 @@ void OnTimer()
             + ",\"stopLoss\":" + Number(OrderStopLoss()) + ",\"takeProfit\":" + Number(OrderTakeProfit())
             + ",\"tickSize\":" + Number(SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE))
             + ",\"tickValue\":" + Number(MarketInfo(symbol, MODE_TICKVALUE))
+            + RiskFields(symbol,kind,OrderOpenPrice(),OrderStopLoss())
             + ",\"openedAtUtc\":" + Utc(OrderOpenTime() - offset) + "}";
       }
       else if(kind >= OP_BUYLIMIT && kind <= OP_SELLSTOP)
@@ -122,6 +196,14 @@ void OnTimer()
          + ",\"digits\":" + IntegerToString((int)MarketInfo(symbol, MODE_DIGITS)) + "}";
    }
    if(OrdersTotal() != total) return;
+   if(IsConnected() && have_offset)
+   {
+      uint scan_now=GetTickCount();
+      if(last_history_scan==0 || scan_now-last_history_scan>=5000 || last_live_signature!=live_signature)
+      {
+         if(ExportHistory(live_signature)) { last_history_scan=scan_now; last_live_signature=live_signature; }
+      }
+   }
    string json = "{\"version\":2,\"platform\":\"mt4\",\"sourceInstanceId\":" + Quote(instance_id)
       + ",\"sequence\":" + IntegerToString(++sequence) + ",\"terminalPath\":" + Quote(TerminalInfoString(TERMINAL_PATH))
       + ",\"connected\":" + (IsConnected() ? "true" : "false") + ",\"capturedAtUtc\":" + Utc(utc)
@@ -130,7 +212,8 @@ void OnTimer()
       + ",\"equity\":" + Number(AccountEquity()) + ",\"floatingPnl\":" + Number(AccountProfit())
       + (have_offset ? ",\"serverUtcOffsetSeconds\":" + IntegerToString(offset) : "")
       + ",\"positions\":[" + positions + "],\"orders\":[" + orders + "],\"symbolSpecifications\":[" + specs + "]"
-      + (have_offset ? ",\"charts\":" + ChartSnapshot() : "") + "}";
+      + ",\"liveOrderSignature\":" + Quote(live_signature)
+      + (have_offset ? ",\"charts\":" + ChartSnapshot() + ",\"quotes\":" + QuotesSnapshot() : "") + "}";
    int file = FileOpen("TradePet\\snapshot.tmp", FILE_WRITE | FILE_TXT | FILE_ANSI, 0, CP_UTF8);
    if(file == INVALID_HANDLE) return;
    FileWriteString(file, json);
@@ -139,28 +222,23 @@ void OnTimer()
    FileMove("TradePet\\snapshot.tmp", 0, "TradePet\\snapshot.json", FILE_REWRITE);
    if(IsConnected() && have_offset)
    {
-      uint now = GetTickCount();
-      if(last_history_scan == 0 || now - last_history_scan >= 5000)
-      {
-         ExportHistory();
-         last_history_scan = now;
-      }
       PollLossZones();
       PollMarketHistory();
    }
 }
 
-void ExportHistory()
+bool ExportHistory(string expected_signature)
 {
    int live_count = OrdersTotal(), history_count = OrdersHistoryTotal();
-   if(live_count + history_count > 100000) { Print("TradePet: history export exceeds 100000 orders."); return; }
-   string orders = "";
+   if(live_count + history_count > 100000) { Print("TradePet: history export exceeds 100000 orders."); return false; }
+   string orders = "", signature = "";
    for(int pool_index = 0; pool_index < 2; pool_index++)
    {
       int count = pool_index == 0 ? live_count : history_count;
       for(int index = 0; index < count; index++)
       {
-         if(!OrderSelect(index, SELECT_BY_POS, pool_index == 0 ? MODE_TRADES : MODE_HISTORY)) return;
+         if(!OrderSelect(index, SELECT_BY_POS, pool_index == 0 ? MODE_TRADES : MODE_HISTORY)) return false;
+         if(pool_index==0) signature+=IntegerToString(OrderTicket())+":"+Number(OrderLots())+";";
          int kind = OrderType();
          if(kind != OP_BUY && kind != OP_SELL && kind != 6 && kind != 7) continue;
          if(StringLen(orders) > 0) orders += ",";
@@ -171,22 +249,23 @@ void ExportHistory()
             + ",\"openPrice\":" + Number(OrderOpenPrice()) + ",\"closePrice\":" + Number(OrderClosePrice())
             + ",\"profit\":" + Number(OrderProfit()) + ",\"commission\":" + Number(OrderCommission())
             + ",\"swap\":" + Number(OrderSwap())
+            + ",\"comment\":" + Quote(OrderComment()) + ",\"magic\":" + IntegerToString(OrderMagicNumber())
             + ",\"point\":" + Number(MarketInfo(OrderSymbol(), MODE_POINT))
             + ",\"tickSize\":" + Number(SymbolInfoDouble(OrderSymbol(), SYMBOL_TRADE_TICK_SIZE))
             + ",\"digits\":" + IntegerToString((int)MarketInfo(OrderSymbol(), MODE_DIGITS)) + "}";
       }
    }
    if(live_count != OrdersTotal() || history_count != OrdersHistoryTotal() ||
-      last_login != AccountNumber() || last_server != AccountServer()) return;
+      last_login != AccountNumber() || last_server != AccountServer() || signature != expected_signature) return false;
    string json = "{\"version\":2,\"platform\":\"mt4\",\"sourceInstanceId\":" + Quote(instance_id)
       + ",\"terminalPath\":" + Quote(TerminalInfoString(TERMINAL_PATH))
       + ",\"accountKey\":" + Quote("MT4:" + AccountServer() + "|" + IntegerToString(AccountNumber()))
       + ",\"capturedAtUtc\":" + Utc(TimeGMT()) + ",\"serverUtcOffsetSeconds\":" + IntegerToString(server_offset)
-      + ",\"scanComplete\":true,\"orders\":[" + orders + "]}";
+      + ",\"liveOrderSignature\":" + Quote(signature) + ",\"scanComplete\":true,\"orders\":[" + orders + "]}";
    int file = FileOpen("TradePet\\history.tmp", FILE_WRITE | FILE_TXT | FILE_ANSI, 0, CP_UTF8);
-   if(file == INVALID_HANDLE) return;
+   if(file == INVALID_HANDLE) return false;
    FileWriteString(file, json); FileFlush(file); FileClose(file);
-   FileMove("TradePet\\history.tmp", 0, "TradePet\\history.json", FILE_REWRITE);
+   return FileMove("TradePet\\history.tmp", 0, "TradePet\\history.json", FILE_REWRITE);
 }
 
 string ChartSnapshot()
@@ -259,7 +338,10 @@ void PollMarketHistory()
    datetime to = (datetime)(JsonLongValue(command, "toEpochUtc", 0) + server_offset);
    if(to <= from || to - from > 366 * 86400) { FileDelete(path); return; }
    MqlRates rates[];
-   int count = CopyRates(symbol, PERIOD_M5, from, to, rates);
+   string error = "";
+   bool selected = SymbolSelect(symbol,true);
+   int count = selected ? CopyRates(symbol, PERIOD_M5, from, to, rates) : 0;
+   if(!selected) error = "该 MT4 账户没有此品种，无法读取历史行情。请核对品种后缀。";
    if(count < 0) return; // MT4 may be downloading history; retry while the request is fresh.
    int maximum = (int)MathMin(5000, MathMax(1, JsonLongValue(command, "maximumBars", 5000)));
    string bars = "";
@@ -274,7 +356,7 @@ void PollMarketHistory()
    }
    string response = "{\"requestId\":" + Quote(id) + ",\"accountKey\":" + Quote(account)
       + ",\"terminalPath\":" + Quote(TerminalInfoString(TERMINAL_PATH)) + ",\"symbol\":" + Quote(symbol)
-      + ",\"timeframe\":\"M5\",\"serverUtcOffsetSeconds\":" + IntegerToString(server_offset) + ",\"bars\":[" + bars + "]}";
+      + ",\"timeframe\":\"M5\",\"serverUtcOffsetSeconds\":" + IntegerToString(server_offset) + ",\"error\":" + Quote(error) + ",\"bars\":[" + bars + "]}";
    string result = "TradePet\\market-response-" + id;
    file = FileOpen(result + ".tmp", FILE_WRITE | FILE_TXT | FILE_ANSI, 0, CP_UTF8);
    if(file == INVALID_HANDLE) return;

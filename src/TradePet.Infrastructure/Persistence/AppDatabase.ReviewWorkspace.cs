@@ -1870,9 +1870,11 @@ public sealed partial class AppDatabase
     private static async Task<TradeReviewDocument?> LoadTradeReviewDocumentAsync(
         SqliteConnection connection,
         TradeKey key,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        SqliteTransaction? transaction = null)
     {
         await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText = "SELECT payload_json FROM trade_review_documents WHERE account_key=$account AND position_id=$position;";
         command.Parameters.AddWithValue("$account", key.AccountKey);
         command.Parameters.AddWithValue("$position", key.PositionId);

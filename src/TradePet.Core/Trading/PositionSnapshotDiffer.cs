@@ -7,15 +7,17 @@ public sealed class PositionSnapshotDiffer
     public IReadOnlyList<TradeDomainEvent> Diff(
         IReadOnlyCollection<PositionSnapshot> previous,
         IReadOnlyCollection<PositionSnapshot> current,
-        DateTimeOffset observedAtUtc)
+        DateTimeOffset observedAtUtc,
+        bool usePositionIdentity = false)
     {
         var events = new List<TradeDomainEvent>();
-        var previousByTicket = previous.ToDictionary(position => position.Ticket);
-        var currentByTicket = current.ToDictionary(position => position.Ticket);
+        long Identity(PositionSnapshot position) => usePositionIdentity ? position.PositionId : position.Ticket;
+        var previousByTicket = previous.ToDictionary(Identity);
+        var currentByTicket = current.ToDictionary(Identity);
 
         foreach (var position in current)
         {
-            if (!previousByTicket.TryGetValue(position.Ticket, out var oldPosition))
+            if (!previousByTicket.TryGetValue(Identity(position), out var oldPosition))
             {
                 events.Add(Create(TradeDomainEventKind.Opened, null, position, position.Volume, observedAtUtc));
                 continue;
@@ -36,7 +38,7 @@ public sealed class PositionSnapshotDiffer
 
         foreach (var oldPosition in previous)
         {
-            if (!currentByTicket.ContainsKey(oldPosition.Ticket))
+            if (!currentByTicket.ContainsKey(Identity(oldPosition)))
             {
                 events.Add(Create(TradeDomainEventKind.Closed, oldPosition, null, oldPosition.Volume, observedAtUtc));
             }

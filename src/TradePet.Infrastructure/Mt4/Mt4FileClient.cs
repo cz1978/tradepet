@@ -50,14 +50,8 @@ public sealed class Mt4FileClient(string terminalPath, string dataDirectory) : I
         {
             foreach (var position in positions)
             {
-                var entry = position?["entryPrice"]?.GetValue<decimal>() ?? 0;
-                var stop = position?["stopLoss"]?.GetValue<decimal>() ?? 0;
-                var volume = position?["volume"]?.GetValue<decimal>() ?? 0;
-                var tickSize = position?["tickSize"]?.GetValue<decimal>() ?? 0;
-                var tickValue = position?["tickValue"]?.GetValue<decimal>() ?? 0;
                 if (position is not null)
-                    position["initialRiskAmount"] = entry > 0 && stop > 0 && volume > 0 && tickSize > 0 && tickValue > 0
-                        ? JsonValue.Create(Math.Abs(entry - stop) / tickSize * tickValue * volume) : null;
+                    position["initialRiskAmount"] = JsonValue.Create(Mt4RiskCalculator.Calculate(position, account["currency"]!.GetValue<string>()));
             }
         }
         var payload = JsonSerializer.SerializeToElement(root, ProtocolJson.Options);
@@ -89,8 +83,12 @@ public sealed class Mt4FileClient(string terminalPath, string dataDirectory) : I
         string? connectedAccount = null;
         string? lastCharts = null;
         string? lastHistoryStatus = null;
+        string? historySignature = null;
         var knownDeals = new Dictionary<long, DealRecord>();
         var knownCashFlows = new Dictionary<long, AccountCashFlow>();
+        IReadOnlyDictionary<long, long> aliases = new Dictionary<long, long>();
+        var archive = new Mt4OrderArchive(dataDirectory);
+        var tickArchive = new Mt4TickArchive(dataDirectory);
         var historyReceived = false;
         int? historyOffset = null;
         var nextHistoryRead = DateTimeOffset.MinValue;
@@ -106,7 +104,7 @@ public sealed class Mt4FileClient(string terminalPath, string dataDirectory) : I
                 using var reader = new StreamReader(stream);
                 frame = ReadFrame(await reader.ReadToEndAsync(cancellationToken), terminalPath, DateTimeOffset.UtcNow);
             }
-            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException
+            catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException or JsonException
                 or InvalidOperationException or ArgumentException or FormatException or NullReferenceException or KeyNotFoundException or OverflowException)
             {
                 // Incomplete writes, removed EAs and stale files must never masquerade as live data.
@@ -125,22 +123,21 @@ public sealed class Mt4FileClient(string terminalPath, string dataDirectory) : I
                     await EmitAsync("connection", new { connected = true }, frame.AccountKey, cancellationToken);
                     knownDeals.Clear();
                     knownCashFlows.Clear();
+                    aliases = new Dictionary<long, long>();
                     historyReceived = false;
                     nextHistoryRead = DateTimeOffset.MinValue;
                     lastCharts = null;
                     lastHistoryStatus = null;
+                    historySignature = null;
                 }
                 connectedAccount = frame.AccountKey;
                 instance = frame.InstanceId;
                 lastSequence = frame.Sequence;
-                await EmitAsync("snapshot", frame.Payload, frame.AccountKey, cancellationToken, frame.CapturedAtUtc);
-                if (frame.Payload.TryGetProperty("charts", out var charts) && charts.GetRawText() != lastCharts)
-                {
-                    await EmitAsync("chart_snapshot", charts, frame.AccountKey, cancellationToken, frame.CapturedAtUtc);
-                    lastCharts = charts.GetRawText();
-                }
+                object? pendingDeals = null;
+                object? pendingStatus = null;
                 var force = Interlocked.Exchange(ref _forceHistoryRefresh, 0) != 0;
-                if (frame.Payload.GetProperty("historyAvailable").GetBoolean() && (force || DateTimeOffset.UtcNow >= nextHistoryRead))
+                var signature = frame.Payload.TryGetProperty("liveOrderSignature", out var liveSignature) ? liveSignature.GetString() : null;
+                if (frame.Payload.GetProperty("historyAvailable").GetBoolean() && (force || signature != historySignature || DateTimeOffset.UtcNow >= nextHistoryRead))
                 {
                     var now = DateTimeOffset.UtcNow;
                     nextHistoryRead = now.AddSeconds(5);
@@ -152,31 +149,54 @@ public sealed class Mt4FileClient(string terminalPath, string dataDirectory) : I
                             FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
                         if (historyStream.Length > 64 * 1024 * 1024) throw new InvalidDataException("MT4 history exceeds size limit.");
                         using var historyReader = new StreamReader(historyStream);
-                        var batch = Mt4HistoryMapper.Read(await historyReader.ReadToEndAsync(cancellationToken), frame, terminalPath, now);
+                        var batch = await archive.MergeAsync(await historyReader.ReadToEndAsync(cancellationToken), frame, terminalPath, now, cancellationToken);
                         var offset = frame.Payload.GetProperty("serverUtcOffsetSeconds").GetInt32();
-                        var recovery = !historyReceived || force || offset != historyOffset || now >= nextFullHistory;
+                        var nextAliases = batch.Mt4PositionAliases ?? new Dictionary<long, long>();
+                        var linksChanged = aliases.Count != nextAliases.Count || nextAliases.Any(p => aliases.GetValueOrDefault(p.Key) != p.Value);
+                        var recovery = !historyReceived || force || offset != historyOffset || now >= nextFullHistory || linksChanged;
                         var deals = batch.Deals.Where(item => recovery || !knownDeals.TryGetValue(item.Ticket, out var old) || old != item).ToArray();
                         var cashFlows = batch.CashFlows.Where(item => recovery || !knownCashFlows.TryGetValue(item.Ticket, out var old) || old != item).ToArray();
                         if (recovery || deals.Length > 0 || cashFlows.Length > 0)
-                            await EmitAsync("deals", new { deals, cashFlows, symbolSpecifications = batch.SymbolSpecifications, isRecovery = recovery }, frame.AccountKey, cancellationToken);
+                            pendingDeals = new { deals = nextAliases.Count > 0 ? batch.Deals : deals, cashFlows, symbolSpecifications = batch.SymbolSpecifications, isRecovery = recovery,
+                                mt4PositionAliases = nextAliases.Count == 0 ? null : nextAliases };
+                        aliases = nextAliases;
                         foreach (var deal in batch.Deals) knownDeals[deal.Ticket] = deal;
                         foreach (var cashFlow in batch.CashFlows) knownCashFlows[cashFlow.Ticket] = cashFlow;
                         if (recovery) nextFullHistory = now.AddMinutes(1);
                         historyReceived = true;
                         ready = true;
                         historyOffset = offset;
-                        status = $"MT4 · 已读取 {batch.Deals.Count(item => item.EntryKind == DealEntryKind.Out)} 条已平仓订单；历史范围以终端设置为准";
+                        historySignature = signature;
+                        status = $"MT4 · 已存档 {batch.Deals.Count(item => item.EntryKind == DealEntryKind.Out)} 条平仓记录 · 已关联 {aliases.Count} 张部分平仓后续票号；未读取过的历史仍以终端加载范围为准";
                     }
-                    catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException
-                        or InvalidOperationException or ArgumentException or FormatException or KeyNotFoundException)
+                    catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException or JsonException
+                        or InvalidOperationException or ArgumentException or FormatException or KeyNotFoundException or Microsoft.Data.Sqlite.SqliteException)
                     {
                         status = "MT4 历史尚未就绪或已过期；请更新桥接插件，并在终端账户历史中选择全部历史";
                     }
                     if (status != lastHistoryStatus)
                     {
-                        await EmitAsync("history_status", new { message = status, ready }, frame.AccountKey, cancellationToken);
+                        pendingStatus = new { message = status, ready };
                         lastHistoryStatus = status;
                     }
+                }
+                // Resolve fresh order links before exposing a replacement ticket as a new position.
+                var live = JsonNode.Parse(frame.Payload.GetRawText())!.AsObject();
+                foreach (var position in live["positions"]!.AsArray())
+                    if (aliases.TryGetValue(position!["ticket"]!.GetValue<long>(), out var positionId)) position["positionId"] = positionId;
+                await EmitAsync("snapshot", live, frame.AccountKey, cancellationToken, frame.CapturedAtUtc);
+                if (pendingDeals is not null) await EmitAsync("deals", pendingDeals, frame.AccountKey, cancellationToken);
+                if (pendingStatus is not null) await EmitAsync("history_status", pendingStatus, frame.AccountKey, cancellationToken);
+                if (frame.Payload.TryGetProperty("charts", out var charts) && charts.GetRawText() != lastCharts)
+                {
+                    await EmitAsync("chart_snapshot", charts, frame.AccountKey, cancellationToken, frame.CapturedAtUtc);
+                    lastCharts = charts.GetRawText();
+                }
+                try { await tickArchive.AppendAsync(frame, cancellationToken); }
+                catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException
+                    or InvalidOperationException or JsonException or KeyNotFoundException or FormatException or OverflowException)
+                {
+                    await EmitAsync("history_status", new { message = "MT4 报价存档失败，Tick 回放可能有缺口：" + exception.Message, ready = historyReceived }, frame.AccountKey, cancellationToken);
                 }
             }
             await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);

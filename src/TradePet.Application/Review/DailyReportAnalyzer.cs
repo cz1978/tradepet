@@ -72,7 +72,7 @@ public static class DailyReportAnalyzer
             $"当日成交现金净盈亏 {Money(facts.RealizedCashPnl)}；当日完整平仓交易的全生命周期净盈亏 {Money(facts.CompleteTradeNetPnl)}。跨日和部分平仓可导致两者不同。",
             $"完整平仓 {completed.Length} 笔，盈利 {wins.Length}、亏损 {losses.Length}、持平 {completed.Length - wins.Length - losses.Length}；按净盈亏 ±0.01 判定胜负。",
         };
-        if (mt4) results.Insert(1, "MT4 统计按订单票据：每条已平仓记录计一笔，部分平仓后的剩余票据不推测合并。费用按已平仓订单记录归入平仓日，开仓/最大手数为该票据的记录手数；显示及日期归属以 broker 服务器为准，历史 UTC 按当前偏移换算，跨夏令时的实际持仓时长存在限制。初始风险按 broker 的 tick 价值估算，仅有可靠开仓采样时计算 R。");
+        if (mt4) results.Insert(1, "MT4 按已存档订单计算：有 broker 票号关联证据的部分平仓归入同一持仓，全部平完才计为完整交易；缺少关联证据的订单保持独立。费用按各平仓记录归入平仓日，原始票号保留在成交明细。显示及日期归属以 broker 服务器为准；历史 UTC 按当前偏移换算，跨夏令时的实际持仓时长存在限制。初始风险优先用合约与盈亏币种换算，仅有可靠开仓采样时计算 R。");
         if (completed.Length > 0)
         {
             results.Add($"盈利交易净额合计 {Money(winningPnl)}；亏损交易净额合计 {Money(losingPnl)}；平均每笔 {Money(completed.Average(t => t.NetPnl))}。");
