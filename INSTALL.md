@@ -1,14 +1,14 @@
 # TradePet 安装与升级说明
 
-适用于 **1.0.0-rc.4 源码构建 / Windows 10、11 x64**。当前是候选版，支持 MT5 与 MT4；MT4 历史按订单票据统计。TradePet 不执行下单、平仓或改单。
+适用于 **1.0.0-rc.4 / Windows 10、11 x64**。当前是候选版，支持 MT5 与 MT4；MT4 历史按订单票据统计。TradePet 不执行下单、平仓或改单。
 
-`rc.4` 包含本次 MT4 功能与日报优化，构建步骤见“从源码构建”。下方 GitHub 已发布的 `rc.3` 便携包仍可下载，但不包含本次改进。
+`rc.4` 便携包包含本次 MT4 功能与日报优化。升级后需安装并重新挂载新版 MT4 桥接插件，旧的 `rc.3` 包不含这些改进。
 
 ## 下载并启动
 
-1. 打开 [GitHub 发布页](https://github.com/cz1978/tradepet/releases/tag/v1.0.0-rc.3)。
-2. 在 Assets 中下载 `TradePet-1.0.0-rc.3-win-x64.zip`。`Source code` 是开发用源码，不是可运行安装包。
-3. 将 ZIP **完整解压**到自己的应用目录，例如 `D:\Apps\TradePet-1.0.0-rc.3`。
+1. 打开 [GitHub 发布页](https://github.com/cz1978/tradepet/releases/tag/v1.0.0-rc.4)。
+2. 在 Assets 中下载 `TradePet-1.0.0-rc.4-win-x64.zip`。`Source code` 是开发用源码，不是可运行安装包。
+3. 将 ZIP **完整解压**到自己的应用目录，例如 `D:\Apps\TradePet-1.0.0-rc.4`。
 4. 运行解压目录内的 `TradePet.exe`，跟随四步设置向导完成配置。不要在压缩包内直接运行，也不要只复制 EXE。
 
 便携包已包含 .NET 8 运行时，无需安装 .NET SDK。保留同目录的 DLL、`Runtime` 和 `Assets` 文件夹。
@@ -16,7 +16,7 @@
 发布页还提供 `SHA256SUMS.txt`。需要核对下载完整性时，在 ZIP 所在目录执行并与该文件比较：
 
 ```powershell
-Get-FileHash .\TradePet-1.0.0-rc.3-win-x64.zip -Algorithm SHA256
+Get-FileHash .\TradePet-1.0.0-rc.4-win-x64.zip -Algorithm SHA256
 ```
 
 该校验用于确认文件一致性，不代替数字签名。当前包未做代码签名；遇到 Windows 提示时先核对来源及哈希，不要关闭系统防护。
