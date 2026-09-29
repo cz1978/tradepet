@@ -2,9 +2,9 @@
 
 > 陪你交易，不替你交易。
 
-**当前版本：1.0.0-rc.5（候选版，2026-09-28）** · [下载 Windows 便携版](https://github.com/cz1978/tradepet/releases/tag/v1.0.0-rc.5) · [安装与升级说明](INSTALL.md) · [更新日志](CHANGELOG.md) · [MIT 许可证](LICENSE)
+**当前版本：1.0.0-rc.6（候选版，2026-09-29）** · [下载 Windows 便携版](https://github.com/cz1978/tradepet/releases/tag/v1.0.0-rc.6) · [安装与升级说明](INSTALL.md) · [更新日志](CHANGELOG.md) · [MIT 许可证](LICENSE)
 
-本次 MT4 订单存档、部分平仓归集、真实报价回放与风险计算改进包含在 `rc.5` 源码和便携包中。使用 MT4 时须同时升级并重新挂载包内的桥接插件。
+`rc.6` 修复新电脑未安装 Python 时 MT5 首次配置失败的问题：便携包已内置 Python 和采集依赖，完整解压即可使用。保留 `rc.5` 的 MT4 订单存档、部分平仓归集、真实报价回放与风险计算改进；使用 MT4 时须安装并挂载包内的桥接插件。
 
 TradePet 是一款面向 Windows 的本地交易桌宠。它以只读方式连接 MT5 或 MT4，把持仓、风险、交易计划、复盘、宏观事件和每日报告收进桌面助手里。
 
@@ -67,11 +67,11 @@ TradePet 会把完整亏损交易投影为可追溯的价格区域，记录进�
 
 ## 安装与首次连接
 
-普通用户请下载发布页中的 **`TradePet-1.0.0-rc.5-win-x64.zip`**，完整解压后运行 `TradePet.exe`。不要下载 GitHub 自动生成的 `Source code` 源码包作为安装包，也不要单独移动 EXE。
+普通用户请下载发布页中的 **`TradePet-1.0.0-rc.6-win-x64.zip`**，完整解压后运行 `TradePet.exe`。不要下载 GitHub 自动生成的 `Source code` 源码包作为安装包，也不要单独移动 EXE。
 
-便携包已包含 .NET 8 运行时、MT4/MT5 只读插件和安装文档，无需另装 .NET SDK。MT5 另需 64 位 Python 3.13；MT4 无需 Python。首次配置、升级保留数据、校验安装包和排障步骤见 [INSTALL.md](INSTALL.md)。
+`rc.6` 便携包已包含 .NET 8、64 位 Python 3.13、MetaTrader5/NumPy 依赖、MT4/MT5 只读插件和安装文档，无需另装 Python 或联网下载依赖。旧版 `rc.5` 及更早版本未包含 Python，建议升级；MT4 无需 Python。首次配置、升级保留数据、校验安装包和排障步骤见 [INSTALL.md](INSTALL.md)。
 
-### 平台支持范围（rc.5）
+### 平台支持范围（rc.6）
 
 | 功能 | MT5 | MT4 |
 | --- | --- | --- |
@@ -80,7 +80,7 @@ TradePet 会把完整亏损交易投影为可追溯的价格区域，记录进�
 | 图表计划、每日交易报告 | 支持，部分功能需要桥接插件 | 支持，需要新版桥接插件 |
 | 经济日历 | MT5 内置日历 | Forex Factory 公开周历及事前提醒，不提供实时公布值 |
 | 历史行情回放 | K 线 / Tick，取决于终端历史覆盖 | M5 K 线及本地实际报价 Tick 回放；未采集的 Tick 不回补 |
-| Python | 需要 64 位 Python 3.13 | 不需要 |
+| Python | 已内置 64 位 Python 3.13 及依赖 | 不需要 |
 
 每次连接一个终端。MT4 缺少历史数据的指标显示“—”，不会用零代替；MT5 净额或交易所账户的限制见下文“账户模式与统计口径”。
 
@@ -88,7 +88,7 @@ TradePet 会把完整亏损交易投影为可追溯的价格区域，记录进�
 
 - Windows 10/11 x64
 - MetaTrader 5，或 MetaTrader 4（需挂载对应的只读桥接插件，能力差异见上表）
-- 从源码构建完整发布包时需要 .NET 8 SDK、MT4 和 MT5 自带的 MetaEditor；MT5 采集另需 64 位 Python 3.13，MT4 不需要 Python
+- 从源码构建完整发布包时需要 .NET 8 SDK、MT4 和 MT5 自带的 MetaEditor，以及带 pip 的 Python。构建时联网下载并打包官方 Python 3.13 x64 和固定版本依赖；用户运行便携包无需另装 Python
 
 ### 从源码构建
 
@@ -98,16 +98,16 @@ cd tradepet
 .\scripts\build-release.ps1
 ```
 
-发布目录为 `artifacts\TradePet-win-x64`。该目录是自包含的 Windows x64 便携版，不包含 Python 本身。
+发布目录为 `artifacts\TradePet-win-x64`。该目录是自包含的 Windows x64 便携版，内含 `Runtime\python-runtime`，无需依赖用户电脑上的 Python。构建脚本会验证 Python 下载文件的 SHA256，并检查内置依赖和采集模块能否加载；打包失败会终止构建。
 
-MT5 编译器默认路径为 `C:\Program Files\WeTrade MetaTrader 5 Terminal\MetaEditor64.exe`，MT4 编译器会从 Program Files 自动查找。其他安装位置可传 `-Mt5MetaEditorPath`、`-Mt4MetaEditorPath`，也可用 `-OutputDirectory` 指定发布目录；完整命令见 [源码构建说明](INSTALL.md#从源码构建)。
+MT5 编译器默认路径为 `C:\Program Files\WeTrade MetaTrader 5 Terminal\MetaEditor64.exe`，MT4 编译器会从 Program Files 自动查找。其他安装位置可传 `-Mt5MetaEditorPath`、`-Mt4MetaEditorPath`、`-PythonPath`，也可用 `-OutputDirectory` 指定发布目录；完整命令见 [源码构建说明](INSTALL.md#从源码构建)。
 
 ### 首次设置向导
 
 首次启动（以及旧版本首次升级）会打开四步设置向导：选择 MT4 / MT5 和终端、准备连接、检查状态、设置桌宠偏好。选择“稍后设置”不会标为完成，下次启动继续提示；成功保存后不再自动弹出。随时可从“设置中心 → 打开设置向导”重新进入。
 
 1. 先启动交易终端并登录账户，在向导中选择它；未自动识别时可以浏览 `terminal64.exe`（MT5）或 `terminal.exe`（MT4）。每次只连接一个终端。
-2. MT5 用户先检测 Python，缺少依赖时点击修复；也可以选择已安装的 Python 3.13。MT4 跳过此步骤。
+2. MT5 用户点击“检测 Python”确认内置环境就绪。源码开发环境或旧发布包仍需安装 Python 并修复依赖。MT4 跳过此步骤。
 3. 点击“安装 / 更新只读插件”，在对应终端导航器中刷新 EA 列表，把 `TradePet / TradePetBridge` 拖到一个图表，并保持该图表打开。MT4 插件无需 DLL 或实盘交易权限，只挂一个图表。
 4. 检查账户与插件状态，选择桌宠偏好并保存。更换平台、终端或修复 Python 后，需要退出并重新启动 TradePet；保存设置本身不代表连接成功。
 

@@ -24,6 +24,12 @@ public partial class SetupWindow : Window
         _viewModel = viewModel;
         _save = save;
         InitializeComponent();
+        if (RuntimePaths.Resolve().PythonIsBundled)
+        {
+            PythonDescription.Text = "已内置 MT5 所需的 Python 和依赖，无需另行安装或联网下载。";
+            PythonStatus.Text = "点击“检测 Python”确认内置环境可用。";
+            ExternalPythonActions.Visibility = Visibility.Collapsed;
+        }
         DataContext = viewModel;
         _ready = true;
         RefreshTerminals();
@@ -126,7 +132,9 @@ public partial class SetupWindow : Window
     });
     private async void CheckPython_Click(object sender, RoutedEventArgs e) => await RunAsync(async () =>
     {
-        PythonStatus.Text = await SetupOperations.CheckPythonAsync(_closed.Token) ? "Python 和 MetaTrader5 依赖已就绪。" : "依赖未就绪，请点击修复。";
+        PythonStatus.Text = await SetupOperations.CheckPythonAsync(_closed.Token) ? "Python 和 MetaTrader5 依赖已就绪。"
+            : RuntimePaths.Resolve().PythonIsBundled ? "内置 Python 环境不完整或无法启动，请退出后重新完整解压发布包。"
+            : "依赖未就绪，请点击修复。";
         Status.Text = PythonStatus.Text;
     });
     private async void RepairPython_Click(object sender, RoutedEventArgs e) => await RepairAsync(null);

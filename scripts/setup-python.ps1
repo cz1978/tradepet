@@ -3,6 +3,14 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$bundledDirectory = Join-Path $PSScriptRoot 'python-runtime'
+if (Test-Path -LiteralPath $bundledDirectory) {
+    $bundledPython = Join-Path $bundledDirectory 'python.exe'
+    if (-not (Test-Path -LiteralPath $bundledPython)) { throw 'Bundled Python is missing. Extract the complete TradePet release ZIP again.' }
+    & $bundledPython -X utf8 -c "import MetaTrader5, numpy; print('TradePet bundled Python environment is ready.')"
+    if ($LASTEXITCODE -ne 0) { throw 'Bundled Python is damaged. Extract the complete TradePet release ZIP again.' }
+    return
+}
 $requirementsPath = Join-Path $PSScriptRoot 'python\requirements.txt'
 if (-not (Test-Path -LiteralPath $requirementsPath)) {
     $requirementsPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'python\requirements.txt'

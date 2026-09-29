@@ -139,6 +139,10 @@ public sealed class Mt5WorkerClient : ITradingWorkerClient
             StandardOutputEncoding = System.Text.Encoding.UTF8,
             StandardErrorEncoding = System.Text.Encoding.UTF8,
         };
+        // Embedded Python ignores PYTHON* environment variables in isolated mode.
+        startInfo.ArgumentList.Add("-u");
+        startInfo.ArgumentList.Add("-X");
+        startInfo.ArgumentList.Add("utf8");
         startInfo.ArgumentList.Add(_options.WorkerScriptPath);
         startInfo.ArgumentList.Add("--terminal-path");
         startInfo.ArgumentList.Add(_options.TerminalPath);

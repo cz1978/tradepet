@@ -8,11 +8,13 @@ internal sealed record RuntimePaths(
     string HistoryWorkerScript,
     string BridgeCompiled,
     string BridgeSource,
-    string PythonSetupScript)
+    string PythonSetupScript,
+    bool PythonIsBundled)
 {
-    public static RuntimePaths Resolve()
+    public static RuntimePaths Resolve(string? baseDirectory = null, string? dataDirectory = null)
     {
-        var baseDirectory = AppContext.BaseDirectory;
+        baseDirectory ??= AppContext.BaseDirectory;
+        dataDirectory ??= TradePet.Infrastructure.Persistence.TradePetPaths.GetDataDirectory();
         var packagedWorker = Path.Combine(baseDirectory, "Runtime", "python", "tradepet_mt5_worker.py");
         var packagedHistoryWorker = Path.Combine(baseDirectory, "Runtime", "python", "tradepet_mt5_history_worker.py");
         var packagedBridge = Path.Combine(baseDirectory, "Runtime", "TradePetBridge.ex5");
@@ -35,18 +37,22 @@ internal sealed record RuntimePaths(
             ? string.Empty
             : Path.Combine(repoRoot, ".venv", "Scripts", "python.exe");
         var userEnvironmentPython = Path.Combine(
-            TradePet.Infrastructure.Persistence.TradePetPaths.GetDataDirectory(),
+            dataDirectory,
             "python",
             "venv",
             "Scripts",
             "python.exe");
         var systemPython = @"C:\Program Files\Python313\python.exe";
-        var python = File.Exists(userEnvironmentPython)
+        var bundledDirectory = Path.Combine(baseDirectory, "Runtime", "python-runtime");
+        // A damaged bundle must report a failure rather than silently use another interpreter.
+        var bundled = Directory.Exists(bundledDirectory);
+        var python = bundled ? Path.Combine(bundledDirectory, "python.exe")
+            : File.Exists(userEnvironmentPython)
             ? userEnvironmentPython
             : File.Exists(virtualEnvironmentPython) ? virtualEnvironmentPython
             : File.Exists(systemPython) ? systemPython : "python";
         var setup = File.Exists(packagedSetup) ? packagedSetup : Path.Combine(repoRoot ?? baseDirectory, "scripts", "setup-python.ps1");
-        return new RuntimePaths(python, worker, historyWorker, bridge, source, setup);
+        return new RuntimePaths(python, worker, historyWorker, bridge, source, setup, bundled);
     }
 
     private static string? FindRepoRoot(string startingPath)

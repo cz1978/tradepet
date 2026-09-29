@@ -29,8 +29,8 @@
                 <StackPanel x:Name="PrepareStep" Visibility="Collapsed">
                     <TextBlock Text="2 · 准备连接" Style="{StaticResource SectionTitleStyle}"/>
                     <StackPanel x:Name="PythonPanel" Margin="0,14,0,18">
-                        <TextBlock Text="MT5 需要 Python 和 MetaTrader5 依赖。修复会从网络下载依赖，可能需要几分钟。" TextWrapping="Wrap"/>
-                        <WrapPanel Margin="0,12,0,0"><Button Content="检测 Python" Click="CheckPython_Click"/><Button Content="修复 Python 依赖" Click="RepairPython_Click"/><Button Content="选择 Python…" Click="BrowsePython_Click"/></WrapPanel>
+                        <TextBlock x:Name="PythonDescription" Text="当前为开发环境，需要 64 位 Python 3.13。修复会从网络下载依赖，可能需要几分钟。" TextWrapping="Wrap"/>
+                        <WrapPanel Margin="0,12,0,0"><Button Content="检测 Python" Click="CheckPython_Click"/><WrapPanel x:Name="ExternalPythonActions"><Button Content="修复 Python 依赖" Click="RepairPython_Click"/><Button Content="选择 Python…" Click="BrowsePython_Click"/></WrapPanel></WrapPanel>
                         <TextBlock x:Name="PythonStatus" Text="尚未检测；若未安装 Python，请先安装 64 位 Python 3.13。" TextWrapping="Wrap" Margin="0,10,0,0" Style="{StaticResource MutedTextStyle}"/>
                     </StackPanel>
                     <TextBlock x:Name="BridgeInstructions" TextWrapping="Wrap" Margin="0,14,0,16"/>

@@ -2,10 +2,12 @@ param(
     [string]$RuntimeIdentifier = 'win-x64',
     [string]$Mt5MetaEditorPath,
     [string]$Mt4MetaEditorPath,
-    [string]$OutputDirectory
+    [string]$OutputDirectory,
+    [string]$PythonPath = 'python'
 )
 
 $ErrorActionPreference = 'Stop'
+if ($RuntimeIdentifier -ne 'win-x64') { throw 'The bundled MT5 Python runtime requires win-x64.' }
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $mt5Options = @{}
 if ($Mt5MetaEditorPath) { $mt5Options.MetaEditorPath = $Mt5MetaEditorPath }
@@ -25,5 +27,7 @@ dotnet publish (Join-Path $repoRoot 'src\TradePet.App\TradePet.App.csproj') `
     --property:PublishSingleFile=false `
     --output $publishDirectory
 if ($LASTEXITCODE -ne 0) { throw 'TradePet publish failed.' }
+
+& (Join-Path $PSScriptRoot 'build-python-runtime.ps1') -PublishDirectory $publishDirectory -PythonPath $PythonPath
 
 Write-Output $publishDirectory

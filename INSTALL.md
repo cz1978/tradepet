@@ -1,22 +1,24 @@
 # TradePet 安装与升级说明
 
-适用于 **1.0.0-rc.5 / Windows 10、11 x64**。当前是候选版，支持 MT5 与 MT4；MT4 支持订单存档、有证据的部分平仓归集及实际报价回放。TradePet 不执行下单、平仓或改单。
+适用于 **1.0.0-rc.6 / Windows 10、11 x64**。当前是候选版，支持 MT5 与 MT4；MT4 支持订单存档、有证据的部分平仓归集及实际报价回放。TradePet 不执行下单、平仓或改单。
 
-`rc.5` 便携包包含本次 MT4 功能与日报优化。升级后需安装并重新挂载新版 MT4 桥接插件，旧的 `rc.3` 包不含这些改进。
+`rc.6` 便携包内置 Python 和采集依赖，并保留 `rc.5` 的 MT4 功能与日报优化。从更早版本升级后需安装并重新挂载包内的 MT4 桥接插件。
+
+旧版 `rc.5` 及更早版本仍需手动配置 Python；建议下载 `rc.6` 完整便携包。
 
 ## 下载并启动
 
-1. 打开 [GitHub 发布页](https://github.com/cz1978/tradepet/releases/tag/v1.0.0-rc.5)。
-2. 在 Assets 中下载 `TradePet-1.0.0-rc.5-win-x64.zip`。`Source code` 是开发用源码，不是可运行安装包。
-3. 将 ZIP **完整解压**到自己的应用目录，例如 `D:\Apps\TradePet-1.0.0-rc.5`。
+1. 打开 [GitHub 发布页](https://github.com/cz1978/tradepet/releases/tag/v1.0.0-rc.6)。
+2. 在 Assets 中下载 `TradePet-1.0.0-rc.6-win-x64.zip`。`Source code` 是开发用源码，不是可运行安装包。
+3. 将 ZIP **完整解压**到自己的应用目录，例如 `D:\Apps\TradePet-1.0.0-rc.6`。
 4. 运行解压目录内的 `TradePet.exe`，跟随四步设置向导完成配置。不要在压缩包内直接运行，也不要只复制 EXE。
 
-便携包已包含 .NET 8 运行时，无需安装 .NET SDK。保留同目录的 DLL、`Runtime` 和 `Assets` 文件夹。
+便携包已包含 .NET 8、Python 和采集依赖，无需安装 .NET SDK 或 Python。保留同目录的 DLL、`Runtime` 和 `Assets` 文件夹。
 
 发布页还提供 `SHA256SUMS.txt`。需要核对下载完整性时，在 ZIP 所在目录执行并与该文件比较：
 
 ```powershell
-Get-FileHash .\TradePet-1.0.0-rc.5-win-x64.zip -Algorithm SHA256
+Get-FileHash .\TradePet-1.0.0-rc.6-win-x64.zip -Algorithm SHA256
 ```
 
 该校验用于确认文件一致性，不代替数字签名。当前包未做代码签名；遇到 Windows 提示时先核对来源及哈希，不要关闭系统防护。
@@ -28,14 +30,16 @@ Get-FileHash .\TradePet-1.0.0-rc.5-win-x64.zip -Algorithm SHA256
 ### 1. 准备终端和 Python
 
 - 安装并启动自己的 MetaTrader 5，登录要监控的账户。
-- 安装 **64 位 Python 3.13**。便携包不包含 Python 安装器。
+- `rc.6` 便携包已内置 **64 位 Python 3.13** 和依赖，无需另装。旧版 `rc.5` 及更早发布包需自行安装 64 位 Python 3.13。
 - 向导中选择“MT5”，选中对应 `terminal64.exe`。未自动发现时点击“浏览终端”。
 
 每次只连接一个终端。需要完整交易复盘时，请使用 MT5 对冲账户；净额和交易所账户提供持仓及账户级风险监控。
 
 ### 2. 准备采集环境
 
-在向导中检测 Python。缺少依赖时点击修复；自动路径不匹配时，选择已安装的 Python 3.13 的 `python.exe`。修复需要联网下载 `Runtime\python\requirements.txt` 中固定版本的依赖。
+新版便携包在向导中点击“检测 Python”即可。程序优先使用 `Runtime\python-runtime\python.exe`，无需联网安装依赖，也不受旧版用户环境影响。请保留整个 `Runtime` 目录；检测失败时，退出助手并将完整 ZIP 重新解压到新目录。内置环境的许可文件位于 `Runtime\python-runtime\LICENSE.txt` 及 `Lib\site-packages` 下各组件目录。
+
+仅旧发布包或源码开发环境需要手动配置：在向导中检测 Python，缺少依赖时点击修复；自动路径不匹配时，选择已安装的 Python 3.13 的 `python.exe`。此方式需要联网下载 `Runtime\python\requirements.txt` 中固定版本的依赖。
 
 修复会使用 `%LOCALAPPDATA%\TradePet\python\venv` 作为专用 Python 环境。也可在解压目录手动运行：
 
@@ -103,7 +107,7 @@ Tick 回放需要同时运行 TradePet 和新版插件。挂图品种采集 Tick
 | 启动后没有新窗口 | 检查托盘是否已有助手。应用限制单实例；先退出旧进程，再运行新版。 |
 | 找不到终端 | 先启动并登录终端，再刷新或浏览实际 EXE；确认 MT4 对应 `terminal.exe`，MT5 对应 `terminal64.exe`。 |
 | 保存的终端已不存在 | 重新选择终端并保存。助手不会自动换到其他终端。 |
-| MT5 Python 检测失败 | 选择 64 位 Python 3.13，联网修复依赖后重启助手；检查 `%LOCALAPPDATA%\TradePet` 下的日志。 |
+| MT5 Python 检测失败 | 新版内置环境：退出助手后重新完整解压 ZIP，保留 `Runtime\python-runtime`。旧包/开发环境：选择 64 位 Python 3.13，联网修复依赖后重启助手。 |
 | 只读插件文件不完整 | 重新完整解压便携 ZIP，确认 `Runtime\TradePetBridge.ex5` 和 `Runtime\mt4\TradePetBridge.ex4` 存在。 |
 | 等待桥接插件 / MT4 数据过期 | 确认插件挂在所选终端的图表上，终端已登录且保持运行；MT4 只挂一个图表。 |
 | MT4 历史和日报为空 | 更新并重新挂载新版插件，账户历史选择“全部历史”，等待报价校时；休市时核实并填写 EA 的 UTC 偏移参数。 |
@@ -113,7 +117,7 @@ Tick 回放需要同时运行 TradePet 和新版插件。挂图品种采集 Tick
 
 ## 从源码构建
 
-开发机需要 Git、.NET 8 SDK，以及 MT4/MT5 自带的 MetaEditor 编译器。运行 MT5 采集还需要 64 位 Python 3.13。
+开发机需要 Git、.NET 8 SDK、MT4/MT5 自带的 MetaEditor 编译器，以及带 pip 的 Python（可用 `-PythonPath` 指定）。构建时需联网下载官方 Python 3.13 x64 嵌入包及依赖，用户运行生成的便携包无需安装 Python。
 
 ```powershell
 git clone https://github.com/cz1978/tradepet.git
@@ -123,7 +127,7 @@ cd tradepet
   -Mt4MetaEditorPath 'C:\你的MT4目录\metaeditor.exe'
 ```
 
-脚本编译两种只读插件并发布 .NET 应用，默认输出到 `artifacts\TradePet-win-x64`。可传 `-OutputDirectory 'D:\Builds\TradePet-win-x64'` 改变输出位置，避免覆盖正在运行的程序。
+脚本编译两种只读插件、发布 .NET 应用并打包验证 Python 环境，默认输出到 `artifacts\TradePet-win-x64`。可传 `-OutputDirectory 'D:\Builds\TradePet-win-x64'` 改变输出位置，避免覆盖正在运行的程序。仅运行 `dotnet publish` 不会生成完整 Python 便携环境，发布时必须使用 `scripts\build-release.ps1`。
 
 不传编译器参数时，MT5 默认使用 `C:\Program Files\WeTrade MetaTrader 5 Terminal\MetaEditor64.exe`；MT4 从 Program Files 查找。完整发布包需要两种编译器，即使运行时只选择一种平台。
 
