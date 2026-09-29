@@ -21,6 +21,7 @@
     <Content Include="..\..\README.md" Link="README.md" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\LICENSE" Link="LICENSE" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\INSTALL.md" Link="INSTALL.md" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\docs\images\tradepet-rc6-install-guide.png" Link="docs\images\tradepet-rc6-install-guide.png" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\CHANGELOG.md" Link="CHANGELOG.md" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\baoer-pet\pet.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\baoer-pet\spritesheet.webp" CopyToOutputDirectory="PreserveNewest" />

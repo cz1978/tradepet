@@ -6,6 +6,14 @@
 
 旧版 `rc.5` 及更早版本仍需手动配置 Python；建议下载 `rc.6` 完整便携包。
 
+## 图文快速安装
+
+**Python 已内置，Bridge 仍需安装并挂到图表。** 点击“安装 / 更新只读插件”只会复制插件文件，还需在交易终端的导航器中刷新，然后把 `TradePetBridge` 拖到一个未挂其他 EA 的图表，点击“确定”。
+
+![TradePet rc.6 图文安装教程：下载解压、选择终端、安装 Bridge、刷新导航器、拖到图表、保存并确认连接](docs/images/tradepet-rc6-install-guide.png)
+
+[打开高清长图](docs/images/tradepet-rc6-install-guide.png)。图中界面为操作示意，菜单名称可能随终端语言略有差异；下文提供可复制的路径与详细步骤。
+
 ## 下载并启动
 
 1. 打开 [GitHub 发布页](https://github.com/cz1978/tradepet/releases/tag/v1.0.0-rc.6)。
@@ -52,11 +60,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\Runtime\setup-python.ps1 -
 ### 3. 安装只读插件
 
 1. 在向导中点击“安装 / 更新只读插件”。
-2. 切回所选 MT5，在“导航器 → EA / 专家顾问”列表右键刷新。
-3. 将 `TradePet / TradePetBridge` 拖到一个图表，并保持终端和图表打开。
+2. 切回所选 MT5，按 `Ctrl+N` 打开“导航器”，在“EA / Expert Advisors（专家顾问或 EA 交易）”列表右键选择“刷新”。
+3. 展开 `TradePet` 文件夹，将 `TradePetBridge` 拖到一个未挂其他 EA 的图表；弹窗中参数保持默认，点击“确定”，并保持终端和图表打开。只读插件无需开启 DLL 导入或交易权限。
 4. 检查助手连接状态。图表对象和经济日历需要桥接插件连接成功。
 
 插件安装位置为所选终端数据目录的 `MQL5\Experts\TradePet`。若未出现插件，在终端“文件 → 打开数据文件夹”核对是否选中了同一个终端。
+
+手动安装备用方式：将便携包内的 `Runtime\TradePetBridge.ex5` 复制到上述 `MQL5\Experts\TradePet` 文件夹；没有 `TradePet` 文件夹时新建。然后重复刷新、挂图步骤。显示“桥接插件已安装，等待挂图”时，不能仅凭安装成功就跳过挂图。
 
 ### 4. 保存并检查
 
@@ -69,10 +79,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\Runtime\setup-python.ps1 -
 1. 启动 MetaTrader 4 并登录账户。
 2. 在向导中选择“MT4”，选中对应的 `terminal.exe`；MT4 不需要 Python。
 3. 点击“安装 / 更新只读插件”。
-4. 在 MT4“导航器 → EA / 专家顾问”中刷新，将 `TradePet / TradePetBridge` 拖到 **一个** 图表，并保持图表打开。
+4. 按 `Ctrl+N` 打开 MT4“导航器”，在“EA / Expert Advisors”列表右键刷新。展开 `TradePet`，将 `TradePetBridge` 拖到 **一个** 未挂其他 EA 的图表，参数保持默认并点击“确定”，保持图表打开。
 5. 检查状态、保存设置；切换平台或终端后重新启动助手。
 
 MT4 插件位于终端数据目录的 `MQL4\Experts\TradePet`，通过 `MQL4\Files` 中的本地快照传递数据，无需 DLL 或“允许实盘交易”。不要在多个图表同时运行本插件，以免重复写入快照。
+
+手动安装备用方式：在 MT4“文件 → 打开数据文件夹”中找到 `MQL4\Experts`，新建 `TradePet` 文件夹并复制便携包内的 `Runtime\mt4\TradePetBridge.ex4`，然后刷新导航器并挂图。
 
 MT4 支持账户、持仓、挂单、浮亏监控、订单历史复盘、M5 K 线及本地实际报价回放、图表计划、亏损区域和日报。升级后须重新挂载新版插件，并在账户历史中选择“全部历史”。已经读到的订单会持续存档；有 broker 票号关联证据的部分平仓按整笔持仓归集，全部平完后才计入完整交易，原票号及各次费用保留。缺少关联证据时保持独立；尚未读取的历史仍受终端加载范围影响。
 
