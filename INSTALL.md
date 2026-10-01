@@ -1,24 +1,24 @@
 # TradePet 安装与升级说明
 
-适用于 **1.0.0-rc.6 / Windows 10、11 x64**。当前是候选版，支持 MT5 与 MT4；MT4 支持订单存档、有证据的部分平仓归集及实际报价回放。TradePet 不执行下单、平仓或改单。
+适用于 **1.0.0-rc.7 / Windows 10、11 x64**。当前是候选版，支持 MT5 与 MT4；MT4 支持订单存档、有证据的部分平仓归集及实际报价回放。TradePet 不执行下单、平仓或改单。
 
-`rc.6` 便携包内置 Python 和采集依赖，并保留 `rc.5` 的 MT4 功能与日报优化。从更早版本升级后需安装并重新挂载包内的 MT4 桥接插件。
+`rc.7` 增加使用流程引导并修复计划保存、复盘查询，继续内置 Python 和采集依赖，保留 MT4 功能与日报优化。从更早版本升级后需安装并重新挂载包内的 MT4 桥接插件。
 
-旧版 `rc.5` 及更早版本仍需手动配置 Python；建议下载 `rc.6` 完整便携包。
+旧版 `rc.5` 及更早版本仍需手动配置 Python；建议下载 `rc.7` 完整便携包。
 
 ## 图文快速安装
 
 **Python 已内置，Bridge 仍需安装并挂到图表。** 点击“安装 / 更新只读插件”只会复制插件文件，还需在交易终端的导航器中刷新，然后把 `TradePetBridge` 拖到一个未挂其他 EA 的图表，点击“确定”。
 
-![TradePet rc.6 图文安装教程：下载解压、选择终端、安装 Bridge、刷新导航器、拖到图表、保存并确认连接](docs/images/tradepet-rc6-install-guide.png)
+![TradePet 图文安装教程：下载解压、选择终端、安装 Bridge、刷新导航器、拖到图表、保存并确认连接](docs/images/tradepet-rc6-install-guide.png)
 
 [打开高清长图](docs/images/tradepet-rc6-install-guide.png)。图中界面为操作示意，菜单名称可能随终端语言略有差异；下文提供可复制的路径与详细步骤。
 
 ## 下载并启动
 
-1. 打开 [GitHub 发布页](https://github.com/cz1978/tradepet/releases/tag/v1.0.0-rc.6)。
-2. 在 Assets 中下载 `TradePet-1.0.0-rc.6-win-x64.zip`。`Source code` 是开发用源码，不是可运行安装包。
-3. 将 ZIP **完整解压**到自己的应用目录，例如 `D:\Apps\TradePet-1.0.0-rc.6`。
+1. 打开 [GitHub 发布页](https://github.com/cz1978/tradepet/releases/tag/v1.0.0-rc.7)。
+2. 在 Assets 中下载 `TradePet-1.0.0-rc.7-win-x64.zip`。`Source code` 是开发用源码，不是可运行安装包。
+3. 将 ZIP **完整解压**到自己的应用目录，例如 `D:\Apps\TradePet-1.0.0-rc.7`。
 4. 运行解压目录内的 `TradePet.exe`，跟随四步设置向导完成配置。不要在压缩包内直接运行，也不要只复制 EXE。
 
 便携包已包含 .NET 8、Python 和采集依赖，无需安装 .NET SDK 或 Python。保留同目录的 DLL、`Runtime` 和 `Assets` 文件夹。
@@ -26,7 +26,7 @@
 发布页还提供 `SHA256SUMS.txt`。需要核对下载完整性时，在 ZIP 所在目录执行并与该文件比较：
 
 ```powershell
-Get-FileHash .\TradePet-1.0.0-rc.6-win-x64.zip -Algorithm SHA256
+Get-FileHash .\TradePet-1.0.0-rc.7-win-x64.zip -Algorithm SHA256
 ```
 
 该校验用于确认文件一致性，不代替数字签名。当前包未做代码签名；遇到 Windows 提示时先核对来源及哈希，不要关闭系统防护。
@@ -38,7 +38,7 @@ Get-FileHash .\TradePet-1.0.0-rc.6-win-x64.zip -Algorithm SHA256
 ### 1. 准备终端和 Python
 
 - 安装并启动自己的 MetaTrader 5，登录要监控的账户。
-- `rc.6` 便携包已内置 **64 位 Python 3.13** 和依赖，无需另装。旧版 `rc.5` 及更早发布包需自行安装 64 位 Python 3.13。
+- `rc.7` 便携包已内置 **64 位 Python 3.13** 和依赖，无需另装。旧版 `rc.5` 及更早发布包需自行安装 64 位 Python 3.13。
 - 向导中选择“MT5”，选中对应 `terminal64.exe`。未自动发现时点击“浏览终端”。
 
 每次只连接一个终端。需要完整交易复盘时，请使用 MT5 对冲账户；净额和交易所账户提供持仓及账户级风险监控。
@@ -100,6 +100,7 @@ Tick 回放需要同时运行 TradePet 和新版插件。挂图品种采集 Tick
 - 快速复盘队列保存在当前进程内。退出后，历史交易仍可在“复盘分析 → 交易档案”查看并补写；保存过的复盘不会因退出丢失。
 - 没有本次待处理交易时，“快速复盘”会进入复盘分析页。自动分析的原因和改进建议均可修改。
 - 设置向导可从“设置中心 → 打开设置向导”重新进入。
+- 首次打开控制台会显示 7 步流程引导，可跳过；以后从顶部“使用引导”重看。复盘页的“复盘使用引导”按查数据、逐笔还原、分析和改进四步说明，具体字段要求可悬停查看。
 
 ## 从旧版升级
 
@@ -111,6 +112,18 @@ Tick 回放需要同时运行 TradePet 和新版插件。挂图品种采集 Tick
 6. 若使用了桌面快捷方式或开机启动，更新为新版路径；开机启动可在新版设置里关闭再开启。
 
 不要删除 `%LOCALAPPDATA%\TradePet` 来“卸载旧版”，否则会丢失本地数据。需要回退时退出新版，使用升级前的完整数据备份配合旧版程序恢复，避免混用数据库版本。
+
+## 历史数据库修复（可选）
+
+包内 `Runtime\tools\repair_history_database.py` 用于修复已知的历史日状态与风险采样重复或索引问题，不会自动运行或替换应用数据库。先退出助手并保留完整数据备份，再对数据库副本执行；输出必须是尚不存在的新文件。
+
+在解压目录的 PowerShell 中运行，例如：
+
+```powershell
+.\Runtime\python-runtime\python.exe -X utf8 .\Runtime\tools\repair_history_database.py D:\Backup\tradepet-copy.db D:\Backup\tradepet-repaired.db
+```
+
+工具保留原始库，输出新数据库及 `.conflicts.json` 冲突归档，核对数据库完整性、外键和原始交易/复盘记录；校验失败会报错。它不能修复所有类型的数据库损坏，未报告成功的副本不要用于恢复。
 
 ## 常见问题
 
