@@ -70,16 +70,22 @@ public partial class App : System.Windows.Application
         viewModel.HidePet = () => _petWindow.Hide();
         viewModel.ExitApplicationAsync = ShutdownAsync;
         _runtime = new TradePetRuntime(viewModel, dependencies);
+        _mainWindow.SaveGuideCompletionAsync = _runtime.CompleteConsoleGuideAsync;
         viewModel.ShowSetup = () =>
         {
             if (_setupWindow is not null) { _setupWindow.Activate(); return; }
             _setupWindow = new SetupWindow(viewModel, _runtime.CompleteSetupAsync);
-            _setupWindow.Closed += (_, _) => _setupWindow = null;
+            _setupWindow.Closed += (_, _) =>
+            {
+                _setupWindow = null;
+                _mainWindow?.EnableGuideOnFirstOpen();
+            };
             _setupWindow.Show();
         };
         viewModel.TogglePlanRecordingAsync = _runtime.TogglePlanRecordingAsync;
         viewModel.ImportPlanAsync = _runtime.ImportCurrentChartAsync;
         viewModel.SaveSettingsAsync = _runtime.SaveSettingsAsync;
+        viewModel.SaveDailyPlanAsync = _runtime.SaveDailyPlanAsync;
         viewModel.InstallBridgeAsync = _runtime.InstallBridgeAsync;
         viewModel.ReplayScenarioAsync = _runtime.ReplayCoreScenarioAsync;
         viewModel.CreateStructuredPlanAsync = _runtime.CreateStructuredPlanAsync;
@@ -98,6 +104,7 @@ public partial class App : System.Windows.Application
 #endif
         await _runtime.StartAsync();
         if (viewModel.NeedsSetup) viewModel.ShowSetup();
+        else _mainWindow.EnableGuideOnFirstOpen();
     }
 
     private void ToggleGlobalVisibility()

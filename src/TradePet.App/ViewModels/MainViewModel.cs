@@ -100,6 +100,8 @@ public sealed class MainViewModel : ObservableObject
     private string _newPlanSetup = string.Empty;
     private string _newPlanTags = string.Empty;
     private string _newPlanNotes = string.Empty;
+    private string _structuredPlanStatusText = string.Empty;
+    private string _planChartStatusText = "开启记录后新画对象会入列；移动同步，删除留历史。";
     private string _selectedReviewPeriod = "近30天";
     private string _reviewSymbolFilter = string.Empty;
     private string _selectedReviewSideFilter = "全部";
@@ -116,12 +118,26 @@ public sealed class MainViewModel : ObservableObject
         TogglePlanRecordingCommand = AsyncCommand(() => TogglePlanRecordingAsync?.Invoke() ?? Task.CompletedTask);
         ImportPlanCommand = AsyncCommand(() => ImportPlanAsync?.Invoke() ?? Task.CompletedTask);
         SaveSettingsCommand = AsyncCommand(() => SaveSettingsAsync?.Invoke() ?? Task.CompletedTask);
+        SaveDailyPlanCommand = AsyncCommand(() => SaveDailyPlanAsync?.Invoke() ?? Task.CompletedTask);
         InstallBridgeCommand = AsyncCommand(() => InstallBridgeAsync?.Invoke() ?? Task.CompletedTask);
         ReplayScenarioCommand = AsyncCommand(() => ReplayScenarioAsync?.Invoke() ?? Task.CompletedTask);
         CreateStructuredPlanCommand = AsyncCommand(() => CreateStructuredPlanAsync?.Invoke() ?? Task.CompletedTask);
         ApplyBehaviorPresetCommand = AsyncCommand(() => ApplyBehaviorPresetAsync?.Invoke() ?? Task.CompletedTask);
         SaveBehaviorSettingsCommand = AsyncCommand(() => SaveBehaviorSettingsAsync?.Invoke() ?? Task.CompletedTask);
-        RefreshReviewCommand = AsyncCommand(() => RefreshReviewAsync?.Invoke() ?? Task.CompletedTask);
+        RefreshReviewCommand = AsyncCommand(async () =>
+        {
+            if (SelectedReviewPeriod == "自定义" &&
+                (!DateOnly.TryParseExact(ReviewFromDateText, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out _) ||
+                 !DateOnly.TryParseExact(ReviewToDateText, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out _)))
+            {
+                ReviewWorkspace.StatusText = "自定义周期的起止日期需填写有效日期，格式为 yyyy-MM-dd。";
+                return;
+            }
+            ReviewWorkspace.Page = 1;
+            await (RefreshReviewAsync?.Invoke() ?? Task.CompletedTask);
+        });
         ToggleFocusCommand = new RelayCommand(() => IsFocusMode = !IsFocusMode);
         ShowMainWindowCommand = new RelayCommand(() => ShowMainWindow?.Invoke());
         ShowPlanPageCommand = new RelayCommand(() => ShowConsolePage?.Invoke(1));
@@ -140,6 +156,7 @@ public sealed class MainViewModel : ObservableObject
     public Func<Task>? TogglePlanRecordingAsync { get; set; }
     public Func<Task>? ImportPlanAsync { get; set; }
     public Func<Task>? SaveSettingsAsync { get; set; }
+    public Func<Task>? SaveDailyPlanAsync { get; set; }
     public Func<Task>? InstallBridgeAsync { get; set; }
     public Func<Task>? ReplayScenarioAsync { get; set; }
     public Func<Task>? CreateStructuredPlanAsync { get; set; }
@@ -159,6 +176,7 @@ public sealed class MainViewModel : ObservableObject
     public ICommand TogglePlanRecordingCommand { get; }
     public ICommand ImportPlanCommand { get; }
     public ICommand SaveSettingsCommand { get; }
+    public ICommand SaveDailyPlanCommand { get; }
     public ICommand InstallBridgeCommand { get; }
     public ICommand ReplayScenarioCommand { get; }
     public ICommand CreateStructuredPlanCommand { get; }
@@ -282,6 +300,7 @@ public sealed class MainViewModel : ObservableObject
     public bool IsPlanRecording { get => _isPlanRecording; set => SetProperty(ref _isPlanRecording, value); }
     public string PlanRecordingText => IsPlanRecording ? "结束记录今日计划" : "开始记录今日计划";
     public bool IsFocusMode { get => _isFocusMode; set => SetProperty(ref _isFocusMode, value); }
+    public bool ConsoleGuideCompleted { get; set; }
     public bool IsTopmost { get => _isTopmost; set => SetProperty(ref _isTopmost, value); }
     public bool IsPositionLocked { get => _isPositionLocked; set => SetProperty(ref _isPositionLocked, value); }
     public bool IsMouseThrough { get => _isMouseThrough; set => SetProperty(ref _isMouseThrough, value); }
@@ -386,6 +405,8 @@ public sealed class MainViewModel : ObservableObject
     public string NewPlanSetup { get => _newPlanSetup; set => SetProperty(ref _newPlanSetup, value); }
     public string NewPlanTags { get => _newPlanTags; set => SetProperty(ref _newPlanTags, value); }
     public string NewPlanNotes { get => _newPlanNotes; set => SetProperty(ref _newPlanNotes, value); }
+    public string StructuredPlanStatusText { get => _structuredPlanStatusText; set => SetProperty(ref _structuredPlanStatusText, value); }
+    public string PlanChartStatusText { get => _planChartStatusText; set => SetProperty(ref _planChartStatusText, value); }
 
     public void ApplyReviewSnapshot(ReviewSnapshot snapshot)
     {

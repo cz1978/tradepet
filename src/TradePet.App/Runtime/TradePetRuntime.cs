@@ -26,6 +26,7 @@ public sealed class TradePetRuntime : IAsyncDisposable
 {
     private const string GlobalScope = "global";
     private const string DesktopSettingKey = "desktop";
+    private const string ConsoleGuideSettingKey = "console-guide-v1";
     private const string BehaviorSettingKey = "behavior-profiles-v1";
     private const string FloatingLossSettingKey = "floating-loss-alerts-v1";
     private const string FloatingLossFallbackFileName = "floating-loss-alerts.json";
@@ -134,6 +135,7 @@ public sealed class TradePetRuntime : IAsyncDisposable
     private DateTimeOffset _lastDailyStatePersistedAtUtc;
     private DateTimeOffset _lastReviewUiAtUtc;
     private DailyPlanSettings _settings = DailyPlanSettings.BalancedDefault;
+    private decimal _savedLossZoneTolerance = 200m;
     private FloatingLossAlertPolicy _floatingLossPolicy = FloatingLossAlertPolicy.BalancedDefault;
     private BehaviorPolicySet? _behaviorPolicies;
     private DailyState? _dailyState;
@@ -546,10 +548,17 @@ public sealed class TradePetRuntime : IAsyncDisposable
         await _stateGate.WaitAsync(_cancellation.Token);
         try
         {
+            if (_account is null)
+            {
+                await OnUiAsync(() => _viewModel.PlanChartStatusText = "请先连接交易账户和图表插件，再记录对象。");
+                await ShowSpeechAsync("还没连接账户。", "连接后再记录图表对象。", TimeSpan.FromSeconds(6));
+                return;
+            }
             if (_viewModel.IsPlanRecording)
             {
                 _viewModel.IsPlanRecording = false;
                 _planBaseline.Clear();
+                await OnUiAsync(() => _viewModel.PlanChartStatusText = "记录已结束；已入列的图表对象仍会同步移动和删除状态。");
                 await ShowSpeechAsync("今日计划记录结束。", string.Empty, TimeSpan.FromSeconds(5));
             }
             else
@@ -561,6 +570,7 @@ public sealed class TradePetRuntime : IAsyncDisposable
                 }
 
                 _viewModel.IsPlanRecording = true;
+                await OnUiAsync(() => _viewModel.PlanChartStatusText = "正在记录：现在到已连接的图表新画线、矩形或文字，再回这里选用途。");
                 await ShowSpeechAsync("开始记录今日计划。", "现在新画的对象会出现在交易计划页面。", TimeSpan.FromSeconds(7));
             }
 
@@ -581,13 +591,27 @@ public sealed class TradePetRuntime : IAsyncDisposable
         {
             if (_account is null)
             {
+                await OnUiAsync(() => _viewModel.PlanChartStatusText = "请先连接交易账户和图表插件，再导入对象。");
                 await ShowSpeechAsync("还没连接账户。", "连接后再导入图表对象。", TimeSpan.FromSeconds(6));
                 return;
             }
 
+            if (_hostChartId is null)
+            {
+                await OnUiAsync(() => _viewModel.PlanChartStatusText = "还没收到当前图表；请确认桥接插件已挂图并完成同步。");
+                await ShowSpeechAsync("还没收到当前图表。", "请确认桥接插件已挂图并完成同步。", TimeSpan.FromSeconds(6));
+                return;
+            }
+
             var candidates = _chartObjects.Values
-                .Where(item => !item.IsDeleted && (_hostChartId is null || item.ChartId == _hostChartId.Value))
+                .Where(item => !item.IsDeleted && item.ChartId == _hostChartId.Value)
                 .ToArray();
+            if (candidates.Length == 0)
+            {
+                await OnUiAsync(() => _viewModel.PlanChartStatusText = "当前图表没有可导入对象；请先绘制并等待插件同步。");
+                await ShowSpeechAsync("当前图表没有可导入对象。", "请先绘制并等待插件同步。", TimeSpan.FromSeconds(6));
+                return;
+            }
             foreach (var chartObject in candidates)
             {
                 await _database.UpsertChartObjectAsync(
@@ -595,6 +619,7 @@ public sealed class TradePetRuntime : IAsyncDisposable
                 await CreateOrUpdatePlanItemAsync(chartObject, createIfMissing: true);
             }
 
+            await OnUiAsync(() => _viewModel.PlanChartStatusText = $"已导入当前图表的 {candidates.Length} 个对象；请在下表选择计划用途。");
             await ShowSpeechAsync("图表对象已导入。", $"共 {candidates.Length} 个。", TimeSpan.FromSeconds(6));
         }
         finally
@@ -605,6 +630,11 @@ public sealed class TradePetRuntime : IAsyncDisposable
 
     public Task SaveSettingsAsync() => WithStateGateAsync(SaveSettingsCoreAsync);
 
+    public Task SaveDailyPlanAsync() => WithStateGateAsync(SaveDailyPlanCoreAsync);
+
+    public Task CompleteConsoleGuideAsync() => WithStateGateAsync(() =>
+        _database.SaveSettingAsync(GlobalScope, ConsoleGuideSettingKey, true, _cancellation.Token));
+
     private async Task SaveSettingsCoreAsync()
     {
         if (!TryParseDailyReportTime(_viewModel.DailyReportTimeText, out var dailyReportTime))
@@ -613,17 +643,8 @@ public sealed class TradePetRuntime : IAsyncDisposable
             return;
         }
         _viewModel.DailyReportTimeText = dailyReportTime.ToString("HH:mm", CultureInfo.InvariantCulture);
-        _settings = DailyPlanSettings.BalancedDefault with
-        {
-            DailyTarget = _viewModel.DailyTarget,
-            DailyLoss = _viewModel.DailyLoss,
-            MaximumTrades = _viewModel.MaximumTrades,
-            MaximumLot = _viewModel.MaximumLot,
-            StopLossReminderEnabled = _viewModel.StopLossReminderEnabled,
-            StopLossReminderSeconds = _viewModel.StopLossReminderSeconds,
-            GivebackMode = GivebackMode.Percentage,
-            GivebackValue = _viewModel.GivebackValue,
-        };
+        _settings = CaptureDailyPlanSettings();
+        _savedLossZoneTolerance = _viewModel.LossZoneTolerance;
         _floatingLossPolicy = _viewModel.GetFloatingLossPolicy();
         var desktop = CaptureDesktopSettings(_setupVersion);
         var settingsPersisted = await TryPersistLiveAsync(
@@ -670,6 +691,62 @@ public sealed class TradePetRuntime : IAsyncDisposable
         {
             await EvaluateFloatingLossAlertsAsync(_account, suppressNotification: false);
         }
+    }
+
+    private DailyPlanSettings CaptureDailyPlanSettings() => DailyPlanSettings.BalancedDefault with
+        {
+            DailyTarget = _viewModel.DailyTarget,
+            DailyLoss = _viewModel.DailyLoss,
+            MaximumTrades = _viewModel.MaximumTrades,
+            MaximumLot = _viewModel.MaximumLot,
+            StopLossReminderEnabled = _viewModel.StopLossReminderEnabled,
+            StopLossReminderSeconds = _viewModel.StopLossReminderSeconds,
+            GivebackMode = GivebackMode.Percentage,
+            GivebackValue = _viewModel.GivebackValue,
+        };
+
+    private async Task SaveDailyPlanCoreAsync()
+    {
+        if (_account is null || _dailyState is null)
+        {
+            UpdateDiagnostic("今日数据尚未就绪，请连接交易终端并等待同步后再保存计划。");
+            await ShowSpeechAsync("计划还不能保存。", "请先连接交易终端并等待今日数据同步。", TimeSpan.FromSeconds(7));
+            return;
+        }
+
+        _settings = CaptureDailyPlanSettings();
+        _savedLossZoneTolerance = _viewModel.LossZoneTolerance;
+        var daySaved = await TryPersistLiveAsync(
+            () => _database.UpsertTradingDayAsync(_dailyState, _settings, _cancellation.Token),
+            "保存今日交易边界");
+        DesktopSettings desktop;
+        try
+        {
+            desktop = await _database.LoadSettingAsync<DesktopSettings>(GlobalScope, DesktopSettingKey, _cancellation.Token)
+                ?? CaptureDesktopSettings(_setupVersion);
+        }
+        catch (OperationCanceledException) when (_cancellation.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            await ReportPersistenceFailureAsync("读取本机设置", exception);
+            desktop = CaptureDesktopSettings(_setupVersion);
+        }
+        var toleranceSaved = await TryPersistLiveAsync(
+            () => _database.SaveSettingAsync(GlobalScope, DesktopSettingKey,
+                desktop with { LossZoneTolerance = _savedLossZoneTolerance, PriceDistanceVersion = 1 }, _cancellation.Token),
+            "保存亏损区半径");
+        var persisted = daySaved && toleranceSaved;
+        UpdateDiagnostic(persisted
+            ? "今日交易边界已保存；当前账户、交易服务器今日生效。"
+            : "今日交易边界已应用，但本地数据库异常，重启前可能无法保留。");
+        await ShowSpeechAsync(persisted ? "今日边界已保存。" : "今日边界已应用。",
+            persisted ? "只提醒，不会自动下单、平仓或修改止损。" : "数据库异常，重启前可能无法保留。",
+            TimeSpan.FromSeconds(persisted ? 5 : 7));
+        await RecalculateDailyAsync(isRecovery: false);
+        await EvaluateMissingStopLossRemindersAsync(_account.CapturedAtUtc);
     }
 
     public async Task<bool> CompleteSetupAsync()
@@ -1141,6 +1218,7 @@ public sealed class TradePetRuntime : IAsyncDisposable
         {
             _mt4HistoryReady = false;
             _chartObjects.Clear();
+            _hostChartId = null;
             if (_activePlatform == TradingPlatform.Mt4) await OnUiAsync(() => _viewModel.SupportsTradeHistory = false);
             await OnUiAsync(() => _viewModel.ResetReviewForAccountChange(
                 "账户已切换，正在读取对应复盘数据。"));
@@ -2511,6 +2589,7 @@ public sealed class TradePetRuntime : IAsyncDisposable
     {
         if (_account is null)
         {
+            await OnUiAsync(() => _viewModel.StructuredPlanStatusText = "请先连接交易账户，再保存结构化计划。");
             await ShowSpeechAsync("还没连接账户。", "连接后再保存交易计划。", TimeSpan.FromSeconds(5));
             return;
         }
@@ -2522,6 +2601,7 @@ public sealed class TradePetRuntime : IAsyncDisposable
             !TryParsePlanDecimal(_viewModel.NewPlanTarget, out var target) ||
             string.IsNullOrWhiteSpace(_viewModel.NewPlanSymbol))
         {
+            await OnUiAsync(() => _viewModel.StructuredPlanStatusText = "品种、参考入场、入场区两端、止损和目标都要填；价格请填数字。策略、形态、标签和备注可留空。");
             await ShowSpeechAsync("计划还没填完整。", "请填写品种、入场区、止损和目标。", TimeSpan.FromSeconds(5));
             return;
         }
@@ -2548,12 +2628,25 @@ public sealed class TradePetRuntime : IAsyncDisposable
         var validation = _tradePlanMatcher.Validate(plan);
         if (!validation.IsValid)
         {
+            await OnUiAsync(() => _viewModel.StructuredPlanStatusText = validation.Error ?? "请检查入场、止损和目标。");
             await ShowSpeechAsync("计划方向不成立。", validation.Error ?? "请检查入场、止损和目标。", TimeSpan.FromSeconds(6));
             return;
         }
+        var saved = await TryPersistLiveAsync(
+            () => _database.UpsertStructuredTradePlanAsync(plan, _cancellation.Token),
+            "保存结构化计划");
+        if (!saved)
+        {
+            await OnUiAsync(() => _viewModel.StructuredPlanStatusText = "结构化计划未保存；请检查本地数据库后重试。");
+            await ShowSpeechAsync("计划未保存。", "本地数据库暂时不可用。", TimeSpan.FromSeconds(6));
+            return;
+        }
         _structuredPlans[plan.Id] = plan;
-        await _database.UpsertStructuredTradePlanAsync(plan, _cancellation.Token);
-        await OnUiAsync(() => _viewModel.StructuredPlans.Insert(0, ToStructuredPlanRow(plan)));
+        await OnUiAsync(() =>
+        {
+            _viewModel.StructuredPlans.Insert(0, ToStructuredPlanRow(plan));
+            _viewModel.StructuredPlanStatusText = $"已保存 {plan.Symbol} 计划；风险倍数 {plan.PlannedRiskMultiple:0.##}。修改会建立新版本。";
+        });
         await ShowSpeechAsync("结构化计划已保存。", $"{plan.Symbol} {FormatSide(plan.Side)}，计划风险倍数 {plan.PlannedRiskMultiple:0.##}", TimeSpan.FromSeconds(5));
     }
 
@@ -6415,12 +6508,15 @@ public sealed class TradePetRuntime : IAsyncDisposable
     {
         var settings = await _database.LoadSettingAsync<DesktopSettings>(GlobalScope, DesktopSettingKey, _cancellation.Token)
             ?? new DesktopSettings(false, true, false, false, 1.0, 0.70, 200m, null, 1);
+        var guideCompleted = await _database.LoadSettingAsync<bool?>(GlobalScope, ConsoleGuideSettingKey, _cancellation.Token)
+            ?? false;
         var tolerancePoints = settings.PriceDistanceVersion >= 1
             ? settings.LossZoneTolerance
             : settings.LossZoneTolerance * 100m;
         await OnUiAsync(() =>
         {
             _viewModel.IsFocusMode = settings.FocusMode;
+            _viewModel.ConsoleGuideCompleted = guideCompleted;
             _setupVersion = settings.SetupVersion;
             _viewModel.NeedsSetup = settings.SetupVersion < 1;
             _viewModel.SelectedPlatform = settings.Platform;
@@ -6430,6 +6526,7 @@ public sealed class TradePetRuntime : IAsyncDisposable
             _viewModel.PetOpacity = settings.Opacity;
             _viewModel.PetScale = settings.Scale;
             _viewModel.LossZoneTolerance = tolerancePoints;
+            _savedLossZoneTolerance = _viewModel.LossZoneTolerance;
             _viewModel.SelectedTerminalPath = settings.TerminalPath;
             _viewModel.ExpandCardOnHover = settings.InteractionVersion >= 1
                 ? settings.ExpandCardOnHover
@@ -6516,9 +6613,9 @@ public sealed class TradePetRuntime : IAsyncDisposable
     {
         _symbolSpecifications.TryGetValue(trade.Symbol, out var specification);
         return PriceDistancePolicy.ToPriceDistance(
-            _viewModel.LossZoneTolerance,
+            _savedLossZoneTolerance,
             specification,
-            Math.Max(0.01m, _viewModel.LossZoneTolerance / 100m));
+            Math.Max(0.01m, _savedLossZoneTolerance / 100m));
     }
 
     private async Task UpdateSymbolSpecificationsAsync(

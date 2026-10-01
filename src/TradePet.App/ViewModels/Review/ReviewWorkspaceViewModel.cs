@@ -154,7 +154,11 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
         _scheduler = scheduler ?? new SystemAsyncScheduler();
         var clock = timeProvider ?? TimeProvider.System;
         _dailyDate = DateOnly.FromDateTime(clock.GetLocalNow().DateTime).ToString("yyyy-MM-dd");
-        RefreshCommand = Command(() => RefreshAsync?.Invoke() ?? Task.CompletedTask);
+        RefreshCommand = Command(async () =>
+        {
+            Page = 1;
+            await (RefreshAsync?.Invoke() ?? Task.CompletedTask);
+        });
         SaveFilterCommand = Command(() => SaveFilterAsync?.Invoke() ?? Task.CompletedTask);
         PreviousPageCommand = Command(async () => { Page = Math.Max(1, Page - 1); await (RefreshAsync?.Invoke() ?? Task.CompletedTask); });
         NextPageCommand = Command(async () => { Page++; await (RefreshAsync?.Invoke() ?? Task.CompletedTask); });

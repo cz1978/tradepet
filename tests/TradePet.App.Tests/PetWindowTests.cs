@@ -141,6 +141,8 @@ public sealed class PetWindowTests
                 VerifySetupFlow();
                 VerifyQuickReview();
                 VerifyDailyTradingReport();
+                // WPF permits one Application per test host; exercise the console on this STA thread.
+                VerifyMainWindowGuide();
             }
             catch (Exception exception)
             {
@@ -157,6 +159,145 @@ public sealed class PetWindowTests
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
         await completion.Task.WaitAsync(TimeSpan.FromSeconds(30));
+    }
+
+    private static void VerifyMainWindowGuide()
+    {
+        var viewModel = new MainViewModel();
+        var saveCount = 0;
+        var console = new MainWindow(viewModel)
+        {
+            AllowClose = true,
+            ShowActivated = false,
+            Width = 920,
+            Height = 640,
+            SaveGuideCompletionAsync = () =>
+            {
+                saveCount++;
+                return Task.CompletedTask;
+            },
+        };
+        try
+        {
+            console.Show();
+            console.EnableGuideOnFirstOpen();
+            console.UpdateLayout();
+
+            var overlay = (Canvas)console.FindName("GuideOverlay");
+            var tabs = (TabControl)console.FindName("MainTabs");
+            var next = (Button)console.FindName("GuideNext");
+            var previous = (Button)console.FindName("GuidePrevious");
+            var skip = (Button)console.FindName("GuideSkip");
+            var card = (Border)console.FindName("GuideCard");
+            Assert.Equal(Visibility.Visible, overlay.Visibility);
+            Assert.False(previous.IsEnabled);
+            Assert.Equal(0, tabs.SelectedIndex);
+
+            foreach (var page in new[] { 1, 1, 2, 3, 4, 5 })
+            {
+                next.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+                console.UpdateLayout();
+                Assert.Equal(page, tabs.SelectedIndex);
+                Assert.InRange(Canvas.GetLeft(card), 0, overlay.ActualWidth - card.ActualWidth);
+                Assert.InRange(Canvas.GetTop(card), 0, overlay.ActualHeight - card.ActualHeight);
+                var target = (FrameworkElement)typeof(MainWindow).GetMethod("GetGuideTarget",
+                    BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(console, null)!;
+                var bounds = target.TransformToAncestor((System.Windows.Media.Visual)console.FindName("MainRoot"))
+                    .TransformBounds(new Rect(new Point(), target.RenderSize));
+                Assert.True(bounds.Bottom > 0 && bounds.Top < overlay.ActualHeight,
+                    $"Guide target is outside the visible console: {target.Name}");
+            }
+
+            Assert.Equal("完成", next.Content);
+            next.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            Assert.True(viewModel.ConsoleGuideCompleted);
+            Assert.Equal(1, saveCount);
+            Assert.Equal(Visibility.Collapsed, overlay.Visibility);
+
+            var savePlan = (Button)console.FindName("GuideSavePlan");
+            var targetInput = (TextBox)console.FindName("DailyTargetInput");
+            var validation = (TextBlock)console.FindName("PlanValidationText");
+            var planSaveCount = 0;
+            viewModel.SaveDailyPlanAsync = () =>
+            {
+                planSaveCount++;
+                return Task.CompletedTask;
+            };
+            tabs.SelectedIndex = 1;
+            targetInput.Text = "-100";
+            savePlan.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            Assert.Equal(0, planSaveCount);
+            Assert.Equal(Visibility.Visible, validation.Visibility);
+            targetInput.Text = "100";
+            var tradeLimitInput = (TextBox)console.FindName("MaximumTradesInput");
+            tradeLimitInput.Text = "1.5";
+            savePlan.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            Assert.Equal(0, planSaveCount);
+            tradeLimitInput.Text = string.Empty;
+            var radiusInput = (TextBox)console.FindName("LossZoneToleranceInput");
+            radiusInput.Text = "0";
+            savePlan.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            Assert.Equal(0, planSaveCount);
+            radiusInput.Text = "200";
+            savePlan.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            Assert.Equal(1, planSaveCount);
+            Assert.Equal(100m, viewModel.DailyTarget);
+            Assert.Equal(Visibility.Collapsed, validation.Visibility);
+
+            var structuredSaves = 0;
+            viewModel.CreateStructuredPlanAsync = () =>
+            {
+                structuredSaves++;
+                return Task.CompletedTask;
+            };
+            ((TextBox)console.FindName("StructuredTargetInput")).Text = "105";
+            ((Button)console.FindName("GuideSaveStructuredPlan"))
+                .RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            Assert.Equal(1, structuredSaves);
+            Assert.Equal("105", viewModel.NewPlanTarget);
+
+            console.Hide();
+            console.Show();
+            console.EnableGuideOnFirstOpen();
+            console.UpdateLayout();
+            Assert.Equal(Visibility.Collapsed, overlay.Visibility);
+
+            var replay = (Button)console.FindName("GuideReplayButton");
+            replay.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            console.UpdateLayout();
+            Assert.Equal(Visibility.Visible, overlay.Visibility);
+            skip.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            Assert.Equal(1, saveCount);
+
+            ((Button)console.FindName("ReviewGuideButton"))
+                .RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            var workspace = (ReviewWorkspaceView)console.FindName("ReviewWorkspace");
+            var workspaceTabs = (TabControl)workspace.FindName("WorkspaceTabs");
+            var statusPanel = (FrameworkElement)workspace.FindName("ReviewStatusPanel");
+            var expectedTabs = new[] { 0, 2, 3, 4 };
+            for (var step = 0; step < expectedTabs.Length; step++)
+            {
+                console.UpdateLayout();
+                Assert.Equal(3, tabs.SelectedIndex);
+                Assert.Equal(expectedTabs[step], workspaceTabs.SelectedIndex);
+                Assert.True(statusPanel.IsVisible);
+                Assert.InRange(Canvas.GetLeft(card), 0, overlay.ActualWidth - card.ActualWidth);
+                Assert.InRange(Canvas.GetTop(card), 0, overlay.ActualHeight - card.ActualHeight);
+                var target = (FrameworkElement)typeof(MainWindow).GetMethod("GetGuideTarget",
+                    BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(console, null)!;
+                Assert.True(target.IsVisible, $"Review guide target is hidden: {target.Name}");
+                Assert.IsNotType<Button>(target);
+                Assert.NotEqual("GuideReviewHeader", target.Name);
+                var bounds = target.TransformToAncestor((System.Windows.Media.Visual)console.FindName("MainRoot"))
+                    .TransformBounds(new Rect(new Point(), target.RenderSize));
+                Assert.True(bounds.Bottom > 0 && bounds.Top < overlay.ActualHeight,
+                    $"Review guide target is outside the console: {target.Name}");
+                next.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            }
+            Assert.Equal(Visibility.Collapsed, overlay.Visibility);
+            Assert.Equal(1, saveCount);
+        }
+        finally { console.Close(); }
     }
 
     private static void VerifyQuickReview()

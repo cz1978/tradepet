@@ -6,6 +6,8 @@ using TradePet.Application.Runtime;
 using TradePet.App.Runtime;
 using TradePet.App.ViewModels.Review;
 using TradePet.Core.Domain;
+using TradePet.Core.Session;
+using TradePet.Core.Trading;
 using TradePet.Infrastructure.Persistence;
 using Xunit;
 
@@ -13,6 +15,219 @@ namespace TradePet.App.Tests;
 
 public sealed class RuntimeContractTests
 {
+    [Fact]
+    public void ReviewQuery_ResetsPageForChangedFiltersButRetainsExplicitNavigation()
+    {
+        var main = new TradePet.App.ViewModels.MainViewModel();
+        var review = main.ReviewWorkspace;
+        var queriedPages = new List<int>();
+        review.RefreshAsync = main.RefreshReviewAsync = () =>
+        {
+            queriedPages.Add(review.Page);
+            return Task.CompletedTask;
+        };
+        review.Page = 8;
+        review.RefreshCommand.Execute(null);
+        review.NextPageCommand.Execute(null);
+        review.PreviousPageCommand.Execute(null);
+        review.Page = 5;
+        main.RefreshReviewCommand.Execute(null);
+        Assert.Equal(new[] { 1, 2, 1, 1 }, queriedPages);
+        main.SelectedReviewPeriod = "自定义";
+        main.ReviewFromDateText = "2026-02-30";
+        main.ReviewToDateText = "2026-09-30";
+        main.RefreshReviewCommand.Execute(null);
+        Assert.Equal(4, queriedPages.Count);
+        Assert.Contains("有效日期", review.StatusText);
+        main.ReviewFromDateText = "2026-09-01";
+        main.RefreshReviewCommand.Execute(null);
+        Assert.Equal(5, queriedPages.Count);
+    }
+
+    [Fact]
+    public async Task StructuredAndChartPlans_SaveMatchClassifyMoveAndRetainDeletedHistory()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"tradepet-plans-{Guid.NewGuid():N}.db");
+        var database = new AppDatabase(path);
+        await database.InitializeAsync();
+        var repository = DispatchProxy.Create<IReviewWorkspaceRepository, ThrowingProxy>();
+        var dependencies = new TradePetRuntimeDependencies(database, repository,
+            DispatchProxy.Create<IReviewPackageWriter, ThrowingProxy>(),
+            DispatchProxy.Create<IReviewAttachmentStore, ThrowingProxy>(),
+            DispatchProxy.Create<IReviewBackupService, ThrowingProxy>(),
+            TimeProvider.System, new ManualAsyncScheduler(),
+            new AccountSessionCoordinator(), new MaintenanceCoordinator());
+        var viewModel = new TradePet.App.ViewModels.MainViewModel
+        {
+            NewPlanSymbol = "XAUUSD.s",
+            NewPlanSide = TradeSide.Buy,
+            NewPlanEntryLow = "99",
+            NewPlanEntryHigh = "101",
+            NewPlanStop = "98",
+            NewPlanTarget = "105",
+            NewPlanStrategy = "突破",
+            NewPlanTags = "测试,区间",
+        };
+        await using var runtime = new TradePetRuntime(viewModel, dependencies);
+        var date = DateOnly.FromDateTime(DateTime.Now);
+        var now = DateTimeOffset.UtcNow;
+        var account = new AccountSnapshot(new AccountScope("PlanBroker", 73), "USD", 1_000m,
+            1_000m, 0m, 2, now);
+        await database.UpsertAccountAsync(account);
+        var flags = BindingFlags.Instance | BindingFlags.NonPublic;
+        typeof(TradePetRuntime).GetField("_account", flags)!.SetValue(runtime, account);
+        async Task Call(string method, params object[] args) =>
+            await (Task)typeof(TradePetRuntime).GetMethod(method, flags)!.Invoke(runtime, args)!;
+
+        await runtime.CreateStructuredPlanAsync();
+        Assert.Contains("参考入场", viewModel.StructuredPlanStatusText);
+        Assert.Empty(await database.LoadStructuredTradePlansAsync(account.Scope.AccountKey, date, date));
+
+        viewModel.NewPlanReferenceEntry = "100";
+        await runtime.CreateStructuredPlanAsync();
+        var plan = Assert.Single(await database.LoadStructuredTradePlansAsync(account.Scope.AccountKey, date, date));
+        Assert.Equal(2.5m, plan.PlannedRiskMultiple);
+        Assert.Contains("测试", plan.Tags);
+        Assert.Contains("区间", plan.Tags);
+        var trade = new TradeRecord(account.Scope.AccountKey, 77, "XAUUSD.s", TradeSide.Buy,
+            plan.CreatedAtUtc.AddSeconds(1), null, date, null, 100m, null, 0.01m, 0.01m,
+            0.01m, 0m, false);
+        Assert.Equal(PlanComplianceStatus.Matched,
+            new TradePlanMatcher().CreateAutomaticMetadata(trade, [plan], now).ComplianceStatus);
+
+        await Call("ToggleStructuredPlanCoreAsync", plan.Id);
+        Assert.False(Assert.Single(await database.LoadStructuredTradePlansAsync(account.Scope.AccountKey, date, date)).IsActive);
+        await Call("ToggleStructuredPlanCoreAsync", plan.Id);
+        var versions = await database.LoadStructuredTradePlansAsync(account.Scope.AccountKey, date, date);
+        Assert.Equal(2, versions.Count);
+        Assert.Single(versions, item => item.IsActive);
+
+        var chart = new ChartObjectSnapshot("test-terminal", 7, "avoid-zone", "XAUUSD.s", "M5",
+            ChartObjectKind.Rectangle, [new(null, 99m), new(null, 101m)], "避开", 0, now);
+        var objects = (Dictionary<string, ChartObjectSnapshot>)typeof(TradePetRuntime)
+            .GetField("_chartObjects", flags)!.GetValue(runtime)!;
+        await runtime.ImportCurrentChartAsync();
+        Assert.Contains("还没收到当前图表", viewModel.PlanChartStatusText);
+        typeof(TradePetRuntime).GetField("_hostChartId", flags)!.SetValue(runtime, 7L);
+        await runtime.ImportCurrentChartAsync();
+        Assert.Contains("没有可导入对象", viewModel.PlanChartStatusText);
+        objects[chart.ObjectKey] = chart;
+        await runtime.ImportCurrentChartAsync();
+        var item = Assert.Single(await database.LoadPlanItemsAsync(account.Scope.AccountKey, date));
+        Assert.Equal(99m, item.PriceLow);
+        Assert.Equal(101m, item.PriceHigh);
+        await Call("SavePlanItemCoreAsync", item with { Category = PlanCategory.NoTradeZone });
+        item = Assert.Single(await database.LoadPlanItemsAsync(account.Scope.AccountKey, date));
+        Assert.Equal(PlanCategory.NoTradeZone, item.Category);
+        Assert.Contains(new LossZoneEngine().EvaluateOpen(trade, date, 1m, [], [], [item], null,
+            DailyPlanSettings.BalancedDefault).AllFacts, fact => fact.Kind == RuleFactKind.NoTradePlan);
+
+        await Call("HandleChartObjectAsync", chart with
+        {
+            Anchors = [new(null, 98m), new(null, 102m)],
+            CapturedAtUtc = now.AddSeconds(2),
+        });
+        item = Assert.Single(await database.LoadPlanItemsAsync(account.Scope.AccountKey, date));
+        Assert.Equal(98m, item.PriceLow);
+        Assert.Equal(102m, item.PriceHigh);
+        await Call("HandleChartObjectAsync", chart with { IsDeleted = true, CapturedAtUtc = now.AddSeconds(3) });
+        item = Assert.Single(await database.LoadPlanItemsAsync(account.Scope.AccountKey, date));
+        Assert.False(item.IsActive);
+    }
+
+    [Fact]
+    public async Task DailyBoundarySave_PersistsCurrentAccountDayIndependentlyOfReportTime()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"tradepet-boundary-{Guid.NewGuid():N}.db");
+        var database = new AppDatabase(path);
+        await database.InitializeAsync();
+        var repository = DispatchProxy.Create<IReviewWorkspaceRepository, ThrowingProxy>();
+        var dependencies = new TradePetRuntimeDependencies(database, repository,
+            DispatchProxy.Create<IReviewPackageWriter, ThrowingProxy>(),
+            DispatchProxy.Create<IReviewAttachmentStore, ThrowingProxy>(),
+            DispatchProxy.Create<IReviewBackupService, ThrowingProxy>(),
+            TimeProvider.System, new ManualAsyncScheduler(),
+            new AccountSessionCoordinator(), new MaintenanceCoordinator());
+        var viewModel = new TradePet.App.ViewModels.MainViewModel
+        {
+            DailyTarget = 100m,
+            DailyLoss = 50m,
+            MaximumTrades = 3,
+            MaximumLot = 0.05m,
+            StopLossReminderEnabled = true,
+            StopLossReminderSeconds = 45,
+            LossZoneTolerance = 150m,
+            DailyReportTimeText = "not a time",
+        };
+        await using var runtime = new TradePetRuntime(viewModel, dependencies);
+        var date = DateOnly.FromDateTime(DateTime.Now);
+        var capturedAt = DateTimeOffset.UtcNow;
+        var account = new AccountSnapshot(new AccountScope("BoundaryBroker", 72), "USD", 1_000m,
+            1_000m, 0m, 2, capturedAt);
+        await database.UpsertAccountAsync(account);
+        var state = new DailyState(account.Scope.AccountKey, date, 0m, 0m, 0m, 0m,
+            0, 0, 0, 0, 0m, false, false, false);
+        var flags = BindingFlags.Instance | BindingFlags.NonPublic;
+        typeof(TradePetRuntime).GetField("_account", flags)!.SetValue(runtime, account);
+        typeof(TradePetRuntime).GetField("_dailyState", flags)!.SetValue(runtime, state);
+        var positions = (Dictionary<long, PositionSnapshot>)typeof(TradePetRuntime)
+            .GetField("_positions", flags)!.GetValue(runtime)!;
+        positions[42] = new PositionSnapshot(42, 42, "EURUSD", TradeSide.Buy, 0.01m,
+            1.10m, 1.10m, 0m, 0m, 0m, capturedAt.AddMinutes(-2), capturedAt);
+        var workerSession = (WorkerSession)typeof(TradePetRuntime)
+            .GetField("_workerSession", flags)!.GetValue(runtime)!;
+        workerSession.Connect(account.Scope.AccountKey);
+        workerSession.MarkSnapshotReceived(requiresDealHistory: false);
+
+        await runtime.SaveDailyPlanAsync();
+
+        var saved = await database.LoadTradingDayAsync(account.Scope.AccountKey, date);
+        Assert.True(saved.HasValue, viewModel.DiagnosticText);
+        Assert.Equal(100m, saved.Value.Settings.DailyTarget);
+        Assert.Equal(50m, saved.Value.Settings.DailyLoss);
+        Assert.Equal(3, saved.Value.Settings.MaximumTrades);
+        Assert.Equal(0.05m, saved.Value.Settings.MaximumLot);
+        Assert.True(saved.Value.Settings.StopLossReminderEnabled);
+        Assert.Equal(45, saved.Value.Settings.StopLossReminderSeconds);
+        Assert.Contains("没有止损", viewModel.BubbleHeadline);
+        var calculator = new DailyStateCalculator();
+        var target = calculator.Calculate(account.Scope.AccountKey, date, [], [], saved.Value.Settings,
+            null, realizedPnlOverride: 100m);
+        var loss = calculator.Calculate(account.Scope.AccountKey, date, [], [], saved.Value.Settings,
+            null, realizedPnlOverride: -50m);
+        Assert.Contains(target.NewFacts, fact => fact.Kind == RuleFactKind.DailyTarget);
+        Assert.Contains(loss.NewFacts, fact => fact.Kind == RuleFactKind.DailyLoss);
+        var desktop = await database.LoadSettingAsync<System.Text.Json.JsonElement>("global", "desktop");
+        Assert.Equal(150m, desktop.GetProperty("lossZoneTolerance").GetDecimal());
+    }
+
+    [Fact]
+    public async Task ConsoleGuideCompletion_SurvivesRuntimeRestartWithoutSavingOtherSettings()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"tradepet-guide-{Guid.NewGuid():N}.db");
+        var database = new AppDatabase(path);
+        await database.InitializeAsync();
+        var repository = DispatchProxy.Create<IReviewWorkspaceRepository, ThrowingProxy>();
+        var dependencies = new TradePetRuntimeDependencies(database, repository,
+            DispatchProxy.Create<IReviewPackageWriter, ThrowingProxy>(),
+            DispatchProxy.Create<IReviewAttachmentStore, ThrowingProxy>(),
+            DispatchProxy.Create<IReviewBackupService, ThrowingProxy>(),
+            TimeProvider.System, new ManualAsyncScheduler(),
+            new AccountSessionCoordinator(), new MaintenanceCoordinator());
+        await using (var runtime = new TradePetRuntime(new TradePet.App.ViewModels.MainViewModel(), dependencies))
+            await runtime.CompleteConsoleGuideAsync();
+
+        var reopenedDatabase = new AppDatabase(path);
+        var reopenedDependencies = dependencies with { Database = reopenedDatabase };
+        var viewModel = new TradePet.App.ViewModels.MainViewModel();
+        await using var reopenedRuntime = new TradePetRuntime(viewModel, reopenedDependencies);
+        await (Task)typeof(TradePetRuntime).GetMethod("LoadDesktopSettingsAsync",
+            BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(reopenedRuntime, null)!;
+
+        Assert.True(viewModel.ConsoleGuideCompleted);
+        Assert.Null(await reopenedDatabase.LoadSettingAsync<object>("global", "desktop"));
+    }
+
     [Fact]
     public async Task QuickReview_TradeClosuresAndSnoozeOnlyQueueWithoutOpeningWindows()
     {
