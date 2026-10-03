@@ -7,6 +7,33 @@ namespace TradePet.Core.Tests;
 public sealed class DailyStateCalculatorTests
 {
     [Fact]
+    public void PercentageTarget_UsesFixedOpeningBalanceAndStoresResolvedAmountAtReach()
+    {
+        var date = new DateOnly(2026, 10, 3);
+        var settings = DailyPlanSettings.BalancedDefault with { DailyTargetPercentage = 2m, DailyTargetBaseBalance = 1000m };
+        var calculator = new DailyStateCalculator();
+        var before = calculator.Calculate("account", date, [], [], settings, null, realizedPnlOverride: 19m);
+        var at = new DateTimeOffset(2026, 10, 3, 1, 0, 0, TimeSpan.Zero);
+        var reached = calculator.Calculate("account", date, [], [], settings, before.State, realizedPnlOverride: 20m, observedAtUtc: at);
+
+        Assert.False(before.State.TargetAlerted);
+        Assert.True(reached.State.TargetAlerted);
+        Assert.Equal(20m, reached.State.TargetAmountAtReach);
+        Assert.Equal(at, reached.State.TargetReachedAtUtc);
+    }
+
+    [Fact]
+    public void PercentageTarget_WithoutOpeningBalanceDoesNotTreatPercentageAsCurrency()
+    {
+        var settings = DailyPlanSettings.BalancedDefault with { DailyTargetPercentage = 2m };
+        var result = new DailyStateCalculator().Calculate("account", new(2026, 10, 3), [], [], settings, null,
+            realizedPnlOverride: 100m);
+
+        Assert.Null(settings.ResolvedDailyTarget);
+        Assert.False(result.State.TargetAlerted);
+    }
+
+    [Fact]
     public void Calculator_FiresGivebackOnceAfterTargetAndNewHigh()
     {
         const string account = "Broker|1";

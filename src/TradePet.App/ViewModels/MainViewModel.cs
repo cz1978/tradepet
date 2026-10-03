@@ -40,6 +40,11 @@ public sealed class MainViewModel : ObservableObject
     private bool _isMouseThrough;
     private bool _startWithWindows;
     private bool _dailyReportEnabled = true;
+    private bool _quickReviewPromptEnabled = true;
+    private bool _entryReasonPromptEnabled = true;
+    private bool _updateNotificationsEnabled = true;
+    private string _updateStatus = "尚未检查新版本。";
+    private bool _updateAvailable;
     private string _dailyReportTimeText = "23:55";
     private double _petOpacity = 1.0;
     private double _petScale = 0.70;
@@ -90,6 +95,7 @@ public sealed class MainViewModel : ObservableObject
     private string _behaviorTriggeredText = "当前没有触发规则";
     private string _todayBehaviorTriggeredText = "当前没有触发规则";
     private string _selectedBehaviorPreset = "平衡";
+    private int _dailyTargetUnitIndex;
     private string _newPlanSymbol = "XAUUSD.s";
     private string _newPlanReferenceEntry = string.Empty;
     private string _newPlanEntryLow = string.Empty;
@@ -144,6 +150,9 @@ public sealed class MainViewModel : ObservableObject
         ShowLossZonesPageCommand = new RelayCommand(() => ShowConsolePage?.Invoke(2));
         ShowReviewPageCommand = new RelayCommand(() => ShowConsolePage?.Invoke(3));
         ShowQuickReviewCommand = AsyncCommand(() => ShowQuickReviewAsync?.Invoke() ?? Task.CompletedTask);
+        ShowEntryReasonCommand = AsyncCommand(() => ShowEntryReasonAsync?.Invoke() ?? Task.CompletedTask);
+        CheckUpdatesCommand = AsyncCommand(() => CheckUpdatesAsync?.Invoke() ?? Task.CompletedTask);
+        OpenReleasePageCommand = new RelayCommand(() => OpenReleasePage?.Invoke());
         ShowDailyTradingReportCommand = AsyncCommand(() => ShowDailyTradingReportAsync?.Invoke() ?? Task.CompletedTask);
         ShowMacroCalendarCommand = new RelayCommand(() => ShowMacroCalendar?.Invoke());
         ShowTimelinePageCommand = new RelayCommand(() => ShowConsolePage?.Invoke(4));
@@ -165,6 +174,9 @@ public sealed class MainViewModel : ObservableObject
     public Func<Task>? RefreshReviewAsync { get; set; }
     public Func<Task>? ShowDailyTradingReportAsync { get; set; }
     public Func<Task>? ShowQuickReviewAsync { get; set; }
+    public Func<Task>? ShowEntryReasonAsync { get; set; }
+    public Func<Task>? CheckUpdatesAsync { get; set; }
+    public Action? OpenReleasePage { get; set; }
     public Action? ShowMacroCalendar { get; set; }
     public Action? ShowMainWindow { get; set; }
     public Action? ShowSetup { get; set; }
@@ -189,6 +201,9 @@ public sealed class MainViewModel : ObservableObject
     public ICommand ShowLossZonesPageCommand { get; }
     public ICommand ShowReviewPageCommand { get; }
     public ICommand ShowQuickReviewCommand { get; }
+    public ICommand ShowEntryReasonCommand { get; }
+    public ICommand CheckUpdatesCommand { get; }
+    public ICommand OpenReleasePageCommand { get; }
     public ICommand ShowDailyTradingReportCommand { get; }
     public ICommand ShowMacroCalendarCommand { get; }
     public ICommand ShowTimelinePageCommand { get; }
@@ -289,7 +304,9 @@ public sealed class MainViewModel : ObservableObject
     public decimal MaximumExposure { get => _maximumExposure; set => SetProperty(ref _maximumExposure, value); }
     public int OpenPositionCount { get => _openPositionCount; set => SetProperty(ref _openPositionCount, value); }
     public decimal CurrentExposure { get => _currentExposure; set => SetProperty(ref _currentExposure, value); }
-    public decimal? DailyTarget { get => _dailyTarget; set => SetProperty(ref _dailyTarget, value); }
+    public decimal? DailyTarget { get => _dailyTarget; set { if (SetProperty(ref _dailyTarget, value)) RaisePropertyChanged(nameof(DailyTargetDisplay)); } }
+    public int DailyTargetUnitIndex { get => _dailyTargetUnitIndex; set { if (SetProperty(ref _dailyTargetUnitIndex, value == 1 ? 1 : 0)) RaisePropertyChanged(nameof(DailyTargetDisplay)); } }
+    public string DailyTargetDisplay => DailyTarget is null ? "未设置" : DailyTargetUnitIndex == 1 ? $"{DailyTarget:0.##}%（当日初始余额）" : $"{DailyTarget:0.##}";
     public decimal? DailyLoss { get => _dailyLoss; set => SetProperty(ref _dailyLoss, value); }
     public int? MaximumTrades { get => _maximumTrades; set => SetProperty(ref _maximumTrades, value); }
     public decimal? MaximumLot { get => _maximumLot; set => SetProperty(ref _maximumLot, value); }
@@ -298,7 +315,7 @@ public sealed class MainViewModel : ObservableObject
     public decimal LossZoneTolerance { get => _lossZoneTolerance; set => SetProperty(ref _lossZoneTolerance, Math.Max(1m, value)); }
     public decimal GivebackValue { get => _givebackValue; set => SetProperty(ref _givebackValue, Math.Clamp(value, 1m, 100m)); }
     public bool IsPlanRecording { get => _isPlanRecording; set => SetProperty(ref _isPlanRecording, value); }
-    public string PlanRecordingText => IsPlanRecording ? "结束记录今日计划" : "开始记录今日计划";
+    public string PlanRecordingText => IsPlanRecording ? "结束记录图表标记" : "开始记录图表标记";
     public bool IsFocusMode { get => _isFocusMode; set => SetProperty(ref _isFocusMode, value); }
     public bool ConsoleGuideCompleted { get; set; }
     public bool IsTopmost { get => _isTopmost; set => SetProperty(ref _isTopmost, value); }
@@ -306,6 +323,12 @@ public sealed class MainViewModel : ObservableObject
     public bool IsMouseThrough { get => _isMouseThrough; set => SetProperty(ref _isMouseThrough, value); }
     public bool StartWithWindows { get => _startWithWindows; set => SetProperty(ref _startWithWindows, value); }
     public bool DailyReportEnabled { get => _dailyReportEnabled; set => SetProperty(ref _dailyReportEnabled, value); }
+    public bool QuickReviewPromptEnabled { get => _quickReviewPromptEnabled; set => SetProperty(ref _quickReviewPromptEnabled, value); }
+    public bool EntryReasonPromptEnabled { get => _entryReasonPromptEnabled; set => SetProperty(ref _entryReasonPromptEnabled, value); }
+    public bool UpdateNotificationsEnabled { get => _updateNotificationsEnabled; set => SetProperty(ref _updateNotificationsEnabled, value); }
+    public string UpdateStatus { get => _updateStatus; set => SetProperty(ref _updateStatus, value); }
+    public bool UpdateAvailable { get => _updateAvailable; set => SetProperty(ref _updateAvailable, value); }
+    public string AppVersionText => "当前版本 " + Runtime.GitHubReleaseChecker.CurrentVersion;
     public string DailyReportTimeText { get => _dailyReportTimeText; set => SetProperty(ref _dailyReportTimeText, value); }
     public double PetOpacity { get => _petOpacity; set => SetProperty(ref _petOpacity, Math.Clamp(value, 0.25, 1.0)); }
     public double PetScale { get => _petScale; set => SetProperty(ref _petScale, Math.Clamp(value, 0.4, 1.5)); }
@@ -601,7 +624,6 @@ public sealed class MainViewModel : ObservableObject
         BehaviorSettings.Add(new(BehaviorRuleKind.LossZonePersistence, "亏损区攻击阈值", policy.LossZonePersistenceThreshold.ToString(), policy.EnabledRules.LossZonePersistence));
         BehaviorSettings.Add(new(BehaviorRuleKind.RevengeScore, "报复性评分阈值", policy.RevengeScoreThreshold.ToString("0.##"), policy.EnabledRules.RevengeScore));
         BehaviorSettings.Add(new(BehaviorRuleKind.OvertradeBurst, "过度交易基线倍数", policy.OvertradeBaselineMultiplier.ToString("0.##"), policy.EnabledRules.OvertradeBurst));
-        BehaviorSettings.Add(new(BehaviorRuleKind.PlanDeviationRate, "计划偏离率阈值（%）", policy.PlanDeviationRateThreshold.ToString("0.##"), policy.EnabledRules.PlanDeviationRate));
         BehaviorSettings.Add(new(BehaviorRuleKind.ProfitGiveback, "盈利回吐阈值（%）", policy.ProfitGivebackThreshold.ToString("0.##"), policy.EnabledRules.ProfitGiveback));
         BehaviorSettings.Add(new(BehaviorRuleKind.SizeEscalationAfterLoss, "亏损后仓位倍数", policy.LotEscalationMultiplier.ToString("0.##"), policy.EnabledRules.SizeEscalationAfterLoss));
         BehaviorSettings.Add(new(BehaviorRuleKind.CooldownViolation, "冷静期（秒）", policy.CooldownSeconds.ToString(), policy.EnabledRules.CooldownViolation));

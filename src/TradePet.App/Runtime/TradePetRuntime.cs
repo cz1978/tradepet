@@ -22,7 +22,7 @@ using TradePet.Infrastructure.Persistence;
 
 namespace TradePet.App.Runtime;
 
-public sealed class TradePetRuntime : IAsyncDisposable
+public sealed partial class TradePetRuntime : IAsyncDisposable
 {
     private const string GlobalScope = "global";
     private const string DesktopSettingKey = "desktop";
@@ -148,7 +148,9 @@ public sealed class TradePetRuntime : IAsyncDisposable
     private readonly HashSet<long> _macroThirtyMinuteReminders = [];
     private readonly HashSet<long> _macroFiveMinuteReminders = [];
     private readonly ConcurrentDictionary<string, TradeRecord> _pendingQuickReviews = new(StringComparer.Ordinal);
-    private QuickReviewWindow? _quickReviewWindow;
+    private QuickReviewCard? _quickReviewCard;
+    public Action<QuickReviewCard>? ShowQuickReviewCard { get; set; }
+    private long _savedReviewQueryId;
     private CancellationTokenSource? _reviewQueryCancellation;
     private CancellationTokenSource? _tradeDetailCancellation;
     private Task? _reviewRefreshTask;
@@ -208,6 +210,7 @@ public sealed class TradePetRuntime : IAsyncDisposable
     {
         var review = _viewModel.ReviewWorkspace;
         review.RefreshAsync = RefreshReviewAsync;
+        review.RefreshSavedReviewsAsync = RefreshSavedTradeReviewsAsync;
         review.SaveFilterAsync = () => WithReviewWriteGateAsync(SaveReviewFilterAsync);
         review.ApplySavedFilterAsync = ApplySavedReviewFilterAsync;
         review.OpenTradeAsync = OpenTradeReviewAsync;
@@ -239,6 +242,7 @@ public sealed class TradePetRuntime : IAsyncDisposable
         review.LoadReplayAsync = LoadTradeReplayAsync;
         review.SeekReplayAsync = SeekTradeReplayAsync;
         review.ExportAsync = ExportReviewAsync;
+        review.ExportMarkdownAsync = ExportReviewMarkdownAsync;
         review.ConfirmExportAsync = ConfirmReviewExportAsync;
         review.BackupAsync = BackupReviewAsync;
         review.RestoreAsync = RestoreReviewAsync;
@@ -348,6 +352,7 @@ public sealed class TradePetRuntime : IAsyncDisposable
         StartBackgroundTask("桌宠状态循环", RunPetLifeAsync);
         StartBackgroundTask("交易日报定时器", RunDailyReportScheduleAsync);
         StartBackgroundTask("宏观事件提醒", RunMacroCalendarMonitorAsync);
+        StartBackgroundTask("GitHub 新版本检查", RunUpdateMonitorAsync);
 
         _activePlatform = _viewModel.SelectedPlatform;
         await OnUiAsync(() =>
@@ -695,7 +700,13 @@ public sealed class TradePetRuntime : IAsyncDisposable
 
     private DailyPlanSettings CaptureDailyPlanSettings() => DailyPlanSettings.BalancedDefault with
         {
-            DailyTarget = _viewModel.DailyTarget,
+            DailyTarget = _viewModel.DailyTargetUnitIndex == 0 ? _viewModel.DailyTarget : null,
+            DailyTargetPercentage = _viewModel.DailyTargetUnitIndex == 1 ? _viewModel.DailyTarget : null,
+            DailyTargetBaseBalance = _viewModel.DailyTargetUnitIndex == 1
+                ? _settings.DailyTargetBaseBalance ?? (_account is null ? null : _account.Balance - CalculateDailyRealizedPnl() -
+                    _cashFlows.Values.Where(flow => flow.AccountKey == _account.Scope.AccountKey &&
+                        ResolveServerDate(flow.OccurredAtUtc) == _serverDate).Sum(flow => flow.Amount))
+                : null,
             DailyLoss = _viewModel.DailyLoss,
             MaximumTrades = _viewModel.MaximumTrades,
             MaximumLot = _viewModel.MaximumLot,
@@ -710,11 +721,22 @@ public sealed class TradePetRuntime : IAsyncDisposable
         if (_account is null || _dailyState is null)
         {
             UpdateDiagnostic("今日数据尚未就绪，请连接交易终端并等待同步后再保存计划。");
-            await ShowSpeechAsync("计划还不能保存。", "请先连接交易终端并等待今日数据同步。", TimeSpan.FromSeconds(7));
+            await ShowSpeechAsync("目标与限额还不能保存。", "请先连接交易终端并等待今日数据同步。", TimeSpan.FromSeconds(7));
             return;
         }
 
-        _settings = CaptureDailyPlanSettings();
+        var settings = CaptureDailyPlanSettings();
+        if (settings.DailyTargetPercentage is > 0m && !_hasInitialDeals)
+        {
+            await ShowSpeechAsync("百分比目标还不能保存。", "请等待成交历史同步完成，才能确定当日初始余额。", TimeSpan.FromSeconds(7));
+            return;
+        }
+        if (settings.DailyTargetPercentage is > 0m && settings.DailyTargetBaseBalance is not > 0m)
+        {
+            await ShowSpeechAsync("百分比目标还不能保存。", "缺少有效的当日初始余额，请等待历史同步，或先使用金额目标。", TimeSpan.FromSeconds(7));
+            return;
+        }
+        _settings = settings;
         _savedLossZoneTolerance = _viewModel.LossZoneTolerance;
         var daySaved = await TryPersistLiveAsync(
             () => _database.UpsertTradingDayAsync(_dailyState, _settings, _cancellation.Token),
@@ -780,7 +802,10 @@ public sealed class TradePetRuntime : IAsyncDisposable
             _viewModel.DailyReportEnabled,
             _viewModel.DailyReportTimeText,
             _viewModel.SelectedPlatform,
-            setupVersion);
+            setupVersion,
+            _viewModel.QuickReviewPromptEnabled,
+            _viewModel.EntryReasonPromptEnabled,
+            _viewModel.UpdateNotificationsEnabled);
 
 
     public async Task InstallBridgeAsync()
@@ -885,6 +910,8 @@ public sealed class TradePetRuntime : IAsyncDisposable
         }
         finally
         {
+            _releaseChecker.Dispose();
+            _updateCheckGate.Dispose();
             _reviewQueryCancellation?.Dispose();
             _tradeDetailCancellation?.Dispose();
             _reviewSaveGate.Dispose();
@@ -1475,7 +1502,6 @@ public sealed class TradePetRuntime : IAsyncDisposable
         await TryPersistLiveAsync(
             () => _database.SaveTradesAsync(projection.Upserts, _cancellation.Token),
             "保存交易投影批次");
-        await ApplyAutomaticPlanMetadataAsync(projection.Upserts);
 
         foreach (var trade in projection.NewlyCompleted)
         {
@@ -1489,6 +1515,13 @@ public sealed class TradePetRuntime : IAsyncDisposable
                 await RegisterClosedTradeZoneAsync(trade, showFeedback: true);
                 QueueQuickReview(trade);
             }
+        }
+
+        if (!recovery)
+        {
+            foreach (var trade in projection.NewlyOpened)
+                _pendingEntryReasons.TryAdd($"{trade.AccountKey}|{trade.PositionId}", trade);
+            await TryShowAutomaticPromptAsync();
         }
 
         if (batch.HistoryProgress?.IsComplete == true)
@@ -1750,20 +1783,27 @@ public sealed class TradePetRuntime : IAsyncDisposable
     private void QueueQuickReview(TradeRecord trade)
     {
         if (!_persistenceAvailable) return;
-        // Closing trades and snooze timers must never open or activate a window.
+        // Queue first; the pet popup is shown only when automatic prompts are enabled.
         _pendingQuickReviews.TryAdd($"{trade.AccountKey}|{trade.PositionId}", trade);
     }
 
-    public async Task ShowQuickReviewAsync()
+    public Task ShowQuickReviewAsync() => ShowQuickReviewAsync(showEmptyMessage: true, automatic: false);
+
+    private async Task ShowQuickReviewAsync(bool showEmptyMessage, bool automatic = false)
     {
-        if (_quickReviewWindow is not null)
+        if (automatic && !_viewModel.QuickReviewPromptEnabled) return;
+        if (_entryReasonCard is not null) { await OnUiAsync(() => ShowEntryReasonCard?.Invoke(_entryReasonCard)); return; }
+        if (_quickReviewCard is not null)
         {
-            if (_quickReviewWindow.WindowState == WindowState.Minimized)
-                _quickReviewWindow.WindowState = WindowState.Normal;
-            _quickReviewWindow.Activate();
+            await OnUiAsync(() => ShowQuickReviewCard?.Invoke(_quickReviewCard));
             return;
         }
-        if (!_persistenceAvailable || _account is null) return;
+        if (!_persistenceAvailable || _account is null)
+        {
+            if (showEmptyMessage)
+                await ShowSpeechAsync("快速复盘暂不可用", "请等待账户连接和本地复盘库就绪。", TimeSpan.FromSeconds(5));
+            return;
+        }
         var accountKey = _account.Scope.AccountKey;
         foreach (var pending in _pendingQuickReviews
                      .Where(item => item.Value.AccountKey == accountKey)
@@ -1781,35 +1821,99 @@ public sealed class TradePetRuntime : IAsyncDisposable
             await OnUiAsync(() =>
             {
                 if (_account?.Scope.AccountKey != accountKey || _cancellation.IsCancellationRequested) return;
-                var window = new QuickReviewWindow(detail, _serverUtcOffsetSeconds);
-                _quickReviewWindow = window;
-                window.Completed += response =>
+                if (_entryReasonCard is not null || automatic && !_viewModel.QuickReviewPromptEnabled) return;
+                if (_quickReviewCard is not null) { ShowQuickReviewCard?.Invoke(_quickReviewCard); return; }
+                var card = new QuickReviewCard(detail, _serverUtcOffsetSeconds);
+                card.SaveReviewAsync = dialog => SaveQuickReviewAsync(trade, detail.Version, dialog);
+                card.ShowSavedReviews = () => _ = ShowSavedReviewsAsync();
+                _quickReviewCard = card;
+                card.Completed += response =>
                 {
                     _pendingQuickReviews.TryRemove(pendingKey, out _);
-                    if (response.SaveRequested) _ = SaveQuickReviewAsync(trade, detail.Version, response);
-                    else if (response.RemindLater) _ = RemindQuickReviewLaterAsync(trade);
+                    if (response.RemindLater) _ = RemindQuickReviewLaterAsync(trade);
+                    _quickReviewCard = null;
+                    if (response.SaveRequested && !automatic) _ = ShowQuickReviewAsync(showEmptyMessage: false);
+                    else _ = TryShowAutomaticPromptAsync();
                 };
-                window.Closed += (_, _) =>
-                {
-                    _quickReviewWindow = null;
-                    _pendingQuickReviews.TryRemove(pendingKey, out _);
-                };
-                window.Show();
+                ShowQuickReviewCard?.Invoke(card);
             });
             return;
         }
-        await OnUiAsync(() => _viewModel.ShowConsolePage?.Invoke(3));
+        if (showEmptyMessage)
+            await ShowSpeechAsync("暂无待复盘交易", "已保存的复盘可在“交易档案 → 已保存复盘”查看。", TimeSpan.FromSeconds(6));
+        else if (!automatic) await TryShowAutomaticPromptAsync();
     }
 
-    private async Task SaveQuickReviewAsync(TradeRecord trade, ReviewDataVersion version, QuickReviewWindow dialog)
+    private async Task ShowSavedReviewsAsync()
     {
-        var planText = $"是否按计划：{dialog.PlanCompliance}";
-        var command = new SaveTradeReviewCommand(new TradeKey(trade.AccountKey, trade.PositionId), string.Empty,
-            dialog.ExitReason, dialog.PlanCompliance == "是" ? planText : string.Empty,
-            dialog.Improvement, dialog.Improvement, $"{planText}{Environment.NewLine}{dialog.AnalysisSummary}", string.Empty, string.Empty,
+        var alreadySelected = false;
+        await OnUiAsync(() =>
+        {
+            alreadySelected = _viewModel.ReviewWorkspace.WorkspaceTabIndex == 2 &&
+                              _viewModel.ReviewWorkspace.ArchiveListIndex == 1;
+            _viewModel.ShowConsolePage?.Invoke(3);
+            _viewModel.ReviewWorkspace.WorkspaceTabIndex = 2;
+            _viewModel.ReviewWorkspace.ArchiveListIndex = 1;
+        });
+        if (alreadySelected) await RefreshSavedTradeReviewsAsync();
+    }
+
+    private async Task RefreshSavedTradeReviewsAsync()
+    {
+        if (!_persistenceAvailable || _account is null)
+        {
+            await OnUiAsync(() => _viewModel.ReviewWorkspace.SavedReviewsStatus = "等待账户连接和本地复盘库就绪。");
+            return;
+        }
+        var accountKey = _account.Scope.AccountKey;
+        var generation = _accountSessions.Current?.Generation ?? -1;
+        var queryId = Interlocked.Increment(ref _savedReviewQueryId);
+        try
+        {
+            var records = await _reviewRepository.LoadSavedTradeReviewsAsync(accountKey, _cancellation.Token);
+            await OnUiAsync(() =>
+            {
+                if (_accountSessions.IsCurrent(accountKey, generation) && queryId == Volatile.Read(ref _savedReviewQueryId))
+                    _viewModel.ReviewWorkspace.ApplySavedReviews(records);
+            });
+        }
+        catch (OperationCanceledException) when (_cancellation.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            AppLog.Write($"Loading saved reviews failed: {exception}");
+            await OnUiAsync(() =>
+            {
+                if (_accountSessions.IsCurrent(accountKey, generation) && queryId == Volatile.Read(ref _savedReviewQueryId))
+                    _viewModel.ReviewWorkspace.SavedReviewsStatus = "复盘记录读取失败，请点击刷新重试。";
+            });
+        }
+    }
+
+    private async Task<string?> SaveQuickReviewAsync(TradeRecord trade, ReviewDataVersion version, QuickReviewCard dialog)
+    {
+        var key = new TradeKey(trade.AccountKey, trade.PositionId);
+        var detail = await _reviewRepository.LoadTradeDetailAsync(key, _cancellation.Token);
+        var command = new SaveTradeReviewCommand(key, detail?.EntryReasonNote?.Reason ?? string.Empty,
+            dialog.ExitReason, string.Empty,
+            dialog.Improvement, dialog.Improvement, dialog.AnalysisSummary, string.Empty, string.Empty,
             version.SourceVersion.ToString(CultureInfo.InvariantCulture), version.RuleVersion, ReviewCompletionStatus.Draft);
         var result = await _journalService.SaveTradeReviewAsync(command, 0, _cancellation.Token);
-        if (!result.IsSaved) await ShowSpeechAsync("快速复盘未保存", result.Message, TimeSpan.FromSeconds(7));
+        if (!result.IsSaved) return result.Message;
+        try
+        {
+            await RefreshSavedTradeReviewsAsync();
+            await RefreshReviewAsync();
+            if (_viewModel.ReviewWorkspace.TradeEditorKey == command.TradeKey &&
+                !_viewModel.ReviewWorkspace.HasUnsavedReviewChanges)
+                await OpenTradeReviewAsync(trade.PositionId);
+            await OnUiAsync(() => _viewModel.ReviewWorkspace.StatusText = "快速复盘已归档，可在交易档案查看。");
+            _ = ShowSpeechAsync("快速复盘已归档", "复盘分析 → 交易档案 → 已保存复盘，可直接查看，无需重复填写。", TimeSpan.FromSeconds(5));
+        }
+        catch (Exception exception)
+        {
+            AppLog.Write($"Quick review was saved, but refreshing its display failed: {exception}");
+        }
+        return null;
     }
 
     private async Task RemindQuickReviewLaterAsync(TradeRecord trade)
@@ -1818,6 +1922,7 @@ public sealed class TradePetRuntime : IAsyncDisposable
         {
             await _scheduler.DelayAsync(TimeSpan.FromMinutes(10), _cancellation.Token);
             QueueQuickReview(trade);
+            await TryShowAutomaticPromptAsync();
         }
         catch (OperationCanceledException) { }
     }
@@ -2020,6 +2125,20 @@ public sealed class TradePetRuntime : IAsyncDisposable
                 RapidReentrySeconds = policy.RapidReentrySeconds,
                 LotEscalationMultiplier = policy.LotEscalationMultiplier,
             };
+    }
+
+    private static BehaviorPolicySet DisablePlanDeviation(BehaviorPolicySet policies)
+    {
+        static BehaviorPolicy Disable(BehaviorPolicy policy) => policy with
+        {
+            EnabledRules = policy.EnabledRules with { PlanDeviationRate = false },
+        };
+        return policies with
+        {
+            Conservative = Disable(policies.Conservative),
+            Balanced = Disable(policies.Balanced),
+            Loose = Disable(policies.Loose),
+        };
     }
 
     private static RuleFact ToBehaviorFact(BehaviorEvaluation evaluation)
@@ -2345,6 +2464,7 @@ public sealed class TradePetRuntime : IAsyncDisposable
         {
             _behaviorPolicies = storedBehaviorPolicies;
         }
+        _behaviorPolicies = DisablePlanDeviation(_behaviorPolicies);
         var storedFloatingLossPolicy = await _database.LoadSettingAsync<FloatingLossAlertPolicy>(
             $"account:{_account.Scope.AccountKey}", FloatingLossSettingKey, _cancellation.Token);
         _floatingLossPolicy = (storedFloatingLossPolicy
@@ -2384,7 +2504,8 @@ public sealed class TradePetRuntime : IAsyncDisposable
         {
             _viewModel.AccountLabel = $"交易账户 · ****{Math.Abs(_account.Scope.Login % 10000):0000}";
             _viewModel.ServerDateText = _serverDateAuthoritative ? _serverDate.ToString("yyyy-MM-dd") : $"{_serverDate:yyyy-MM-dd}（等待桥接插件）";
-            _viewModel.DailyTarget = _settings.DailyTarget;
+            _viewModel.DailyTargetUnitIndex = _settings.DailyTargetPercentage is > 0m ? 1 : 0;
+            _viewModel.DailyTarget = _settings.DailyTargetPercentage ?? _settings.DailyTarget;
             _viewModel.DailyLoss = _settings.DailyLoss;
             _viewModel.MaximumTrades = _settings.MaximumTrades;
             _viewModel.MaximumLot = _settings.MaximumLot;
@@ -2468,7 +2589,7 @@ public sealed class TradePetRuntime : IAsyncDisposable
         _dailyState = null;
         _workerSession.ResetDealsBaseline();
         _settings = DailyPlanSettings.BalancedDefault;
-        _behaviorPolicies = BehaviorPolicySet.CreateDefault(_account.Scope.AccountKey);
+        _behaviorPolicies = DisablePlanDeviation(BehaviorPolicySet.CreateDefault(_account.Scope.AccountKey));
         _floatingLossPolicy = (await LoadFloatingLossFallbackAsync(_account.Scope.AccountKey)
             ?? FloatingLossAlertPolicy.BalancedDefault).Normalize();
 
@@ -4615,19 +4736,14 @@ public sealed class TradePetRuntime : IAsyncDisposable
             review.ExportStatus = "请先查询当前账户的复盘数据。";
             return;
         }
-        var scope = review.ExportScope == "当前页选中交易"
-            ? ReviewExportScope.SelectedTrades : ReviewExportScope.AllFiltered;
-        var selectedIds = review.SelectedTradeIds.ToHashSet();
-        var exportTrades = (scope == ReviewExportScope.AllFiltered
-                ? query.Snapshot.AllFilteredTrades ?? query.Snapshot.Trades
-                : query.Snapshot.Trades.Where(trade => selectedIds.Contains(trade.PositionId)).ToArray())
-            .ToArray();
-        if (scope == ReviewExportScope.SelectedTrades && exportTrades.Length == 0)
+        var scope = ReviewExportScope.AllFiltered;
+        var exportTrades = (query.Snapshot.AllFilteredTrades ?? query.Snapshot.Trades).ToArray();
+        if (exportTrades.Length != query.Snapshot.TotalCount)
         {
-            review.ExportStatus = "当前页没有勾选交易；请先在交易档案页选择。";
+            review.ExportStatus = "查询结果尚未包含完整交易范围，请重新查询后导出。";
             return;
         }
-        review.ExportStatus = "正在冻结所选范围并读取详情…";
+        review.ExportStatus = "正在生成完整查询范围的复盘报告…";
         var exportKeys = exportTrades
             .Select(trade => new TradeKey(trade.AccountKey, trade.PositionId))
             .ToArray();
@@ -4677,6 +4793,44 @@ public sealed class TradePetRuntime : IAsyncDisposable
         review.ExportStatus = "预览已生成。检查范围及附件勾选后，再确认写出。";
     }
 
+    private async Task ExportReviewMarkdownAsync()
+    {
+        try
+        {
+            await ExportReviewAsync();
+            var review = _viewModel.ReviewWorkspace;
+            var prepared = _preparedReviewExport;
+            if (prepared is null) return;
+            await using var operationLease = await _maintenance.EnterOperationAsync(
+                MaintenanceOperationKind.File, _cancellation.Token);
+            var latestVersion = await _reviewRepository.LoadReviewDataVersionAsync(
+                prepared.Snapshot.Filter.AccountKey, _cancellation.Token);
+            if (latestVersion.Token != prepared.Snapshot.Version.Token ||
+                !ReferenceEquals(_lastWorkspaceQuery, prepared.Query) ||
+                _account?.Scope.AccountKey != prepared.Snapshot.Filter.AccountKey)
+            {
+                review.ClearExportPreview();
+                _preparedReviewExport = null;
+                review.ExportStatus = "导出期间数据或账户已变化，请重新查询后导出。";
+                return;
+            }
+            var details = prepared.Details.Select(detail => new TradeDetailSnapshot(
+                detail.Trade, detail.Deals, detail.Metadata, detail.Document, detail.Excursion,
+                detail.PnlSamples, detail.Plan, detail.Playbook, detail.Assessments, detail.Behaviors,
+                detail.Attachments, detail.Campaign, detail.Version.Token, detail.EntryReasonNote?.Reason ?? string.Empty)).ToArray();
+            var package = _reviewExportService.Build(prepared.Snapshot, details, prepared.Query.Data,
+                ReviewExportMode.LocalArchive, prepared.Scope);
+            var destination = await _reviewPackageWriter.WriteMarkdownAsync(package,
+                cancellationToken: _cancellation.Token);
+            await OnUiAsync(() => review.ExportStatus = $"Markdown 报告已导出：{destination}");
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _viewModel.ReviewWorkspace.ExportStatus = $"Markdown 导出失败：{exception.Message}";
+            await ReportPersistenceFailureAsync("导出 Markdown 报告", exception);
+        }
+    }
+
     private async Task ConfirmReviewExportAsync()
     {
         var review = _viewModel.ReviewWorkspace;
@@ -4723,7 +4877,7 @@ public sealed class TradePetRuntime : IAsyncDisposable
             var detailSnapshots = prepared.Details.Select(detail => new TradeDetailSnapshot(
                 detail.Trade, detail.Deals, detail.Metadata, detail.Document, detail.Excursion,
                 detail.PnlSamples, detail.Plan, detail.Playbook, detail.Assessments, detail.Behaviors,
-                detail.Attachments, detail.Campaign, detail.Version.Token)).ToArray();
+                detail.Attachments, detail.Campaign, detail.Version.Token, detail.EntryReasonNote?.Reason ?? string.Empty)).ToArray();
             var package = _reviewExportService.Build(prepared.Snapshot, detailSnapshots, prepared.Query.Data,
                 ReviewExportMode.PublicShare, prepared.Scope, selectedAttachments);
             var entries = package.Entries.ToList();
@@ -5776,6 +5930,66 @@ public sealed class TradePetRuntime : IAsyncDisposable
             ? ShowDailyTradingReportAsync(date, automatic: true)
             : Task.CompletedTask;
 
+    private async Task<ReviewWorkspaceData> LoadDailyReportEvidenceAsync(
+        ReviewWorkspaceData data, DateOnly date, int serverUtcOffsetSeconds)
+    {
+        var offset = TimeSpan.FromSeconds(serverUtcOffsetSeconds);
+        var from = new DateTimeOffset(date.ToDateTime(TimeOnly.MinValue), offset).ToUniversalTime();
+        var dayEnd = from.AddDays(1);
+        var now = _timeProvider.GetUtcNow();
+        var to = now < dayEnd ? now : dayEnd;
+        var relevant = data.Trades.Where(trade => trade.AccountKey == data.AccountKey &&
+            trade.OpenedAtUtc < dayEnd && (trade.ClosedAtUtc is null || trade.ClosedAtUtc >= from)).ToArray();
+        var samples = new Dictionary<long, IReadOnlyList<PositionPnlSample>>();
+        foreach (var trade in relevant)
+        {
+            var detail = await _reviewRepository.LoadTradeDetailAsync(new TradeKey(data.AccountKey, trade.PositionId), _cancellation.Token);
+            if (detail is not null) samples[trade.PositionId] = detail.PnlSamples;
+        }
+        var terminal = _terminal;
+        var paths = RuntimePaths.Resolve();
+        var histories = new List<MarketHistoryResult>();
+        foreach (var symbol in relevant.Select(trade => trade.Symbol).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            var request = new MarketHistoryRequest(Guid.NewGuid().ToString("N"), terminal?.TerminalId ?? string.Empty,
+                data.AccountKey, symbol, "M5", from, to, MarketDataPrecision.Bars, MaximumBars: 500);
+            MarketHistoryResult? cached = null;
+            try
+            {
+                if (terminal is null || to <= from) throw new InvalidOperationException("交易终端或当日时间范围尚未就绪。");
+                var stored = await _reviewRepository.LoadMarketDataAsync(data.AccountKey, terminal.TerminalId,
+                    symbol, "M5", MarketDataPrecision.Bars, from, to, _cancellation.Token);
+                if (stored.Range is not null) cached = new MarketHistoryResult(stored.Range, stored.Bars, stored.Ticks);
+                if (cached?.Range.Coverage == MarketCoverageStatus.Complete)
+                {
+                    histories.Add(cached);
+                    continue;
+                }
+                IMarketHistorySource client = _activePlatform == TradingPlatform.Mt4
+                    ? new TradePet.Infrastructure.Mt4.Mt4MarketHistoryClient(terminal.TerminalPath, terminal.DataDirectory!, serverUtcOffsetSeconds)
+                    : new Mt5HistoryClient(new Mt5HistoryOptions(paths.PythonExecutable, paths.HistoryWorkerScript,
+                        terminal.TerminalPath, terminal.TerminalId));
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(_cancellation.Token);
+                timeout.CancelAfter(TimeSpan.FromSeconds(20));
+                var history = await new TradeReplayService(_reviewRepository, client).LoadAsync(request, timeout.Token);
+                histories.Add(history.Bars.Count == 0 && cached is { Bars.Count: > 0 }
+                    ? cached with { Range = cached.Range with { Coverage = MarketCoverageStatus.Partial, Error = history.Range.Error } }
+                    : history);
+            }
+            catch (OperationCanceledException) when (_cancellation.IsCancellationRequested) { throw; }
+            catch (Exception exception)
+            {
+                var error = exception is OperationCanceledException ? "读取当日行情超时。" : exception.Message;
+                histories.Add(cached is { Bars.Count: > 0 }
+                    ? cached with { Range = cached.Range with { Coverage = MarketCoverageStatus.Partial, Error = error } }
+                    : new MarketHistoryResult(new MarketDataRange(request.RequestId, request.TerminalId, data.AccountKey,
+                        symbol, "M5", from, to, null, null, MarketDataPrecision.Bars, MarketCoverageStatus.Failed,
+                        string.Empty, error, now), [], []));
+            }
+        }
+        return data with { DailyMarketData = histories, PositionSamples = samples };
+    }
+
     private async Task ShowDailyTradingReportAsync(DateOnly date, bool automatic)
     {
         if (_activePlatform == TradingPlatform.Mt4 && (!_mt4HistoryAvailable || !_mt4HistoryReady || !_hasInitialDeals))
@@ -5847,20 +6061,18 @@ public sealed class TradePetRuntime : IAsyncDisposable
                 .OrderBy(item => item.ClosedAtUtc)
                 .ThenBy(item => item.PositionId)
                 .ToArray();
+            data = await LoadDailyReportEvidenceAsync(data, date, reportOffsetSeconds);
+            if (_account?.Scope.AccountKey != accountKey) return;
             var winCount = completed.Count(item => item.NetPnl > 0.01m);
             var lossCount = completed.Count(item => item.NetPnl < -0.01m);
             var breakevenCount = completed.Length - winCount - lossCount;
-            var insidePlanCount = completed.Count(item =>
-                data.Metadata.TryGetValue(item.PositionId, out var metadata) &&
-                metadata.ComplianceStatus is PlanComplianceStatus.Matched or PlanComplianceStatus.ManualInside);
-            var outsidePlanCount = completed.Count(item =>
-                data.Metadata.TryGetValue(item.PositionId, out var metadata) &&
-                metadata.ComplianceStatus is PlanComplianceStatus.OutsidePlan or PlanComplianceStatus.ManualOutside);
+            var sampledTradeCount = completed.Count(item => data.Excursions.TryGetValue(item.PositionId, out var excursion) && excursion.AccountKey == accountKey);
+            var reliableSampleCount = completed.Count(item => data.Excursions.TryGetValue(item.PositionId, out var excursion) && excursion.AccountKey == accountKey && excursion.IsReliable);
             var reviewedCount = completed.Count(item =>
                 data.Documents.TryGetValue(item.PositionId, out var document) &&
                 document.Status == ReviewCompletionStatus.Reviewed);
             var behaviorAlerts = data.Behaviors.Count(item =>
-                item.AccountKey == accountKey && item.ServerDate == date &&
+                item.AccountKey == accountKey && item.ServerDate == date && item.Rule != BehaviorRuleKind.PlanDeviationRate &&
                 item.Level is BehaviorRiskLevel.Attention or BehaviorRiskLevel.Critical);
             var report = new DailyTradingReport(
                 accountKey,
@@ -5876,9 +6088,8 @@ public sealed class TradePetRuntime : IAsyncDisposable
                 completed.Length == 0 ? null : winCount * 100m / completed.Length,
                 completed.OrderByDescending(item => item.NetPnl).FirstOrDefault(),
                 completed.OrderBy(item => item.NetPnl).FirstOrDefault(),
-                insidePlanCount,
-                outsidePlanCount,
-                completed.Length - insidePlanCount - outsidePlanCount,
+                sampledTradeCount,
+                reliableSampleCount,
                 reviewedCount,
                 completed.Length - reviewedCount,
                 behaviorAlerts,
@@ -5996,7 +6207,7 @@ public sealed class TradePetRuntime : IAsyncDisposable
             .ThenBy(item => item.Ticket)
             .ToArray();
         var behaviors = data.Behaviors
-            .Where(item => item.AccountKey == report.AccountKey && item.ServerDate == date)
+            .Where(item => item.AccountKey == report.AccountKey && item.ServerDate == date && item.Rule != BehaviorRuleKind.PlanDeviationRate)
             .OrderBy(item => item.EventAtUtc)
             .ToArray();
         var cashFlows = (data.CashFlows ?? [])
@@ -6044,11 +6255,9 @@ public sealed class TradePetRuntime : IAsyncDisposable
         builder.AppendLine($"| 行为风险提醒 | {report.BehaviorAlertCount} |");
         builder.AppendLine();
 
-        builder.AppendLine("## 二、计划执行与风险状态");
+        builder.AppendLine("## 二、持仓采样与风险状态");
         builder.AppendLine();
-        builder.AppendLine($"- 计划内：{report.InsidePlanCount} 笔");
-        builder.AppendLine($"- 计划外：{report.OutsidePlanCount} 笔");
-        builder.AppendLine($"- 未分类：{report.UnclassifiedPlanCount} 笔");
+        builder.AppendLine($"- 有持仓采样：{report.SampledTradeCount}/{report.TradeCount} 笔；全程采样可靠：{report.ReliableSampleCount}/{report.TradeCount} 笔");
         builder.AppendLine($"- 已复盘：{report.ReviewedCount} 笔；待复盘：{report.PendingReviewCount} 笔");
         builder.AppendLine($"- 达标时刻：{(facts.TargetReachedAtUtc is null ? "未记录" : FormatServerTime(facts.TargetReachedAtUtc.Value, offset))}");
         builder.AppendLine($"- 达标金额：{(facts.TargetAmount is null ? "未记录" : FormatReportMoney(facts.TargetAmount.Value, report.Currency))}");
@@ -6070,13 +6279,13 @@ public sealed class TradePetRuntime : IAsyncDisposable
         }
         else
         {
-            builder.AppendLine("| Position | 品种 | 方向 | 开仓（服务器） | 平仓（服务器） | 入场 | 出场 | 最大手数 | 净盈亏 | 计划执行 | 策略 / 形态 | 标签 | 复盘状态 |");
-            builder.AppendLine("|---:|---|---|---|---|---:|---:|---:|---:|---|---|---|---|");
+            builder.AppendLine("| Position | 品种 | 方向 | 开仓（服务器） | 平仓（服务器） | 入场 | 出场 | 最大手数 | 净盈亏 | 复盘状态 |");
+            builder.AppendLine("|---:|---|---|---|---|---:|---:|---:|---:|---|");
             foreach (var trade in completed)
             {
                 data.Metadata.TryGetValue(trade.PositionId, out var metadata);
                 data.Documents.TryGetValue(trade.PositionId, out var document);
-                builder.AppendLine($"| {trade.PositionId} | {MdCell(trade.Symbol)} | {FormatSide(trade.Side)} | {FormatServerTime(trade.OpenedAtUtc, offset)} | {FormatServerTime(trade.ClosedAtUtc, offset)} | {trade.EntryPrice:0.#####} | {FormatNullable(trade.ExitPrice)} | {trade.MaximumVolume:0.####} | {trade.NetPnl:+0.##;-0.##;0} | {FormatCompliance(metadata?.ComplianceStatus)} | {MdCell(JoinNonEmpty(metadata?.Strategy, metadata?.Setup))} | {MdCell(metadata is null ? null : string.Join(", ", metadata.Tags))} | {FormatReviewStatus(document?.Status)} |");
+                builder.AppendLine($"| {trade.PositionId} | {MdCell(trade.Symbol)} | {FormatSide(trade.Side)} | {FormatServerTime(trade.OpenedAtUtc, offset)} | {FormatServerTime(trade.ClosedAtUtc, offset)} | {trade.EntryPrice:0.#####} | {FormatNullable(trade.ExitPrice)} | {trade.MaximumVolume:0.####} | {trade.NetPnl:+0.##;-0.##;0} | {FormatReviewStatus(document?.Status)} |");
             }
         }
         builder.AppendLine();
@@ -6534,6 +6743,9 @@ public sealed class TradePetRuntime : IAsyncDisposable
             _viewModel.MiniPositionVisible = settings.MiniPositionVisible;
             _viewModel.MiniPositionPinned = settings.MiniPositionPinned;
             _viewModel.DailyReportEnabled = settings.DailyReportEnabled;
+            _viewModel.QuickReviewPromptEnabled = settings.QuickReviewPromptEnabled;
+            _viewModel.EntryReasonPromptEnabled = settings.EntryReasonPromptEnabled;
+            _viewModel.UpdateNotificationsEnabled = settings.UpdateNotificationsEnabled;
             _viewModel.DailyReportTimeText = NormalizeDailyReportTime(settings.DailyReportTime);
             _viewModel.StartWithWindows = StartupRegistration.IsEnabled();
         });
@@ -6863,7 +7075,10 @@ public sealed class TradePetRuntime : IAsyncDisposable
         bool DailyReportEnabled = true,
         string DailyReportTime = "23:55",
         TradingPlatform Platform = TradingPlatform.Mt5,
-        int SetupVersion = 0);
+        int SetupVersion = 0,
+        bool QuickReviewPromptEnabled = true,
+        bool EntryReasonPromptEnabled = true,
+        bool UpdateNotificationsEnabled = true);
 
     private sealed record BehaviorReviewEditCommand(
         string AccountKey,

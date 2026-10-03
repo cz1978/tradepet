@@ -35,6 +35,8 @@ public partial class PetWindow : Window
     private bool _trayResourcesDisposed;
     private bool _quickCardVisible;
     private bool _quickCardPinned;
+    private QuickReviewCard? _reviewCard;
+    private EntryReasonCard? _entryReasonCard;
     private bool _isDragging;
     private double _homeLeft;
     private bool _fullscreenActive;
@@ -54,6 +56,7 @@ public partial class PetWindow : Window
         QuickCardPopup.PlacementTarget = PetSprite;
         SpeechBubblePopup.DataContext = viewModel;
         SpeechBubblePopup.PlacementTarget = PetSprite;
+        ReviewCardPopup.PlacementTarget = PetSprite;
         _viewModel.PropertyChanged += ViewModel_PropertyChanged;
         SourceInitialized += (_, _) =>
         {
@@ -171,6 +174,10 @@ public partial class PetWindow : Window
         _hideTimer.Stop();
         _viewModel.PropertyChanged -= ViewModel_PropertyChanged;
         QuickCardPopup.IsOpen = false;
+        ReviewCardPopup.IsOpen = false;
+        if (_reviewCard is not null) _reviewCard.Completed -= ReviewCard_Completed;
+        if (_entryReasonCard is not null) _entryReasonCard.Completed -= EntryReasonCard_Completed;
+        ReviewCardHost.Content = null;
         SpeechBubblePopup.IsOpen = false;
         PetSprite.Dispose();
         _trayIcon.Visible = false;
@@ -307,11 +314,11 @@ public partial class PetWindow : Window
     private void ToggleMiniPosition_Click(object sender, RoutedEventArgs e) =>
         _viewModel.MiniPositionVisible = !_viewModel.MiniPositionVisible;
 
-    private void OpenPlan_Click(object sender, RoutedEventArgs e)
+    private void OpenQuickReview_Click(object sender, RoutedEventArgs e)
     {
         _quickCardPinned = false;
         SetQuickCardVisible(false);
-        _viewModel.ShowPlanPageCommand.Execute(null);
+        _viewModel.ShowQuickReviewCommand.Execute(null);
     }
 
     private void OpenConsole_Click(object sender, RoutedEventArgs e)
@@ -342,6 +349,7 @@ public partial class PetWindow : Window
 
     private void SetQuickCardVisible(bool visible)
     {
+        if (visible && (_reviewCard is not null || _entryReasonCard is not null)) return;
         if (visible && (_isDragging || !IsVisible))
         {
             return;
@@ -386,9 +394,70 @@ public partial class PetWindow : Window
         }
     }
 
-    private void UpdateSpeechBubble() =>
+    public void ShowQuickReviewCard(QuickReviewCard card)
+    {
+        if (card.IsCompleted) return;
+        if (_reviewCard != card)
+        {
+            if (_reviewCard is not null) _reviewCard.Completed -= ReviewCard_Completed;
+            _reviewCard = card;
+            ReviewCardHost.Content = card;
+            card.Completed += ReviewCard_Completed;
+        }
+        _quickCardPinned = false;
+        SetQuickCardVisible(false);
+        if (!IsVisible) Show();
+        UpdateSpeechBubble();
+    }
+
+    private void ReviewCard_Completed(QuickReviewCard card)
+    {
+        if (_reviewCard != card) return;
+        card.Completed -= ReviewCard_Completed;
+        _reviewCard = null;
+        if (ReferenceEquals(ReviewCardHost.Content, card))
+        {
+            ReviewCardPopup.IsOpen = false;
+            ReviewCardHost.Content = null;
+        }
+        UpdateSpeechBubble();
+    }
+
+    public void ShowEntryReasonCard(EntryReasonCard card)
+    {
+        if (card.IsCompleted) return;
+        if (_entryReasonCard != card)
+        {
+            if (_entryReasonCard is not null) _entryReasonCard.Completed -= EntryReasonCard_Completed;
+            _entryReasonCard = card;
+            ReviewCardHost.Content = card;
+            card.Completed += EntryReasonCard_Completed;
+        }
+        _quickCardPinned = false;
+        SetQuickCardVisible(false);
+        if (!IsVisible) Show();
+        UpdateSpeechBubble();
+    }
+
+    private void EntryReasonCard_Completed(EntryReasonCard card)
+    {
+        if (_entryReasonCard != card) return;
+        card.Completed -= EntryReasonCard_Completed;
+        _entryReasonCard = null;
+        if (ReferenceEquals(ReviewCardHost.Content, card))
+        {
+            ReviewCardPopup.IsOpen = false;
+            ReviewCardHost.Content = null;
+        }
+        UpdateSpeechBubble();
+    }
+
+    private void UpdateSpeechBubble()
+    {
+        ReviewCardPopup.IsOpen = !_trayResourcesDisposed && IsVisible && !_isDragging && (_reviewCard is not null || _entryReasonCard is not null);
         SpeechBubblePopup.IsOpen = !_trayResourcesDisposed && IsVisible &&
-                                   !_isDragging && _viewModel.IsBubbleVisible;
+                                   !_isDragging && _viewModel.IsBubbleVisible && !ReviewCardPopup.IsOpen;
+    }
 
     private void ResizeForScale(bool clamp = true)
     {
@@ -438,7 +507,7 @@ public partial class PetWindow : Window
 
     private void MoveWithActivity()
     {
-        if (_isDragging || _viewModel.IsPositionLocked || !IsVisible || _quickCardVisible ||
+        if (_isDragging || _viewModel.IsPositionLocked || !IsVisible || _quickCardVisible || _reviewCard is not null || _entryReasonCard is not null ||
             _viewModel.IsBubbleVisible || ContextMenu?.IsOpen == true || PetSprite.IsMouseOver)
         {
             return;

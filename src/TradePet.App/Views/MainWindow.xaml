@@ -205,11 +205,12 @@
                          ItemContainerStyle="{StaticResource SideNavItemStyle}"
                          SelectedIndex="{Binding ElementName=MainTabs, Path=SelectedIndex, Mode=TwoWay}">
                     <ListBoxItem Content="今日概览" />
-                    <ListBoxItem Content="交易计划" />
+                    <ListBoxItem Content="日目标与风险" />
                     <ListBoxItem Content="亏损区域" />
                     <ListBoxItem Content="复盘分析" />
                     <ListBoxItem Content="时间线" />
                     <ListBoxItem Content="设置中心" />
+                    <ListBoxItem Content="报告与数据" />
                 </ListBox>
 
                 <Border x:Name="GuideConnectionStatus" Grid.Row="3" Style="{StaticResource PageCardStyle}" Padding="12" Background="#101821">
@@ -244,7 +245,7 @@
                 <StackPanel>
                     <TextBlock Text="{Binding GreetingText}" FontSize="22" FontWeight="SemiBold" />
                     <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                        <TextBlock Text="守住计划，尊重市场，等待属于你的机会" Style="{StaticResource MutedTextStyle}" />
+                        <TextBlock Text="守住边界，尊重市场，等待属于你的机会" Style="{StaticResource MutedTextStyle}" />
                         <TextBlock Text="  ·  服务器交易日 " Foreground="#546170" FontSize="11" />
                         <TextBlock Text="{Binding ServerDateText}" Foreground="#AEBBB5" FontSize="11" />
                     </StackPanel>
@@ -270,7 +271,7 @@
                             <TextBlock Text="正在等待订单历史和服务器时间。请更新桥接插件；MT4 账户历史请选择全部历史。数据就绪前依赖历史的指标显示为 —。"
                                        TextWrapping="Wrap" Foreground="{StaticResource AccentBrush}" Margin="0,0,0,12"
                                        Visibility="{Binding MonitoringOnly, Converter={StaticResource BoolToVisibility}}" />
-                            <TextBlock Text="MT4 · 时间及交易日以 broker 服务器为准。订单历史、复盘、日报、图表计划和 M5 回放已接入；历史范围取决于终端已加载记录。部分平仓按票据统计；原生历史 Tick 不可回补；公开周历不含实时公布值。"
+                            <TextBlock Text="MT4 · 时间及交易日以 broker 服务器为准。订单历史、复盘、日报、图表标记和 M5 回放已接入；历史范围取决于终端已加载记录。部分平仓按票据统计；原生历史 Tick 不可回补；公开周历不含实时公布值。"
                                        TextWrapping="Wrap" Style="{StaticResource MutedTextStyle}" Margin="0,0,0,12"
                                        Visibility="{Binding IsMt4, Converter={StaticResource BoolToVisibility}}" />
                             <UniformGrid x:Name="GuideOverviewMetrics" Columns="4" Margin="0,0,0,12">
@@ -491,11 +492,11 @@
                                 <Border Grid.Column="0" Style="{StaticResource PageCardStyle}" Margin="0,0,10,0" Padding="14">
                                     <Grid>
                                         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-                                        <TextBlock Text="今日计划" Style="{StaticResource SectionTitleStyle}" FontSize="14" />
+                                        <TextBlock Text="今日目标与限额" Style="{StaticResource SectionTitleStyle}" FontSize="14" />
                                         <UniformGrid Grid.Row="1" Columns="2" Rows="2" Margin="0,10,0,0">
                                             <StackPanel>
                                                 <TextBlock Text="盈利目标" Style="{StaticResource MutedTextStyle}" FontSize="10" />
-                                                <TextBlock Text="{Binding DailyTarget, TargetNullValue=未设置}" Margin="0,3,0,0" />
+                                                <TextBlock Text="{Binding DailyTargetDisplay}" Margin="0,3,0,0" />
                                             </StackPanel>
                                             <StackPanel>
                                                 <TextBlock Text="亏损上限" Style="{StaticResource MutedTextStyle}" FontSize="10" />
@@ -587,7 +588,7 @@
                     </ScrollViewer>
                 </TabItem>
 
-                <TabItem Header="交易计划">
+                <TabItem Header="日目标与风险">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <Grid>
                         <Grid.RowDefinitions>
@@ -595,7 +596,7 @@
                         </Grid.RowDefinitions>
                         <Grid x:Name="GuidePlanHeader" Margin="0,0,0,12">
                             <StackPanel>
-                                <TextBlock Text="交易计划" FontSize="20" FontWeight="SemiBold" />
+                                <TextBlock Text="日目标与风险" FontSize="20" FontWeight="SemiBold" />
                                 <TextBlock Text="提前写下边界，交易时只负责执行。" Style="{StaticResource MutedTextStyle}" Margin="0,5,0,0" />
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
@@ -609,31 +610,68 @@
                                 <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                                 <Grid>
                                     <TextBlock Text="今日交易边界" Style="{StaticResource SectionTitleStyle}" />
-                                    <Button x:Name="GuideSavePlan" Content="保存计划" Click="SavePlan_Click" Style="{StaticResource PrimaryButtonStyle}"
+                                    <Button x:Name="GuideSavePlan" Content="保存目标与限额" Click="SavePlan_Click" Style="{StaticResource PrimaryButtonStyle}"
                                             HorizontalAlignment="Right" Padding="13,7" Margin="0" />
                                 </Grid>
-                                <UniformGrid Grid.Row="1" Columns="5" Margin="0,15,0,0">
-                                    <StackPanel x:Name="GuideDailyTarget" Margin="0,0,9,0" ToolTip="填正数，单位为账户货币。今日已实现盈亏加持仓浮盈亏达到目标时提醒一次；留空关闭。">
+                                <Grid Grid.Row="1" Margin="0,15,0,0">
+                                    <Grid.Resources>
+                                        <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+                                            <Setter Property="Height" Value="40" />
+                                            <Setter Property="FontSize" Value="13" />
+                                            <Setter Property="Padding" Value="10,0" />
+                                            <Setter Property="VerticalContentAlignment" Value="Center" />
+                                        </Style>
+                                    </Grid.Resources>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/><ColumnDefinition Width="9"/>
+                                        <ColumnDefinition Width="*"/><ColumnDefinition Width="9"/>
+                                        <ColumnDefinition Width="*"/><ColumnDefinition Width="9"/>
+                                        <ColumnDefinition Width="*"/><ColumnDefinition Width="9"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel x:Name="GuideDailyTarget" ToolTip="金额使用账户货币；百分比按当日初始余额换算。今日已实现盈亏加持仓浮盈亏达到目标时提醒一次；留空关闭。">
                                         <TextBlock Text="每日盈利目标" Style="{StaticResource FieldLabelStyle}" />
-                                        <TextBox x:Name="DailyTargetInput" Text="{Binding DailyTarget, UpdateSourceTrigger=LostFocus, TargetNullValue=''}" />
+                                        <Border x:Name="DailyTargetField" Height="40" Background="#0C121B" BorderThickness="1" CornerRadius="8">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+                                                    <Style.Triggers>
+                                                        <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                                            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                                                        </Trigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="1"/><ColumnDefinition Width="64"/></Grid.ColumnDefinitions>
+                                                <TextBox x:Name="DailyTargetInput" Text="{Binding DailyTarget, UpdateSourceTrigger=LostFocus, TargetNullValue=''}"
+                                                         Height="38" Padding="6,0" Background="Transparent" BorderThickness="0" />
+                                                <Border Grid.Column="1" Background="{StaticResource BorderBrush}" Margin="0,7" />
+                                                <ComboBox x:Name="DailyTargetUnitInput" Grid.Column="2" SelectedIndex="{Binding DailyTargetUnitIndex, Mode=TwoWay}"
+                                                          Height="38" MinHeight="38" Background="Transparent" BorderThickness="0" Padding="8,0,25,0"
+                                                          ToolTip="金额：账户货币；%：当日初始余额的百分比。">
+                                                    <ComboBoxItem Content="金额"/><ComboBoxItem Content="%"/>
+                                                </ComboBox>
+                                            </Grid>
+                                        </Border>
                                     </StackPanel>
-                                    <StackPanel x:Name="GuideDailyLoss" Margin="0,0,9,0" ToolTip="填亏损金额的正数，单位为账户货币。例如填 100，今日合计盈亏到 -100 时提醒一次；留空关闭。">
+                                    <StackPanel x:Name="GuideDailyLoss" Grid.Column="2" ToolTip="填亏损金额的正数，单位为账户货币。例如填 100，今日合计盈亏到 -100 时提醒一次；留空关闭。">
                                         <TextBlock Text="每日亏损上限" Style="{StaticResource FieldLabelStyle}" />
                                         <TextBox x:Name="DailyLossInput" Text="{Binding DailyLoss, UpdateSourceTrigger=LostFocus, TargetNullValue=''}" />
                                     </StackPanel>
-                                    <StackPanel x:Name="GuideMaximumTrades" Margin="0,0,9,0" ToolTip="填正整数；按交易服务器日期统计当日开仓笔数，达到该数时提醒一次，不会拦截下单；留空关闭。">
+                                    <StackPanel x:Name="GuideMaximumTrades" Grid.Column="4" ToolTip="填正整数；按交易服务器日期统计当日开仓笔数，达到该数时提醒一次，不会拦截下单；留空关闭。">
                                         <TextBlock Text="最多交易次数" Style="{StaticResource FieldLabelStyle}" />
                                         <TextBox x:Name="MaximumTradesInput" Text="{Binding MaximumTrades, UpdateSourceTrigger=LostFocus, TargetNullValue=''}" />
                                     </StackPanel>
-                                    <StackPanel x:Name="GuideMaximumLot" Margin="0,0,9,0" ToolTip="填正数，单位为手。同品种同方向的当前持仓手数合计达到该值时提醒一次；留空关闭。">
+                                    <StackPanel x:Name="GuideMaximumLot" Grid.Column="6" ToolTip="填正数，单位为手。同品种同方向的当前持仓手数合计达到该值时提醒一次；留空关闭。">
                                         <TextBlock Text="同向持仓上限（手）" Style="{StaticResource FieldLabelStyle}" />
                                         <TextBox x:Name="MaximumLotInput" Text="{Binding MaximumLot, UpdateSourceTrigger=LostFocus, TargetNullValue=''}" />
                                     </StackPanel>
-                                    <StackPanel x:Name="GuideLossZoneTolerance" ToolTip="填正数，按品种最小可交易跳动换算为价格距离。例如最小跳动 0.01、填 200，半径就是 2.00；已有亏损区保留原半径。">
+                                    <StackPanel x:Name="GuideLossZoneTolerance" Grid.Column="8" ToolTip="填正数，按品种最小可交易跳动换算为价格距离。例如最小跳动 0.01、填 200，半径就是 2.00；已有亏损区保留原半径。">
                                         <TextBlock Text="亏损区半径（跳动数）" Style="{StaticResource FieldLabelStyle}" />
                                         <TextBox x:Name="LossZoneToleranceInput" Text="{Binding LossZoneTolerance, UpdateSourceTrigger=LostFocus}" />
                                     </StackPanel>
-                                </UniformGrid>
+                                </Grid>
                                 <StackPanel x:Name="GuideStopLossReminder" Grid.Row="2" Orientation="Horizontal" Margin="0,12,0,0"
                                             ToolTip="勾选后，实时持仓持续未设置止损达到等待秒数时，每笔持仓提醒一次；不会代设止损。">
                                     <CheckBox Content="持仓持续无止损时提醒" IsChecked="{Binding StopLossReminderEnabled}" VerticalAlignment="Center" />
@@ -651,56 +689,10 @@
                                 <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                                 <Grid x:Name="GuidePlanObjectsHeader" Margin="16,13">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                                    <TextBlock Text="图表计划对象" Style="{StaticResource SectionTitleStyle}" />
+                                    <TextBlock Text="图表标记" Style="{StaticResource SectionTitleStyle}" />
                                     <TextBlock Grid.Column="1" Text="{Binding PlanChartStatusText}" Style="{StaticResource MutedTextStyle}"
                                                Margin="14,0,0,0" TextAlignment="Right" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                                 </Grid>
-                                <Border x:Name="GuideStructuredForm" Grid.Row="1" Background="#111A24" BorderBrush="#202A38" BorderThickness="0,1,0,1" Padding="12,10">
-                                    <Grid>
-                                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                                        <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="0.8*"/><ColumnDefinition/><ColumnDefinition Width="1.4*"/><ColumnDefinition Width="1.4*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                        <TextBlock Text="手填结构化计划：按当前账户、今日、品种和方向匹配后续交易；与下方图表对象分别保存。" Style="{StaticResource MutedTextStyle}" FontSize="11" Grid.ColumnSpan="6" />
-                                        <StackPanel Grid.Row="1" Margin="0,7,7,0" ToolTip="必填：填写交易终端的完整品种名，含后缀，例如 XAUUSD.s；只有同品种交易才会匹配。"><TextBlock Text="品种 *" Style="{StaticResource FieldLabelStyle}"/><TextBox x:Name="StructuredSymbolInput" Text="{Binding NewPlanSymbol, UpdateSourceTrigger=LostFocus}" /></StackPanel>
-                                        <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,7,7,0" ToolTip="选择买入或卖出；后续仅匹配同方向交易。"><TextBlock Text="方向 *" Style="{StaticResource FieldLabelStyle}"/><ComboBox ItemsSource="{Binding TradeSideOptions}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding NewPlanSide}" /></StackPanel>
-                                        <StackPanel Grid.Row="1" Grid.Column="2" Margin="0,7,7,0" ToolTip="必填，且必须位于入场区内；计划风险倍数按目标到参考入场的距离除以参考入场到止损的距离计算。"><TextBlock Text="参考入场 *" Style="{StaticResource FieldLabelStyle}"/><TextBox x:Name="StructuredReferenceInput" Text="{Binding NewPlanReferenceEntry, UpdateSourceTrigger=LostFocus}" /></StackPanel>
-                                        <StackPanel Grid.Row="1" Grid.Column="3" Margin="0,7,7,0" ToolTip="必填：左侧最低价、右侧最高价。后续交易只有入场价落在区间内才算匹配；价格不必相等。"><TextBlock Text="入场区 *" Style="{StaticResource FieldLabelStyle}"/><StackPanel Orientation="Horizontal"><TextBox x:Name="StructuredLowInput" Width="58" Text="{Binding NewPlanEntryLow, UpdateSourceTrigger=LostFocus}"/><TextBlock Text=" – " VerticalAlignment="Center"/><TextBox x:Name="StructuredHighInput" Width="58" Text="{Binding NewPlanEntryHigh, UpdateSourceTrigger=LostFocus}"/></StackPanel></StackPanel>
-                                        <StackPanel Grid.Row="1" Grid.Column="4" Margin="0,7,7,0" ToolTip="必填。买入：止损低于入场区、目标高于入场区；卖出相反。这是记录计划，不会向终端设置真实止损或止盈。"><TextBlock Text="止损 / 目标 *" Style="{StaticResource FieldLabelStyle}"/><StackPanel Orientation="Horizontal"><TextBox x:Name="StructuredStopInput" Width="58" Text="{Binding NewPlanStop, UpdateSourceTrigger=LostFocus}"/><TextBlock Text=" / " VerticalAlignment="Center"/><TextBox x:Name="StructuredTargetInput" Width="58" Text="{Binding NewPlanTarget, UpdateSourceTrigger=LostFocus}"/></StackPanel></StackPanel>
-                                        <Button x:Name="GuideSaveStructuredPlan" Grid.Row="1" Grid.Column="5" Content="保存结构化计划" Click="SaveStructuredPlan_Click" Style="{StaticResource PrimaryButtonStyle}" VerticalAlignment="Bottom" Margin="0,7,0,0" Padding="10,7" ToolTip="保存到当前账户的交易服务器今日。修改旧计划会创建新版本，不改动已匹配的旧交易。" />
-                                        <StackPanel Grid.Row="2" Margin="0,7,7,0" ToolTip="可选：给计划写策略名，便于复盘分类。"><TextBlock Text="策略" Style="{StaticResource FieldLabelStyle}"/><TextBox x:Name="StructuredStrategyInput" Text="{Binding NewPlanStrategy, UpdateSourceTrigger=LostFocus}" /></StackPanel>
-                                        <StackPanel Grid.Row="2" Grid.Column="1" Margin="0,7,7,0" ToolTip="可选：记录入场形态，便于复盘筛选。"><TextBlock Text="形态" Style="{StaticResource FieldLabelStyle}"/><TextBox x:Name="StructuredSetupInput" Text="{Binding NewPlanSetup, UpdateSourceTrigger=LostFocus}" /></StackPanel>
-                                        <StackPanel x:Name="GuideStructuredMetadata" Grid.Row="2" Grid.Column="2" Grid.ColumnSpan="3" Margin="0,7,7,0" ToolTip="可选：用中文或英文逗号、顿号分隔标签，便于复盘查找。"><TextBlock Text="标签（逗号分隔）" Style="{StaticResource FieldLabelStyle}"/><TextBox x:Name="StructuredTagsInput" Text="{Binding NewPlanTags, UpdateSourceTrigger=LostFocus}" /></StackPanel>
-                                        <StackPanel Grid.Row="2" Grid.Column="5" Margin="0,7,0,0" ToolTip="可选：补充这笔计划的理由。"><TextBlock Text="备注" Style="{StaticResource FieldLabelStyle}"/><TextBox x:Name="StructuredNotesInput" Text="{Binding NewPlanNotes, UpdateSourceTrigger=LostFocus}" /></StackPanel>
-                                        <TextBlock Grid.Row="3" Grid.ColumnSpan="6" Text="{Binding StructuredPlanStatusText}" Foreground="#B7C5C7" FontSize="11" TextWrapping="Wrap" Margin="0,7,0,0" />
-                                    </Grid>
-                                </Border>
-                                <ListView x:Name="GuideStructuredList" Grid.Row="2" ItemsSource="{Binding StructuredPlans}"
-                                          MaxHeight="116"
-                                          ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                          ScrollViewer.HorizontalScrollBarVisibility="Auto">
-                                    <ListView.View>
-                                        <GridView>
-                                            <GridViewColumn Header="计划品种" Width="95" DisplayMemberBinding="{Binding Symbol}" />
-                                            <GridViewColumn Header="方向" Width="55" DisplayMemberBinding="{Binding Side}" />
-                                            <GridViewColumn Header="入场区" Width="125" DisplayMemberBinding="{Binding EntryRange}" />
-                                            <GridViewColumn Header="止损 / 目标" Width="150" DisplayMemberBinding="{Binding StopTarget}" />
-                                            <GridViewColumn Header="策略 / 形态" Width="130" DisplayMemberBinding="{Binding Strategy}" />
-                                            <GridViewColumn Header="计划风险倍数" Width="95" DisplayMemberBinding="{Binding RiskMultiple}" />
-                                            <GridViewColumn Header="状态" Width="70" DisplayMemberBinding="{Binding Status}" />
-                                            <GridViewColumn Header="操作" Width="145">
-                                                <GridViewColumn.CellTemplate>
-                                                    <DataTemplate>
-                                                        <StackPanel Orientation="Horizontal">
-                                                            <Button Content="修改" Command="{Binding ReviseCommand}"
-                                                                    Style="{StaticResource QuietButtonStyle}" Padding="7,3" Margin="0,0,5,0" />
-                                                            <Button Content="{Binding ToggleText}" Command="{Binding ToggleActiveCommand}"
-                                                                    Style="{StaticResource QuietButtonStyle}" Padding="7,3" Margin="0" />
-                                                        </StackPanel>
-                                                    </DataTemplate>
-                                                </GridViewColumn.CellTemplate>
-                                            </GridViewColumn>
-                                        </GridView>
-                                    </ListView.View>
-                                </ListView>
                                 <ListView x:Name="GuideChartObjectList" Grid.Row="3" ItemsSource="{Binding PlanItems}"
                                           MaxHeight="240"
                                           ScrollViewer.VerticalScrollBarVisibility="Auto"
@@ -710,7 +702,7 @@
                                             <GridViewColumn Header="品种" Width="100" DisplayMemberBinding="{Binding Symbol}" />
                                             <GridViewColumn Header="对象范围" Width="190" DisplayMemberBinding="{Binding KindText}" />
                                             <GridViewColumn Header="图表文字" Width="150" DisplayMemberBinding="{Binding Text}" />
-                                            <GridViewColumn Header="计划用途" Width="170">
+                                            <GridViewColumn Header="标记用途" Width="170">
                                                 <GridViewColumn.CellTemplate>
                                                     <DataTemplate>
                                                         <ComboBox Width="155"
@@ -938,16 +930,6 @@
                                                 <GridViewColumn Header="品种" Width="88" DisplayMemberBinding="{Binding Symbol}" />
                                                 <GridViewColumn Header="方向" Width="48" DisplayMemberBinding="{Binding Side}" />
                                                 <GridViewColumn Header="净盈亏" Width="72" DisplayMemberBinding="{Binding Pnl}" />
-                                                <GridViewColumn Header="计划归类" Width="125">
-                                                    <GridViewColumn.CellTemplate>
-                                                        <DataTemplate>
-                                                            <ComboBox Width="115"
-                                                                      ItemsSource="{Binding DataContext.PlanComplianceOptions, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                                      DisplayMemberPath="Label" SelectedValuePath="Value"
-                                                                      SelectedValue="{Binding ComplianceStatus, Mode=TwoWay}" />
-                                                        </DataTemplate>
-                                                    </GridViewColumn.CellTemplate>
-                                                </GridViewColumn>
                                                 <GridViewColumn Header="策略" Width="100">
                                                     <GridViewColumn.CellTemplate><DataTemplate><TextBox Width="92" Text="{Binding Strategy, UpdateSourceTrigger=LostFocus}" /></DataTemplate></GridViewColumn.CellTemplate>
                                                 </GridViewColumn>
@@ -1001,6 +983,25 @@
                                 <TextBlock Text="调整桌宠行为、交易提醒和终端连接。" Style="{StaticResource MutedTextStyle}" Margin="0,5,0,0" />
                                 <Button Content="打开设置向导 / 切换 MT4、MT5" Command="{Binding ShowSetupCommand}" HorizontalAlignment="Left" Margin="0,12,0,0" />
                             </StackPanel>
+                            <Border Style="{StaticResource PageCardStyle}" Margin="0,0,0,12">
+                                <Grid>
+                                    <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
+                                    <StackPanel Margin="0,0,18,0">
+                                        <TextBlock Text="快速记录提示" Style="{StaticResource SectionTitleStyle}" Margin="0,0,0,8" />
+                                        <CheckBox Content="平仓后自动提示快速复盘" IsChecked="{Binding QuickReviewPromptEnabled}" />
+                                        <CheckBox Content="入场后自动提示下单原因" IsChecked="{Binding EntryReasonPromptEnabled}" />
+                                        <TextBlock Text="两个提示默认开启，可分别关闭。显示在宠物旁，不抢焦点；也可从宠物菜单手动打开。" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,4,0,9" />
+                                        <Button Content="保存设置" Command="{Binding SaveSettingsCommand}" Style="{StaticResource PrimaryButtonStyle}" HorizontalAlignment="Left" Margin="0" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="版本更新" Style="{StaticResource SectionTitleStyle}" Margin="0,0,0,8" />
+                                        <CheckBox Content="自动检查并提醒 GitHub 新版本" IsChecked="{Binding UpdateNotificationsEnabled}" />
+                                        <TextBlock Text="{Binding AppVersionText}" Style="{StaticResource MutedTextStyle}" />
+                                        <TextBlock Text="{Binding UpdateStatus}" Foreground="{StaticResource AccentBrush}" TextWrapping="Wrap" Margin="0,5,0,7" />
+                                        <WrapPanel><Button Content="检查更新" Command="{Binding CheckUpdatesCommand}" Padding="9,5"/><Button Content="打开发布页" Command="{Binding OpenReleasePageCommand}" Padding="9,5"/></WrapPanel>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
                             <Grid>
                                 <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
                                 <Border Grid.Column="0" Style="{StaticResource PageCardStyle}" Margin="0,0,10,0">
@@ -1094,11 +1095,70 @@
                                     <Grid Margin="0,14,0,0">
                                         <TextBlock Text="默认三段为 1%、2%、3%；每段都能单独关闭或修改。一次跨过多段时只弹最高一段。"
                                                    Style="{StaticResource MutedTextStyle}" VerticalAlignment="Center" />
-                                        <Button Content="保存提醒比例" Command="{Binding SaveSettingsCommand}"
+                                        <Button Content="保存设置" Command="{Binding SaveSettingsCommand}"
                                                 Style="{StaticResource PrimaryButtonStyle}" HorizontalAlignment="Right" />
                                     </Grid>
                                 </StackPanel>
                             </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+                <TabItem Header="报告与数据">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel>
+                            <StackPanel x:Name="GuideReportData" Margin="0,0,0,14">
+                                <TextBlock Text="报告与数据" FontSize="20" FontWeight="SemiBold" />
+                                <TextBlock Text="导出交易报告、分享复盘结果，或备份与恢复本地记录。" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,5,0,0" />
+                            </StackPanel>
+                            <Border Style="{StaticResource PageCardStyle}" Margin="0,0,0,10">
+                                <StackPanel>
+                                    <TextBlock Text="今日交易日报" Style="{StaticResource SectionTitleStyle}" />
+                                    <TextBlock Text="按当前账户的服务器交易日生成。打开日报后查看交易与费用明细，点击“导出 MD”选择保存位置，也可复制完整报告给 AI。终端与服务器时间需先就绪。" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,7,0,10" />
+                                    <Button x:Name="ReportDailyButton" Content="打开今日交易日报" Command="{Binding ShowDailyTradingReportCommand}" HorizontalAlignment="Left" Style="{StaticResource PrimaryButtonStyle}" />
+                                </StackPanel>
+                            </Border>
+                            <StackPanel DataContext="{Binding ReviewWorkspace}">
+                                <Border Style="{StaticResource PageCardStyle}" Margin="0,0,0,10">
+                                    <StackPanel>
+                                        <TextBlock Text="周期复盘报告" Style="{StaticResource SectionTitleStyle}" />
+                                        <TextBlock Text="按“复盘分析”中已查询的日期和筛选条件，导出全部交易及复盘内容。无需逐笔勾选。" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,7,0,7" />
+                                        <TextBlock Text="{Binding ExportRangeText}" Foreground="{StaticResource AccentBrush}" TextWrapping="Wrap" Margin="0,0,0,10" />
+                                        <WrapPanel>
+                                            <Button x:Name="ReportMarkdownButton" Content="导出复盘报告（MD）" Command="{Binding ExportMarkdownCommand}" Style="{StaticResource PrimaryButtonStyle}" Margin="0,0,8,7" />
+                                            <Button Content="打开导出目录" Click="OpenExportDirectory_Click" Margin="0,0,0,7" />
+                                        </WrapPanel>
+                                        <TextBlock Text="报告包含交易、原始成交与费用明细、复盘笔记、日记和周期总结。文件保存到本地导出目录，保留账户信息，不包含截图原文件。" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,0,0,10" />
+                                        <Expander Header="公开分享 ZIP（含 MD / CSV / HTML）">
+                                            <StackPanel Margin="0,8,0,0">
+                                                <TextBlock Text="分享包使用上方的同一导出范围。先生成预览，再确认写出；账户和已识别的本机路径会被遮盖。" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,0,0,7" />
+                                                <Button Content="生成公开导出预览" Command="{Binding ExportCommand}" HorizontalAlignment="Left" />
+                                                <TextBlock Text="{Binding ExportPreview}" TextWrapping="Wrap" Margin="0,7,0,5" />
+                                                <TextBlock Text="原始截图/附件默认不包含；仅勾选确实要公开的文件。图片内容无法自动保证匿名。" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" />
+                                                <ItemsControl ItemsSource="{Binding ExportAttachmentOptions}" Margin="0,4,0,6">
+                                                    <ItemsControl.ItemTemplate><DataTemplate>
+                                                        <StackPanel Margin="0,3,0,3">
+                                                            <CheckBox IsChecked="{Binding IsIncluded}" Content="{Binding Display}" ToolTip="勾选后原始文件将进入公开分享包；请检查画面与文件内容" />
+                                                            <TextBox Text="{Binding PublicNote, UpdateSourceTrigger=PropertyChanged}" ToolTip="公开说明；原文件名不会进入分享包" Margin="0,4,0,0" />
+                                                        </StackPanel>
+                                                    </DataTemplate></ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                                <Button Content="确认并写出公开分享 ZIP" Command="{Binding ConfirmExportCommand}" IsEnabled="{Binding CanConfirmExport}" HorizontalAlignment="Left" />
+                                            </StackPanel>
+                                        </Expander>
+                                    </StackPanel>
+                                </Border>
+                                <Border Style="{StaticResource PageCardStyle}" Margin="0,0,0,10">
+                                    <StackPanel>
+                                        <TextBlock Text="本地备份与恢复" Style="{StaticResource SectionTitleStyle}" />
+                                        <TextBlock Text="备份用于迁移或恢复数据库、复盘记录和附件，报告文件不能替代备份。恢复会校验备份并替换当前本地数据，恢复前请先创建当前备份。" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,7,0,10" />
+                                        <WrapPanel>
+                                            <Button Content="创建完整本地备份" Command="{Binding BackupCommand}" Margin="0,0,8,7" />
+                                            <Button Content="校验并恢复本地备份" Command="{Binding RestoreCommand}" Margin="0,0,0,7" />
+                                        </WrapPanel>
+                                    </StackPanel>
+                                </Border>
+                                <TextBox Text="{Binding ExportStatus, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" BorderThickness="0" Background="Transparent" Margin="0,0,0,10" ToolTip="导出或备份结果，可选中复制文件路径" />
+                            </StackPanel>
                         </StackPanel>
                     </ScrollViewer>
                 </TabItem>

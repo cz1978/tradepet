@@ -23,9 +23,8 @@ public sealed record DailyTradingReport(
     decimal? WinRate,
     TradeRecord? BestTrade,
     TradeRecord? WorstTrade,
-    int InsidePlanCount,
-    int OutsidePlanCount,
-    int UnclassifiedPlanCount,
+    int SampledTradeCount,
+    int ReliableSampleCount,
     int ReviewedCount,
     int PendingReviewCount,
     int BehaviorAlertCount,
@@ -57,7 +56,7 @@ public partial class DailyTradingReportWindow : Window
         FeesText.Text = FormatMoney(report.Fees, report.Currency);
         BestTradeText.Text = FormatTrade(report.BestTrade, report.Currency);
         WorstTradeText.Text = FormatTrade(report.WorstTrade, report.Currency);
-        PlanText.Text = $"计划内 {report.InsidePlanCount} · 计划外 {report.OutsidePlanCount} · 未分类 {report.UnclassifiedPlanCount}";
+        ProcessText.Text = $"有持仓采样 {report.SampledTradeCount}/{report.TradeCount} 笔 · 全程采样可靠 {report.ReliableSampleCount}/{report.TradeCount} 笔";
         ReviewText.Text = $"已完成 {report.ReviewedCount} · 待复盘 {report.PendingReviewCount}";
         BehaviorText.Text = report.BehaviorAlertCount == 0
             ? "没有记录到风险提醒；不代表全天没有风险"

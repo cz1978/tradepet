@@ -1239,7 +1239,7 @@ public sealed class ReviewExportService
             ? BuildPublicData(snapshot, details, workspaceData, scope, includedAttachments ?? [], publicIds, netPnl)
             : BuildData(snapshot, details, workspaceData, mode);
         var markdown = BuildMarkdown(snapshot, workspaceData, accountLabel, currency, exportedTrades.Count,
-            netPnl, revisionTotal, reviewCompletionPercentage, scope);
+            netPnl, revisionTotal, reviewCompletionPercentage, scope, exportedTrades, detailByPosition, mode, publicIds);
         var html = BuildHtml(snapshot, workspaceData, accountLabel, currency, exportedTrades, detailDocuments,
             publicIds, mode, netPnl, revisionTotal, scope);
         return new ReviewExportPackage(
@@ -1318,6 +1318,8 @@ public sealed class ReviewExportService
                     trade.OpenedAtUtc,
                     trade.ClosedAtUtc,
                     trade.NetPnl,
+                    entryReason = SanitizePublicText(string.IsNullOrWhiteSpace(detail.Document?.EntryReason)
+                        ? detail.RecordedEntryReason : detail.Document.EntryReason, accountKey),
                     planId = detail.Plan is null ? null : planIds[detail.Plan.Id],
                     review = detail.Document is null ? null : new
                     {
@@ -1426,6 +1428,7 @@ public sealed class ReviewExportService
                 detail.Trade.OpeningVolume,
                 detail.Trade.MaximumVolume,
                 detail.Trade.NetPnl,
+                recordedEntryReason = detail.RecordedEntryReason,
                 deals = detail.Deals.Select(deal => new
                 {
                     ticket = deal.Ticket.ToString(CultureInfo.InvariantCulture),
@@ -1578,7 +1581,13 @@ public sealed class ReviewExportService
         decimal netPnl,
         int revisionTotal,
         decimal reviewCompletionPercentage,
-        ReviewExportScope scope) => $"""
+        ReviewExportScope scope,
+        IReadOnlyList<TradeRecord> trades,
+        IReadOnlyDictionary<long, TradeDetailSnapshot> details,
+        ReviewExportMode mode,
+        IReadOnlyDictionary<long, string> publicIds)
+    {
+        var builder = new StringBuilder($"""
         # TradePet 复盘导出
 
         - 账户：{accountLabel}
@@ -1596,7 +1605,87 @@ public sealed class ReviewExportService
 
         - 日记数量：{(scope == ReviewExportScope.AllFiltered ? workspaceData?.DailyJournals.Count ?? 0 : 0)}
         - 周期总结数量：{(scope == ReviewExportScope.AllFiltered ? workspaceData?.PeriodReviews?.Count ?? 0 : 0)}
-        """;
+        """);
+        builder.AppendLine().AppendLine();
+        var wins = trades.Count(trade => trade.NetPnl > 0);
+        var losses = trades.Count(trade => trade.NetPnl < 0);
+        builder.AppendLine($"- 盈利 / 亏损 / 持平：{wins} / {losses} / {trades.Count - wins - losses}");
+        builder.AppendLine($"- 胜率：{(trades.Count == 0 ? "未知" : Number(100m * wins / trades.Count) + "%")}");
+        builder.AppendLine().AppendLine("## 逐笔交易与复盘");
+        if (trades.Count == 0) builder.AppendLine("所选范围没有完整交易。");
+        foreach (var trade in trades)
+        {
+            var detail = details[trade.PositionId];
+            var id = mode == ReviewExportMode.PublicShare ? publicIds[trade.PositionId] : trade.PositionId.ToString(CultureInfo.InvariantCulture);
+            builder.AppendLine().AppendLine($"### 交易 {id}");
+            builder.AppendLine($"- 品种 / 方向：{Text(trade.Symbol)} / {trade.Side}");
+            builder.AppendLine($"- 开仓 / 平仓（服务器时间）：{Time(trade.OpenedAtUtc)} / {Time(trade.ClosedAtUtc)}");
+            builder.AppendLine($"- 入场 / 出场价格：{Number(trade.EntryPrice)} / {(trade.ExitPrice is { } exit ? Number(exit) : "未知")}");
+            builder.AppendLine($"- 开仓 / 最大手数：{Number(trade.OpeningVolume)} / {Number(trade.MaximumVolume)}");
+            builder.AppendLine($"- 净盈亏：{Number(trade.NetPnl)}");
+            if (detail.Metadata is { } metadata)
+            {
+                Field("策略", metadata.Strategy);
+                Field("形态", metadata.Setup);
+                Field("标签", string.Join(", ", metadata.Tags));
+            }
+            if (detail.Document is { } document)
+            {
+                builder.AppendLine($"- 复盘状态 / 修订：{document.Status} / {document.Revision}");
+                Field("入场原因", string.IsNullOrWhiteSpace(document.EntryReason) ? detail.RecordedEntryReason : document.EntryReason); Field("退出原因", document.ExitReason);
+                Field("做得好", document.DidWell); Field("待改进", document.ToImprove);
+                Field("下次行动", document.NextAction); Field("总结", document.Summary);
+                Field("情绪", document.Emotion); Field("市场状态", document.MarketCondition);
+            }
+            if (detail.Document is null) Field("入场原因", detail.RecordedEntryReason);
+            if (detail.Deals.Count == 0)
+            {
+                builder.AppendLine("- 原始成交与费用明细：未提供。");
+                continue;
+            }
+            builder.AppendLine().AppendLine("| 成交 | 服务器时间 | 出入场 | 手数 | 价格 | 盈利 | 佣金 | 隔夜费 | 其他费用 |");
+            builder.AppendLine("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |");
+            var ordinal = 0;
+            foreach (var deal in detail.Deals.OrderBy(deal => deal.OccurredAtUtc).ThenBy(deal => deal.Ticket))
+            {
+                ordinal++;
+                var dealId = mode == ReviewExportMode.PublicShare ? $"D{ordinal:D6}" : deal.Ticket.ToString(CultureInfo.InvariantCulture);
+                builder.AppendLine($"| {dealId} | {Time(deal.OccurredAtUtc)} | {deal.EntryKind} | {Number(deal.Volume)} | {Number(deal.Price)} | {Number(deal.Profit)} | {Number(deal.Commission)} | {Number(deal.Swap)} | {Number(deal.Fee)} |");
+            }
+        }
+        if (scope == ReviewExportScope.AllFiltered && workspaceData is not null)
+        {
+            builder.AppendLine().AppendLine("## 日记内容");
+            foreach (var journal in workspaceData.DailyJournals.Values.OrderBy(journal => journal.ServerDate))
+            {
+                builder.AppendLine().AppendLine($"### {journal.ServerDate:yyyy-MM-dd}");
+                Field("盘前计划", journal.PreMarketPlan); Field("盘中记录", journal.IntradayNotes);
+                Field("盘后总结", journal.PostMarketSummary); Field("做得好", journal.DidWell);
+                Field("待改进", journal.ToImprove); Field("下一步行动", journal.NextAction);
+            }
+            builder.AppendLine().AppendLine("## 周期总结内容");
+            foreach (var period in workspaceData.PeriodReviews ?? [])
+            {
+                builder.AppendLine().AppendLine($"### {period.FromServerDate:yyyy-MM-dd} 至 {period.ToServerDate:yyyy-MM-dd}");
+                Field("事实", period.Facts); Field("做得好", period.DidWell);
+                Field("待改进", period.ToImprove); Field("下一步行动", period.NextAction);
+            }
+        }
+        return builder.ToString();
+
+        string Text(string value) => mode == ReviewExportMode.PublicShare
+            ? SanitizePublicText(value, snapshot.Filter.AccountKey) : value;
+        string Time(DateTimeOffset? value) => value is { } time
+            ? time.UtcDateTime.AddSeconds(snapshot.Filter.ServerUtcOffsetSeconds).ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) : "未知";
+        static string Number(decimal value) => value.ToString("0.########", CultureInfo.InvariantCulture);
+        void Field(string label, string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return;
+            builder.AppendLine($"- **{label}：**");
+            foreach (var line in Text(value).Replace("\r", string.Empty).Split('\n'))
+                builder.Append("> ").AppendLine(line);
+        }
+    }
 
     private static string BuildHtml(
         ReviewWorkspaceSnapshot snapshot,

@@ -229,7 +229,7 @@ public sealed class RuntimeContractTests
     }
 
     [Fact]
-    public async Task QuickReview_TradeClosuresAndSnoozeOnlyQueueWithoutOpeningWindows()
+    public async Task QuickReview_DisabledAutomaticPromptsKeepClosuresAndSnoozeQueued()
     {
         var scheduler = new ManualAsyncScheduler();
         var repository = DispatchProxy.Create<IReviewWorkspaceRepository, ThrowingProxy>();
@@ -240,7 +240,8 @@ public sealed class RuntimeContractTests
             DispatchProxy.Create<IReviewBackupService, ThrowingProxy>(),
             TimeProvider.System, scheduler, new AccountSessionCoordinator(), new MaintenanceCoordinator());
         await using var runtime = new TradePetRuntime(
-            new TradePet.App.ViewModels.MainViewModel(scheduler), dependencies);
+            new TradePet.App.ViewModels.MainViewModel(scheduler)
+            { QuickReviewPromptEnabled = false, EntryReasonPromptEnabled = false }, dependencies);
         var flags = BindingFlags.Instance | BindingFlags.NonPublic;
         var queue = typeof(TradePetRuntime).GetMethod("QueueQuickReview", flags)!;
         var pending = (ConcurrentDictionary<string, TradeRecord>)typeof(TradePetRuntime)
@@ -262,7 +263,8 @@ public sealed class RuntimeContractTests
         delay.Release();
         await reminder.WaitAsync(TimeSpan.FromSeconds(2));
         Assert.Equal(trade, Assert.Single(pending).Value);
-        Assert.Null(typeof(TradePetRuntime).GetField("_quickReviewWindow", flags)!.GetValue(runtime));
+        Assert.Null(typeof(TradePetRuntime).GetField("_quickReviewCard", flags)!.GetValue(runtime));
+        Assert.Null(typeof(TradePetRuntime).GetField("_entryReasonCard", flags)!.GetValue(runtime));
     }
 
     [Fact]
@@ -414,6 +416,32 @@ public sealed class RuntimeContractTests
         Assert.True(viewModel.HasUnsavedReviewChanges);
         Assert.Equal("提交后继续输入的新版本", viewModel.Summary);
         viewModel.ResetAccountState("cleanup", preserveTradeDraft: false);
+    }
+
+    [Fact]
+    public void SavedReviews_ShowDraftContentAndClearWhenSwitchingAccounts()
+    {
+        var viewModel = new ReviewWorkspaceViewModel(new ManualAsyncScheduler());
+        var detail = Detail("account-a", 9);
+        var document = ReviewDocument(new TradeKey("account-a", 9), 1, "持仓浮盈回吐的复盘依据") with
+        {
+            ExitReason = "主动止盈", ToImprove = "控制回吐", NextAction = "检查退出条件",
+        };
+        viewModel.ApplySavedReviews([new SavedTradeReviewData(detail.Trade, document)]);
+        var row = Assert.Single(viewModel.SavedReviews);
+        Assert.Equal("持仓浮盈回吐的复盘依据", row.Summary);
+        Assert.Equal("主动止盈", row.ExitReason);
+        Assert.Equal("检查退出条件", row.NextAction);
+        Assert.Equal("已保存复盘", row.Status);
+        Assert.Equal(row, viewModel.SelectedSavedReview);
+        viewModel.ApplyDetail(detail with { Document = document }, sessionGeneration: 1);
+        Assert.Equal("持仓浮盈回吐的复盘依据", viewModel.Summary);
+        Assert.Equal("主动止盈", viewModel.ExitReason);
+        Assert.Equal("控制回吐", viewModel.ToImprove);
+        Assert.Equal("已保存复盘", viewModel.DocumentStatus);
+        viewModel.ResetAccountState("account-b", preserveTradeDraft: false);
+        Assert.Empty(viewModel.SavedReviews);
+        Assert.Null(viewModel.SelectedSavedReview);
     }
 
     [Fact]

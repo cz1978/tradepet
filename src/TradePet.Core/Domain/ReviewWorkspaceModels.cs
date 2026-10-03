@@ -757,7 +757,8 @@ public sealed record TradeDetailSnapshot(
     IReadOnlyList<BehaviorOccurrence> Behaviors,
     IReadOnlyList<ReviewAttachment> Attachments,
     TradeCampaign? Campaign,
-    string SourceVersion);
+    string SourceVersion,
+    string RecordedEntryReason = "");
 
 public sealed record ReplayFrame(
     DateTimeOffset CursorUtc,

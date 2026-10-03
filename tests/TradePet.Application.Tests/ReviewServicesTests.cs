@@ -635,6 +635,33 @@ public sealed class ReviewServicesTests
     }
 
     [Fact]
+    public void Export_IncludesEntryReasonWithoutRequiringACompletedReview()
+    {
+        var trade = Trade(1, 10m);
+        var filter = new ReviewWorkspaceFilter("Broker|1", new(2026, 9, 1), new(2026, 9, 30));
+        var version = new ReviewDataVersion("Broker|1", 1, 1, 1, "rule-1", "time-1", Now);
+        var snapshot = new ReviewWorkspaceSnapshot(filter,
+            new TradePet.Core.Trading.ReviewAnalyticsCalculator().Calculate(
+                new ReviewFilter("Broker|1", filter.FromServerDate, filter.ToServerDate), [trade]),
+            [trade], new Dictionary<long, TradeReviewDocument>(), [], [], [],
+            new ReviewDataQuality(1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, new Dictionary<string, int>()),
+            version, 1, 1, 100);
+        var detail = new TradeDetailSnapshot(trade, [], null, null, null, [], null, null, [], [], [], null,
+            version.Token, "回踩入场");
+        foreach (var mode in new[] { ReviewExportMode.LocalArchive, ReviewExportMode.PublicShare })
+        {
+            var package = new ReviewExportService(new FixedTimeProvider(Now)).Build(snapshot, [detail], mode: mode);
+            var md = System.Text.Encoding.UTF8.GetString(package.Entries.Single(item => item.Path == "review.md").Content);
+            Assert.Contains("**入场原因：**", md);
+            Assert.Contains("> 回踩入场", md);
+            using var data = System.Text.Json.JsonDocument.Parse(package.Entries.Single(item => item.Path == "review-data.json").Content);
+            var row = data.RootElement.GetProperty("trades")[0];
+            Assert.Equal("回踩入场", row.GetProperty(mode == ReviewExportMode.LocalArchive ? "recordedEntryReason" : "entryReason").GetString());
+            Assert.Equal(System.Text.Json.JsonValueKind.Null, row.GetProperty("review").ValueKind);
+        }
+    }
+
+    [Fact]
     public async Task Export_All251AndExplicitSelectionKeepCountNetAndRevisionAlignedAcrossFormats()
     {
         var repository = FakeRepository.Create();
@@ -931,6 +958,13 @@ public sealed class ReviewServicesTests
                 CashFlows: CashFlows,
                 TradingSessions: TradingSessions);
         }
+
+        public Task<IReadOnlyList<SavedTradeReviewData>> LoadSavedTradeReviewsAsync(
+            string accountKey, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<SavedTradeReviewData>>(Document is { } document
+                ? Trades.Where(trade => trade.AccountKey == accountKey && trade.PositionId == document.TradeKey.PositionId)
+                    .Select(trade => new SavedTradeReviewData(trade, document)).ToArray()
+                : []);
 
         public Task<TradeDetailData?> LoadTradeDetailAsync(TradeKey key, CancellationToken cancellationToken = default)
         {

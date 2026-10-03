@@ -42,6 +42,7 @@
             <StackPanel>
                 <TextBlock x:Name="TitleText" Foreground="#F2F5F4" FontSize="24" FontWeight="Bold" />
                 <TextBlock x:Name="AccountText" Foreground="#91A3B5" FontSize="12" Margin="0,5,0,0" />
+                <TextBlock Text="按服务器交易日统计。查看各页后，可在右下角导出完整 MD 或复制报告给 AI。" Foreground="#91A3B5" FontSize="12" TextWrapping="Wrap" Margin="0,5,12,0" />
             </StackPanel>
             <Border Grid.Column="1" Background="#1E443D" CornerRadius="12" Padding="10,5" VerticalAlignment="Top">
                 <TextBlock x:Name="StatusText" Foreground="#65D9BE" FontWeight="SemiBold" />
@@ -94,8 +95,8 @@
                     <TextBlock x:Name="WorstTradeText" Foreground="#F06B78" FontSize="14" TextWrapping="Wrap" Margin="0,5,0,0" />
                 </StackPanel>
                 <StackPanel Grid.Column="1">
-                    <TextBlock Text="计划执行" Style="{StaticResource MutedText}" />
-                    <TextBlock x:Name="PlanText" Foreground="#F2F5F4" TextWrapping="Wrap" Margin="0,5,0,12" />
+                    <TextBlock Text="持仓过程采样" Style="{StaticResource MutedText}" />
+                    <TextBlock x:Name="ProcessText" Foreground="#F2F5F4" TextWrapping="Wrap" Margin="0,5,0,12" />
                     <TextBlock Text="复盘进度" Style="{StaticResource MutedText}" />
                     <TextBlock x:Name="ReviewText" Foreground="#F2F5F4" TextWrapping="Wrap" Margin="0,5,0,12" />
                     <TextBlock Text="行为提醒" Style="{StaticResource MutedText}" />
@@ -167,7 +168,7 @@
                         <DataGridTextColumn Header="MFE（最高盈亏）" Binding="{Binding Mfe}" Width="150"/>
                         <DataGridTextColumn Header="浮盈回吐" Binding="{Binding Giveback}" Width="150"/>
                         <DataGridTextColumn Header="采样覆盖" Binding="{Binding Coverage}" Width="210"/>
-                        <DataGridTextColumn Header="计划执行" Binding="{Binding Compliance}" Width="100"/>
+                        <DataGridTextColumn Header="实际 SL/TP 记录" Binding="{Binding Protection}" Width="300"/>
                         <DataGridTextColumn Header="已记录退出原因" Binding="{Binding ExitReason}" Width="300"/>
                         <DataGridTextColumn Header="下一步" Binding="{Binding NextAction}" Width="360"/>
                     </DataGrid.Columns>
@@ -188,7 +189,7 @@
 
         <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right">
             <Button Content="复制给 AI" Click="CopyMarkdown_Click" Padding="14,7" />
-            <Button Content="另存 MD" Click="SaveMarkdown_Click" Padding="14,7" Margin="10,0,0,0" />
+            <Button Content="导出 MD" Click="SaveMarkdown_Click" ToolTip="选择保存位置，导出完整 Markdown 交易日报" Padding="14,7" Margin="10,0,0,0" />
             <Button Content="打开复盘" Click="OpenReview_Click" Padding="16,7" Margin="10,0,0,0" />
             <Button Content="关闭" Click="Close_Click" Padding="18,7" Margin="10,0,0,0" />
         </StackPanel>

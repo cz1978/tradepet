@@ -11,7 +11,7 @@ public sealed record DailyReportTradeRow(
     long PositionId, string Symbol, string Direction, string OpenedAt, string ClosedAt,
     string Holding, string OpeningVolume, string MaximumVolume, string NetPnl, string Fees,
     string InitialRisk, string ActualR, string Mae, string Mfe, string Giveback, string Coverage,
-    string Compliance, string ExitReason, string NextAction);
+    string Protection, string ExitReason, string NextAction);
 
 public sealed record DailyReportAnalysis(
     IReadOnlyList<DailyReportSection> Sections,
@@ -87,12 +87,13 @@ public static class DailyReportAnalyzer
         results.Add(dayDeals.Length == 0 ? "当日费用拆分：无成交记录，不能据此认定没有费用。" :
             $"当日已记录佣金 {Money(dayDeals.Sum(d => d.Commission))}、隔夜费 {Money(dayDeals.Sum(d => d.Swap))}、其他费 {Money(dayDeals.Sum(d => d.Fee))}（保留终端原始正负号）。");
         sections.Add(new("结果与统计口径", results));
+        var market = DailyMarketContextAnalyzer.Analyze(data, date, facts.ServerUtcOffsetSeconds);
+        sections.Add(market.Section);
 
         var sources = new List<string>();
         AddGroups("品种", completed.GroupBy(t => t.Symbol));
         AddGroups("方向", completed.GroupBy(t => t.Side == TradeSide.Buy ? "买入" : "卖出"));
         AddGroups("入场时段（服务器，按开仓小时）", completed.GroupBy(t => t.OpenedAtUtc.ToOffset(offset).ToString("HH:00", CultureInfo.InvariantCulture)));
-        AddGroups("策略", completed.GroupBy(t => data.Metadata.TryGetValue(t.PositionId, out var m) && !string.IsNullOrWhiteSpace(m.Strategy) ? m.Strategy : "未分类"));
         if (sources.Count == 0) sources.Add("无完整平仓样本，暂不做盈亏来源拆分。");
         sources.Add("以上是样本分组结果，不代表品种、时段或策略导致了盈亏；单日小样本不能证明长期优势。");
         sections.Add(new("盈亏来源拆分", sources));
@@ -130,9 +131,7 @@ public static class DailyReportAnalyzer
         sections.Add(new("风险、回撤与持仓", riskLines));
 
         var discipline = new List<string>();
-        foreach (var group in completed.GroupBy(t => Compliance(data.Metadata.GetValueOrDefault(t.PositionId)?.ComplianceStatus)))
-            discipline.Add($"{group.Key}：{group.Count()} 笔，净盈亏 {Money(group.Sum(t => t.NetPnl))}，交易编号 {string.Join("、", group.Select(t => "#" + t.PositionId))}。");
-        var behaviors = data.Behaviors.Where(b => b.AccountKey == data.AccountKey && b.ServerDate == date &&
+        var behaviors = data.Behaviors.Where(b => b.AccountKey == data.AccountKey && b.ServerDate == date && b.Rule != BehaviorRuleKind.PlanDeviationRate &&
             b.Level is BehaviorRiskLevel.Attention or BehaviorRiskLevel.Critical).ToArray();
         if (behaviors.Length == 0) discipline.Add("没有记录到需注意或严重级别的行为提醒；这不代表全天没有风险或规则全部通过。");
         foreach (var group in behaviors.GroupBy(b => b.Rule))
@@ -158,7 +157,7 @@ public static class DailyReportAnalyzer
             var giveback = sample.Mfe is > 0m ? Math.Max(0m, sample.Mfe.Value - trade.NetPnl) : (decimal?)null;
             var rowAction = !string.IsNullOrWhiteSpace(document?.NextAction) ? document!.NextAction :
                 !sample.HasReliableInitialRisk ? "补查开仓时的止损与风险记录；缺失不能直接判定未设止损。" :
-                giveback is > 0m ? "对照退出计划复核浮盈回吐及平仓原因。" : "补充入场、退出依据并确认计划执行分类。";
+                giveback is > 0m ? "结合当时走势复核浮盈回吐及平仓原因。" : "补充实际退出原因和下一次改进动作。";
             rows.Add(new(trade.PositionId, trade.Symbol, trade.Side == TradeSide.Buy ? "买入" : "卖出",
                 Time(trade.OpenedAtUtc), Time(trade.ClosedAtUtc),
                 trade.ClosedAtUtc >= trade.OpenedAtUtc ? Duration(trade.ClosedAtUtc.Value - trade.OpenedAtUtc) : "—",
@@ -167,19 +166,15 @@ public static class DailyReportAnalyzer
                 MaybeMoney(sample.InitialRiskAmount), sample.ActualRiskMultiple.HasValue ? Number(sample.ActualRiskMultiple.Value) + " R" : "—",
                 MaybeMoney(sample.Mae), MaybeMoney(sample.Mfe), MaybeMoney(giveback),
                 excursion is null ? "无采样" : $"{Number(excursion.CoveragePercentage)}% · {(sample.HasReliableExcursion ? "可靠" : "不足，不计算极值")}",
-                Compliance(data.Metadata.GetValueOrDefault(trade.PositionId)?.ComplianceStatus),
+                QuickReviewAnalyzer.DescribeProtection(trade, data.PositionSamples?.GetValueOrDefault(trade.PositionId) ?? []),
                 Present(document?.ExitReason, "未记录，不能仅凭盈亏判定平仓原因"), rowAction));
         }
 
-        var outside = completed.Where(t => data.Metadata.GetValueOrDefault(t.PositionId)?.ComplianceStatus is PlanComplianceStatus.OutsidePlan or PlanComplianceStatus.ManualOutside).ToArray();
-        var unclassified = completed.Count(t => data.Metadata.GetValueOrDefault(t.PositionId)?.ComplianceStatus is null or PlanComplianceStatus.Unclassified);
-        if (outside.Length > 0) actions.Add($"计划外交易 {outside.Length} 笔（{Ids(outside)}，净盈亏 {Money(outside.Sum(t => t.NetPnl))}）：逐笔补写偏离原因，下一交易日前确认可执行的入场条件。");
-        if (unclassified > 0) actions.Add($"尚有 {unclassified} 笔未分类：先补齐计划归属，再比较计划内外表现，避免把未分类当成计划外。");
         if (coveredRisk.Length < completed.Length) actions.Add($"{completed.Length - coveredRisk.Length} 笔缺少可靠初始风险：下一次开仓前记录止损、手数与货币风险，已有缺失不事后补造 R 值。");
         foreach (var group in behaviors.Where(b => !b.EvidenceInsufficient && string.IsNullOrWhiteSpace(b.MissingData)).GroupBy(b => b.Rule))
             actions.Add($"针对「{RuleName(group.Key)}」的 {group.Count()} 条提醒，复核 {Time(group.First().EventAtUtc)} 起的关联证据，在下一交易日前写明触发条件和应对动作。");
         var givebackTrades = completed.Where(t => risk[t.PositionId].Mfe is > 0m && risk[t.PositionId].Mfe > t.NetPnl).ToArray();
-        if (givebackTrades.Length > 0) actions.Add($"可靠采样中 {givebackTrades.Length} 笔出现浮盈回吐（{Ids(givebackTrades)}）：对照退出计划与已记录原因复核，不直接推断为过早或过晚平仓。");
+        if (givebackTrades.Length > 0) actions.Add($"可靠采样中 {givebackTrades.Length} 笔出现浮盈回吐（{Ids(givebackTrades)}）：结合当时走势与已记录原因复核，不直接推断为过早或过晚平仓。");
         foreach (var trade in completed)
             if (data.Documents.TryGetValue(trade.PositionId, out var doc) && !string.IsNullOrWhiteSpace(doc.NextAction))
                 actions.Add($"人工记录 · #{trade.PositionId}：{doc.NextAction.Trim()}");
@@ -187,7 +182,7 @@ public static class DailyReportAnalyzer
             actions.Add($"当日日记中的下一步行动：{journal.NextAction.Trim()}");
         var pending = completed.Count(t => data.Documents.GetValueOrDefault(t.PositionId)?.Status != ReviewCompletionStatus.Reviewed);
         if (pending > 0) actions.Add($"完成 {pending} 笔待复盘交易的入场依据、退出原因与下一步动作，再标记为已复盘。");
-        if (actions.Count == 0) actions.Add("现有记录不足以提出具体纠偏动作；下一交易日前检查计划、风险记录与数据采集状态。");
+        if (actions.Count == 0) actions.Add("现有记录不足以提出具体纠偏动作；下一交易日前检查风险记录与数据采集状态。");
         sections.Add(new("下一交易日行动清单", actions));
 
         var carry = data.Trades.Where(t => t.AccountKey == data.AccountKey && t.OpenServerDate <= date &&
@@ -211,6 +206,8 @@ public static class DailyReportAnalyzer
             foreach (var line in section.Lines) markdown.AppendLine($"- {Cell(line)}");
             markdown.AppendLine();
         }
+        if (!string.IsNullOrWhiteSpace(market.Markdown))
+            markdown.AppendLine("## M5 行情与交易位置").AppendLine().Append(market.Markdown);
         markdown.AppendLine("## 逐笔风险与退出复核").AppendLine();
         foreach (var row in rows)
         {
@@ -218,9 +215,31 @@ public static class DailyReportAnalyzer
             markdown.AppendLine($"- {row.Direction} · 开仓 {row.OpenedAt} · 平仓 {row.ClosedAt} · 持仓 {row.Holding}");
             markdown.AppendLine($"- 开仓 / 最大手数：{row.OpeningVolume} / {row.MaximumVolume}；净盈亏 {row.NetPnl}；已记录费用 {row.Fees}");
             markdown.AppendLine($"- 初始风险 {row.InitialRisk}；实际 R {row.ActualR}；MAE {row.Mae}；MFE {row.Mfe}；浮盈回吐 {row.Giveback}");
-            markdown.AppendLine($"- 极值采样覆盖：{row.Coverage}；计划执行：{row.Compliance}");
+            markdown.AppendLine($"- 极值采样覆盖：{row.Coverage}；{row.Protection}");
             markdown.AppendLine($"- 已记录退出原因：{Cell(row.ExitReason)}");
             markdown.AppendLine($"- 下一步：{Cell(row.NextAction)}").AppendLine();
+            var trade = completed.First(item => item.PositionId == row.PositionId);
+            var observations = (data.PositionSamples?.GetValueOrDefault(row.PositionId) ?? [])
+                .Where(s => s.TradeKey == new TradeKey(data.AccountKey, row.PositionId) && s.Volume > 0m &&
+                    s.AlgorithmVersion == "position-pnl-v1" && s.CapturedAtUtc >= trade.OpenedAtUtc &&
+                    s.CapturedAtUtc <= trade.ClosedAtUtc)
+                .OrderBy(s => s.CapturedAtUtc).ToArray();
+            if (observations.Length > 0)
+            {
+                var evidence = new List<PositionPnlSample>
+                {
+                    observations[0], observations[^1], observations.MinBy(s => s.NetPnl)!, observations.MaxBy(s => s.NetPnl)!,
+                };
+                evidence.AddRange(observations.Zip(observations.Skip(1))
+                    .Where(pair => pair.First.StopLoss != pair.Second.StopLoss || pair.First.TakeProfit != pair.Second.TakeProfit)
+                    .Select(pair => pair.Second));
+                markdown.AppendLine("实际持仓记录（首尾、采样内最高/最低净盈亏、所有已记录 SL/TP 变化；局部采样不能代表全程极值）：").AppendLine();
+                markdown.AppendLine("| 采样时间（服务器） | 净盈亏 | 持仓手数 | SL | TP |");
+                markdown.AppendLine("|---|---:|---:|---:|---:|");
+                foreach (var observation in evidence.Distinct().OrderBy(s => s.CapturedAtUtc))
+                    markdown.AppendLine($"| {Time(observation.CapturedAtUtc)} | {Money(observation.NetPnl)} | {Number(observation.Volume)} | {MaybePrice(observation.StopLoss)} | {MaybePrice(observation.TakeProfit)} |");
+                markdown.AppendLine();
+            }
         }
         if (rows.Count == 0) markdown.AppendLine("无完整平仓交易。").AppendLine();
         return new(sections, rows, markdown.ToString());
@@ -239,16 +258,11 @@ public static class DailyReportAnalyzer
     }
 
     private static string Number(decimal value) => value.ToString("0.####", CultureInfo.InvariantCulture);
+    private static string MaybePrice(decimal? value) => value is > 0m ? value.Value.ToString("0.#####", CultureInfo.InvariantCulture) : "未设置";
     private static string Duration(TimeSpan value) => $"{(int)value.TotalHours}小时 {value.Minutes}分 {value.Seconds}秒";
     private static string Present(string? value, string fallback = "未记录") => string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
     private static string Ids(IEnumerable<TradeRecord> trades) => string.Join("、", trades.Select(t => "#" + t.PositionId));
     private static string Cell(string value) => value.Replace("|", "\\|").Replace("\r", "").Replace("\n", "<br>");
-    private static string Compliance(PlanComplianceStatus? status) => status switch
-    {
-        PlanComplianceStatus.Matched or PlanComplianceStatus.ManualInside => "计划内",
-        PlanComplianceStatus.OutsidePlan or PlanComplianceStatus.ManualOutside => "计划外",
-        _ => "未分类",
-    };
     private static string RuleName(BehaviorRuleKind rule) => rule switch
     {
         BehaviorRuleKind.ReentryCount => "重复进场",

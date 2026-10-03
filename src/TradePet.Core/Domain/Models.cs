@@ -188,8 +188,14 @@ public sealed record DailyPlanSettings(
     bool StopLossReminderEnabled,
     int StopLossReminderSeconds,
     GivebackMode GivebackMode,
-    decimal GivebackValue)
+    decimal GivebackValue,
+    decimal? DailyTargetPercentage = null,
+    decimal? DailyTargetBaseBalance = null)
 {
+    public decimal? ResolvedDailyTarget => DailyTargetPercentage is > 0m
+        ? DailyTargetBaseBalance is > 0m ? DailyTargetBaseBalance * DailyTargetPercentage / 100m : null
+        : DailyTarget;
+
     public static DailyPlanSettings BalancedDefault { get; } = new(
         null,
         null,

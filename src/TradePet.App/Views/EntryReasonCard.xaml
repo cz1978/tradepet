@@ -1,0 +1,23 @@
+<UserControl x:Class="TradePet.App.Views.EntryReasonCard" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Width="360" UseLayoutRounding="True">
+    <StackPanel Margin="14">
+        <TextBlock Text="快速记录入场原因" FontSize="16" FontWeight="SemiBold" />
+        <TextBlock x:Name="TradeText" Style="{StaticResource MutedTextStyle}" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,10" />
+        <TextBlock Text="选一个入场原因后记录，也可以跳过。" FontSize="12" TextWrapping="Wrap" />
+        <WrapPanel Margin="0,8,0,3">
+            <WrapPanel.Resources><Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}"><Setter Property="Padding" Value="9,5"/><Setter Property="Margin" Value="0,0,6,6"/><Setter Property="FontSize" Value="12"/></Style></WrapPanel.Resources>
+            <Button Content="突破" Tag="突破入场" Click="Reason_Click"/><Button Content="回踩" Tag="回踩入场" Click="Reason_Click"/>
+            <Button Content="区间反转" Tag="区间反转入场" Click="Reason_Click"/><Button Content="跟随趋势" Tag="跟随趋势入场" Click="Reason_Click"/>
+            <Button Content="消息驱动" Tag="消息驱动入场" Click="Reason_Click"/><Button Content="试探仓" Tag="试探性入场" Click="Reason_Click"/>
+        </WrapPanel>
+        <TextBlock x:Name="ChosenReasonText" Foreground="{StaticResource AccentBrush}" TextWrapping="Wrap" />
+        <Expander Header="其他原因 / 手写补充（可选）" Foreground="{StaticResource MutedBrush}" Margin="0,7,0,0" IsExpanded="False">
+            <TextBox x:Name="ReasonBox" MaxLength="500" MinHeight="48" AcceptsReturn="True" TextWrapping="Wrap" TextChanged="Reason_TextChanged" Margin="0,7,0,0"/>
+        </Expander>
+        <TextBlock x:Name="StatusText" Foreground="#F3A4A0" TextWrapping="Wrap" FontSize="11" Margin="0,8,0,0" />
+        <StackPanel x:Name="FooterButtons" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <Button Content="跳过" Click="Skip_Click" Padding="9,5"/>
+            <Button x:Name="RecordReasonButton" Content="记录原因" Click="Save_Click" Style="{StaticResource PrimaryButtonStyle}" Padding="10,5" Margin="0"/>
+        </StackPanel>
+    </StackPanel>
+</UserControl>

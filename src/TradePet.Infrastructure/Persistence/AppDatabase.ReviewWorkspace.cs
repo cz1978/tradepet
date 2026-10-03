@@ -160,6 +160,34 @@ public sealed partial class AppDatabase
         return details;
     }
 
+    public async Task<IReadOnlyList<SavedTradeReviewData>> LoadSavedTradeReviewsAsync(
+        string accountKey, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(accountKey);
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT t.position_id, t.symbol, t.side, t.opened_at_utc, t.closed_at_utc, t.open_server_date,
+                   t.close_server_date, t.entry_price, t.exit_price, t.opening_volume, t.maximum_volume,
+                   t.remaining_volume, t.net_pnl, t.is_complete, d.payload_json
+            FROM trade_review_documents d
+            JOIN trades t ON t.account_key = d.account_key AND t.position_id = d.position_id
+            WHERE d.account_key = $account
+            ORDER BY d.updated_at_utc DESC, d.position_id DESC;
+            """;
+        command.Parameters.AddWithValue("$account", accountKey);
+        var result = new List<SavedTradeReviewData>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var document = Deserialize<TradeReviewDocument>(reader.GetString(14));
+            var trade = ReadTrade(reader, accountKey);
+            if (document.TradeKey == new TradeKey(accountKey, trade.PositionId))
+                result.Add(new SavedTradeReviewData(trade, document));
+        }
+        return result;
+    }
+
     public async Task<TradeReviewDocument?> LoadTradeReviewDocumentAsync(
         TradeKey key,
         CancellationToken cancellationToken = default)
@@ -1824,8 +1852,12 @@ public sealed partial class AppDatabase
                 "SELECT payload_json FROM playbook_versions WHERE account_key = $account AND id = $id;",
                 key.AccountKey, playbookId, cancellationToken);
         }
+        var entryReason = await LoadJsonSingleAsync<TradeEntryReasonNote>(connection,
+            "SELECT value_json FROM settings WHERE scope_key = $account AND setting_key = $id;",
+            TradeEntryReasonNote.Scope(key.AccountKey), TradeEntryReasonNote.SettingKey(key.PositionId), cancellationToken);
+        if (entryReason?.TradeKey != key) entryReason = null;
         return new TradeDetailData(trade, deals, metadata, document, excursion, samples, plan, playbook,
-            assessments, behaviors, attachments, campaign, version);
+            assessments, behaviors, attachments, campaign, version, entryReason);
     }
 
     private static async Task<StructuredTradePlan?> LoadStructuredTradePlanByIdAsync(

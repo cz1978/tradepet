@@ -53,7 +53,8 @@
                 <TextBlock Text="保留副本后可继续编辑并人工合并；退出失败时会提供 JSON 恢复文件。" Style="{StaticResource MutedTextStyle}" Margin="8,3,0,0" />
             </WrapPanel>
         </StackPanel>
-    <TabControl x:Name="WorkspaceTabs" Grid.Row="1" Background="Transparent" BorderThickness="0" Padding="0">
+    <TabControl x:Name="WorkspaceTabs" Grid.Row="1" Background="Transparent" BorderThickness="0" Padding="0"
+                SelectedIndex="{Binding WorkspaceTabIndex, Mode=TwoWay}" SelectionChanged="WorkspaceTabs_SelectionChanged">
         <TabItem Header="总览">
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <StackPanel>
@@ -186,6 +187,8 @@
             <Grid Margin="0,6,0,0">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="0.9*" MinWidth="280"/><ColumnDefinition Width="1.5*"/></Grid.ColumnDefinitions>
                 <Border Style="{StaticResource PageCardStyle}" Padding="6" Margin="0,0,8,0">
+                    <TabControl x:Name="ArchiveLists" Background="Transparent" BorderThickness="0" SelectedIndex="{Binding ArchiveListIndex, Mode=TwoWay}" SelectionChanged="ArchiveLists_SelectionChanged">
+                        <TabItem Header="全部交易">
                     <DockPanel>
                         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,6">
                             <Button Content="上一页" Command="{Binding PreviousPageCommand}" Padding="7,5"/><TextBlock Text="{Binding PageText}" Margin="6,5" FontSize="10"/><Button Content="下一页" Command="{Binding NextPageCommand}" Padding="7,5"/>
@@ -231,19 +234,76 @@
                             </DataTemplate></ListView.ItemTemplate>
                         </ListView>
                     </DockPanel>
+                        </TabItem>
+                        <TabItem Header="已保存复盘" ToolTip="所有已保存的快速复盘，不受上方交易日期筛选影响。">
+                            <DockPanel Margin="0,6,0,0">
+                                <StackPanel DockPanel.Dock="Top" Margin="4,0,4,7">
+                                    <TextBlock Text="{Binding SavedReviewsStatus}" Style="{StaticResource MutedTextStyle}" FontSize="10" TextWrapping="Wrap" />
+                                    <Button Content="刷新复盘" Command="{Binding RefreshSavedReviewsCommand}" HorizontalAlignment="Left" Padding="7,3" Margin="0,5,0,0" />
+                                </StackPanel>
+<ListBox x:Name="SavedArchiveReviews" SelectionChanged="SavedArchiveReviews_SelectionChanged" ItemsSource="{Binding SavedReviews}" SelectedItem="{Binding SelectedSavedReview, Mode=TwoWay}"
+                                 Background="Transparent" Foreground="{StaticResource TextBrush}" BorderThickness="0"
+                                 HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling">
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="ListBoxItem">
+                                                <Border x:Name="ReviewRow" Background="Transparent" BorderBrush="Transparent" BorderThickness="1" CornerRadius="8" Padding="8" Margin="0,0,0,5">
+                                                    <ContentPresenter HorizontalAlignment="Stretch" />
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="ReviewRow" Property="Background" Value="{StaticResource CardAltBrush}" />
+                                                    </Trigger>
+                                                    <Trigger Property="IsSelected" Value="True">
+                                                        <Setter TargetName="ReviewRow" Property="Background" Value="{StaticResource AccentSoftBrush}" />
+                                                        <Setter TargetName="ReviewRow" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                            <ListBox.ItemTemplate><DataTemplate>
+                                <StackPanel Margin="0,3,0,8">
+                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding SavedAt}" Style="{StaticResource MutedTextStyle}" Margin="0,4,0,0" />
+                                    <TextBlock Text="{Binding Status}" Foreground="{StaticResource AccentBrush}" Margin="0,3,0,0" />
+                                    <TextBlock Text="{Binding ExitReason}" TextTrimming="CharacterEllipsis" Margin="0,4,0,0" />
+                                </StackPanel>
+                            </DataTemplate></ListBox.ItemTemplate>
+                        </ListBox>
+                            </DockPanel>
+                        </TabItem>
+                    </TabControl>
                 </Border>
                 <Border x:Name="ReviewGuideTradeEditor" Grid.Column="1" Style="{StaticResource PageCardStyle}" Padding="14">
                     <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel>
                         <Grid><TextBlock Text="{Binding SelectedTradeTitle}" Style="{StaticResource SectionTitleStyle}"/><TextBlock Text="{Binding DocumentStatus}" HorizontalAlignment="Right" Foreground="{StaticResource AccentBrush}"/></Grid>
                         <TextBlock Text="{Binding TradeIdentity}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,3,0,0"/>
                         <TextBlock Text="{Binding TradeFacts}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,4,0,8"/>
-                        <TextBlock Text="原始成交明细（只读）" Style="{StaticResource SectionTitleStyle}" Margin="0,5,0,4"/>
-                        <ListView ItemsSource="{Binding TradeDeals}" MaxHeight="145"><ListView.View><GridView>
-                            <GridViewColumn Header="时间" Width="100" DisplayMemberBinding="{Binding Time}"/><GridViewColumn Header="ticket" Width="85" DisplayMemberBinding="{Binding Ticket}"/><GridViewColumn Header="类型" Width="75" DisplayMemberBinding="{Binding Kind}"/><GridViewColumn Header="数量" Width="60" DisplayMemberBinding="{Binding Volume}"/><GridViewColumn Header="价格" Width="75" DisplayMemberBinding="{Binding Price}"/><GridViewColumn Header="利润" Width="65" DisplayMemberBinding="{Binding Profit}"/><GridViewColumn Header="佣金" Width="60" DisplayMemberBinding="{Binding Commission}"/><GridViewColumn Header="隔夜" Width="55" DisplayMemberBinding="{Binding Swap}"/><GridViewColumn Header="其他费" Width="55" DisplayMemberBinding="{Binding Fee}"/><GridViewColumn Header="净额" Width="65" DisplayMemberBinding="{Binding NetPnl}"/>
-                        </GridView></ListView.View></ListView>
-                        <TextBlock Text="计划与风险来源" Style="{StaticResource SectionTitleStyle}" Margin="0,12,0,4"/>
-                        <TextBlock Text="{Binding PlanFacts}" TextWrapping="Wrap"/><TextBlock Text="{Binding RiskFacts}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,3,0,0"/>
-                        <TextBlock Text="交易总结（完成复盘必填）" Style="{StaticResource EditorLabel}"/><TextBox Text="{Binding Summary, UpdateSourceTrigger=PropertyChanged, Delay=250}" AcceptsReturn="True" Height="66" TextWrapping="Wrap"/>
+                        <TextBlock Text="入场原因" Style="{StaticResource EditorLabel}"/><TextBlock Text="{Binding EntryReason}" TextWrapping="Wrap" />
+                        <TextBlock Text="快速复盘" Style="{StaticResource SectionTitleStyle}" Margin="0,8,0,6" />
+                        <TextBlock Text="这笔交易尚未保存快速复盘。平仓后在宠物对话框保存，即可在此查看。" TextWrapping="Wrap">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers><DataTrigger Binding="{Binding Summary}" Value=""><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                        <TextBlock Text="平仓原因" Style="{StaticResource EditorLabel}" /><TextBlock Text="{Binding ExitReason}" TextWrapping="Wrap" />
+                        <TextBlock Text="改进事项" Style="{StaticResource EditorLabel}" /><TextBlock Text="{Binding ToImprove}" TextWrapping="Wrap" />
+                        <Expander Header="自动复盘依据 / 历史记录" Foreground="{StaticResource TextBrush}" Margin="0,12,0,0" IsExpanded="False">
+                            <StackPanel><TextBlock Text="{Binding Summary}" TextWrapping="Wrap" Margin="0,6,0,0"/><TextBlock Text="下一次动作" Style="{StaticResource EditorLabel}"/><TextBlock Text="{Binding NextAction}" TextWrapping="Wrap"/></StackPanel>
+                        </Expander>
+                        <Expander Header="手写补充 / 修改（可选）" Foreground="{StaticResource TextBrush}" Margin="0,16,0,0" IsExpanded="False">
+                            <StackPanel>
+                        <TextBlock Text="交易总结（可选）" Style="{StaticResource EditorLabel}"/><TextBox Text="{Binding Summary, UpdateSourceTrigger=PropertyChanged, Delay=250}" AcceptsReturn="True" Height="66" TextWrapping="Wrap"/>
                         <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
                             <StackPanel Margin="0,0,5,0"><TextBlock Text="入场理由" Style="{StaticResource EditorLabel}"/><TextBox Text="{Binding EntryReason, UpdateSourceTrigger=PropertyChanged, Delay=250}" AcceptsReturn="True" Height="58" TextWrapping="Wrap"/></StackPanel>
                             <StackPanel Grid.Column="1" Margin="5,0,0,0"><TextBlock Text="退出理由" Style="{StaticResource EditorLabel}"/><TextBox Text="{Binding ExitReason, UpdateSourceTrigger=PropertyChanged, Delay=250}" AcceptsReturn="True" Height="58" TextWrapping="Wrap"/></StackPanel>
@@ -252,9 +312,21 @@
                             <StackPanel Margin="0,0,5,0"><TextBlock Text="做得好" Style="{StaticResource EditorLabel}"/><TextBox Text="{Binding DidWell, UpdateSourceTrigger=PropertyChanged, Delay=250}" AcceptsReturn="True" Height="55" TextWrapping="Wrap"/></StackPanel>
                             <StackPanel Grid.Column="1" Margin="5,0,0,0"><TextBlock Text="需要改进" Style="{StaticResource EditorLabel}"/><TextBox Text="{Binding ToImprove, UpdateSourceTrigger=PropertyChanged, Delay=250}" AcceptsReturn="True" Height="55" TextWrapping="Wrap"/></StackPanel>
                         </Grid>
-                        <TextBlock Text="下一次执行动作（完成复盘必填）" Style="{StaticResource EditorLabel}"/><TextBox Text="{Binding NextAction, UpdateSourceTrigger=PropertyChanged, Delay=250}" AcceptsReturn="True" Height="55" TextWrapping="Wrap"/>
+                        <TextBlock Text="下一次执行动作（可选）" Style="{StaticResource EditorLabel}"/><TextBox Text="{Binding NextAction, UpdateSourceTrigger=PropertyChanged, Delay=250}" AcceptsReturn="True" Height="55" TextWrapping="Wrap"/>
                         <WrapPanel Margin="0,7,0,0"><TextBox Width="130" Text="{Binding Emotion, UpdateSourceTrigger=PropertyChanged}" ToolTip="自报情绪" Style="{StaticResource CompactInput}"/><TextBox Width="180" Text="{Binding MarketCondition, UpdateSourceTrigger=PropertyChanged}" ToolTip="市场环境" Style="{StaticResource CompactInput}"/></WrapPanel>
-                        <WrapPanel><Button x:Name="ReviewGuideTradeSave" Content="保存草稿" Command="{Binding SaveReviewCommand}" Style="{StaticResource PrimaryButtonStyle}"/><Button Content="标记已复盘" Command="{Binding MarkReviewedCommand}" Margin="7,0,0,0"/></WrapPanel>
+                        <WrapPanel><Button x:Name="ReviewGuideTradeSave" Content="保存补充" Command="{Binding SaveReviewCommand}" Style="{StaticResource PrimaryButtonStyle}"/></WrapPanel>
+
+                            </StackPanel>
+                        </Expander>
+                        <Expander Header="成交、风险与执行证据（可选）" Foreground="{StaticResource TextBrush}" Margin="0,12,0,0" IsExpanded="False">
+                            <StackPanel>
+                        <TextBlock Text="原始成交明细（只读）" Style="{StaticResource SectionTitleStyle}" Margin="0,5,0,4"/>
+                        <ListView ItemsSource="{Binding TradeDeals}" MaxHeight="145"><ListView.View><GridView>
+                            <GridViewColumn Header="时间" Width="100" DisplayMemberBinding="{Binding Time}"/><GridViewColumn Header="ticket" Width="85" DisplayMemberBinding="{Binding Ticket}"/><GridViewColumn Header="类型" Width="75" DisplayMemberBinding="{Binding Kind}"/><GridViewColumn Header="数量" Width="60" DisplayMemberBinding="{Binding Volume}"/><GridViewColumn Header="价格" Width="75" DisplayMemberBinding="{Binding Price}"/><GridViewColumn Header="利润" Width="65" DisplayMemberBinding="{Binding Profit}"/><GridViewColumn Header="佣金" Width="60" DisplayMemberBinding="{Binding Commission}"/><GridViewColumn Header="隔夜" Width="55" DisplayMemberBinding="{Binding Swap}"/><GridViewColumn Header="其他费" Width="55" DisplayMemberBinding="{Binding Fee}"/><GridViewColumn Header="净额" Width="65" DisplayMemberBinding="{Binding NetPnl}"/>
+                        </GridView></ListView.View></ListView>
+                        <TextBlock Text="实际风险与持仓采样" Style="{StaticResource SectionTitleStyle}" Margin="0,12,0,4"/>
+                        <TextBlock Text="{Binding RiskFacts}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,3,0,0"/>
+
                         <TextBlock Text="执行评价" Style="{StaticResource SectionTitleStyle}" Margin="0,14,0,5"/>
                         <ItemsControl ItemsSource="{Binding RuleAssessments}"><ItemsControl.ItemTemplate><DataTemplate>
                             <Grid Margin="0,3"><Grid.ColumnDefinitions><ColumnDefinition Width="65"/><ColumnDefinition/><ColumnDefinition Width="115"/><ColumnDefinition Width="150"/></Grid.ColumnDefinitions>
@@ -262,7 +334,7 @@
                             </Grid>
                         </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
                         <Button x:Name="ReviewGuideAssessments" Content="保存执行评价" Command="{Binding SaveAssessmentsCommand}" HorizontalAlignment="Left" Margin="0,5,0,0"/>
-                        <TextBlock Text="交易过程与行为证据" Style="{StaticResource SectionTitleStyle}" Margin="0,14,0,5"/>
+                        <Button Content="完成详细评价" Command="{Binding MarkReviewedCommand}" HorizontalAlignment="Left" Margin="0,7,0,0"/><TextBlock Text="交易过程与行为证据" Style="{StaticResource SectionTitleStyle}" Margin="0,14,0,5"/>
                         <ListView ItemsSource="{Binding TradeProcess}" MaxHeight="180"><ListView.View><GridView><GridViewColumn Header="时间" Width="105" DisplayMemberBinding="{Binding Time}"/><GridViewColumn Header="事件" Width="105" DisplayMemberBinding="{Binding Kind}"/><GridViewColumn Header="事实" Width="370" DisplayMemberBinding="{Binding Summary}"/><GridViewColumn Header="来源" Width="120" DisplayMemberBinding="{Binding Source}"/></GridView></ListView.View></ListView>
                         <TextBlock Text="证据标签建议" Style="{StaticResource SectionTitleStyle}" Margin="0,14,0,2"/>
                         <TextBlock Text="只根据证据充分的关注/严重行为事件生成；采用或撤销不会改变原始规则事件。" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,0,0,5"/>
@@ -279,6 +351,9 @@
                         <CheckBox Content="查看完整复盘（显示游标后的最终结果与事后记录）" IsChecked="{Binding ShowFullReplayReview}" Margin="0,5,0,0"/>
                         <Grid Margin="0,5"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Button Content="上一事件" Command="{Binding PreviousReplayEventCommand}"/><Slider Grid.Column="1" Minimum="0" Maximum="100" Value="{Binding ReplayProgress, UpdateSourceTrigger=PropertyChanged}" Margin="8,0"/><Button Grid.Column="2" Content="{Binding ReplayButtonText}" Command="{Binding ToggleReplayCommand}"/><Button Grid.Column="3" Content="下一事件" Command="{Binding NextReplayEventCommand}" Margin="6,0,0,0"/></Grid>
                         <ListBox ItemsSource="{Binding ReplayEvents}" MaxHeight="170"/>
+
+                            </StackPanel>
+                        </Expander>
                     </StackPanel></ScrollViewer>
                 </Border>
             </Grid>
@@ -406,7 +481,7 @@
             </Grid></ScrollViewer>
         </TabItem>
 
-        <TabItem Header="机会记录" ToolTip="记录没成交的机会：新建后填写品种、预设条件和未参与原因，保存后可补截图。这里也可预览公开导出、创建完整本地备份；恢复前应先备份当前内容。">
+        <TabItem Header="机会记录" ToolTip="记录没成交的机会：新建后填写品种、预设条件和未参与原因，保存后可补截图。报告导出与备份在控制台“报告与数据”页。">
             <Grid Margin="0,6,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="1.05*"/><ColumnDefinition Width="1.3*"/></Grid.ColumnDefinitions>
                 <Border Style="{StaticResource PageCardStyle}" Padding="14" Margin="0,0,8,0"><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel>
                     <Grid x:Name="ReviewGuideOpportunity"><TextBlock Text="记录未成交机会或合理放弃" Style="{StaticResource SectionTitleStyle}"/><Button Content="新建记录" Command="{Binding NewOpportunityCommand}" HorizontalAlignment="Right"/></Grid>
@@ -421,29 +496,11 @@
                     <WrapPanel Margin="0,8,0,0"><Button Content="保存机会记录" Command="{Binding SaveOpportunityCommand}" Style="{StaticResource PrimaryButtonStyle}"/><Button Content="导入机会截图" Command="{Binding ImportOpportunityAttachmentCommand}" Margin="7,0,0,0"/></WrapPanel>
                     <TextBlock Text="已选记录的证据" Style="{StaticResource EditorLabel}" Margin="0,8,0,0"/>
                     <ListBox ItemsSource="{Binding OpportunityAttachments}" MaxHeight="150" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" ScrollViewer.CanContentScroll="True"><ListBox.ItemTemplate><DataTemplate><Grid Margin="0,2"><Grid.ColumnDefinitions><ColumnDefinition Width="56"/><ColumnDefinition/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Image Source="{Binding Thumbnail}" Width="50" Height="38" Stretch="Uniform"/><TextBlock Grid.Column="1" Text="{Binding FileName}" ToolTip="{Binding Source}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/><Button Grid.Column="2" Content="打开" Command="{Binding OpenCommand}" Padding="6,2"/><Button Grid.Column="3" Content="删除" Command="{Binding DeleteCommand}" Padding="6,2" Margin="4,0,0,0"/></Grid></DataTemplate></ListBox.ItemTemplate></ListBox>
-                    <Separator Margin="0,14"/>
-                    <TextBlock x:Name="ReviewGuideExport" Text="公开分享导出范围" Style="{StaticResource EditorLabel}"/>
-                    <ComboBox ItemsSource="{Binding ExportScopeOptions}" SelectedItem="{Binding ExportScope}" Margin="0,4,0,5"/>
-                    <Button Content="生成公开导出预览" Command="{Binding ExportCommand}"/>
-                    <TextBlock Text="{Binding ExportPreview}" TextWrapping="Wrap" Margin="0,7,0,5"/>
-                    <TextBlock Text="原始截图/附件默认不包含；仅勾选确实要公开的文件。图片内容无法自动保证匿名。"
-                               Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap"/>
-                    <ItemsControl ItemsSource="{Binding ExportAttachmentOptions}" MaxHeight="130" Margin="0,4,0,6">
-                        <ItemsControl.ItemTemplate><DataTemplate>
-                            <StackPanel Margin="0,3,0,3">
-                                <CheckBox IsChecked="{Binding IsIncluded}" Content="{Binding Display}" ToolTip="勾选后原始文件将进入公开分享包；请自行检查画面与文件内容"/>
-                                <TextBox Text="{Binding PublicNote, UpdateSourceTrigger=PropertyChanged}" ToolTip="公开说明；原文件名不会进入分享包，已识别的账户和本机路径会被遮盖" Style="{StaticResource CompactInput}"/>
-                            </StackPanel>
-                        </DataTemplate></ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                    <Button Content="确认并写出公开分享 ZIP" Command="{Binding ConfirmExportCommand}" IsEnabled="{Binding CanConfirmExport}"/>
-                    <Button x:Name="ReviewGuideBackup" Content="创建完整本地备份" Command="{Binding BackupCommand}" Margin="0,7,0,0"/>
-                    <Button Content="校验并恢复本地备份" Command="{Binding RestoreCommand}" Margin="0,7,0,0"/>
-                    <TextBlock Text="{Binding ExportStatus}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,6,0,0"/>
                 </StackPanel></ScrollViewer></Border>
                 <Border Grid.Column="1" Style="{StaticResource PageCardStyle}" Padding="8"><ListView ItemsSource="{Binding Opportunities}"><ListView.View><GridView><GridViewColumn Header="日期" Width="70" DisplayMemberBinding="{Binding Date}"/><GridViewColumn Header="品种" Width="85" DisplayMemberBinding="{Binding Symbol}"/><GridViewColumn Header="类型" Width="80" DisplayMemberBinding="{Binding Kind}"/><GridViewColumn Header="原因" Width="135" DisplayMemberBinding="{Binding Reason}"/><GridViewColumn Header="记录" Width="190" DisplayMemberBinding="{Binding Notes}"/><GridViewColumn Header="操作" Width="65"><GridViewColumn.CellTemplate><DataTemplate><Button Content="编辑" Command="{Binding OpenCommand}" Padding="7,3" Margin="0"/></DataTemplate></GridViewColumn.CellTemplate></GridViewColumn></GridView></ListView.View></ListView></Border>
             </Grid>
         </TabItem>
+
     </TabControl>
     </Grid>
 </UserControl>

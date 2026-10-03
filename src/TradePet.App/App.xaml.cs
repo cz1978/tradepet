@@ -70,6 +70,9 @@ public partial class App : System.Windows.Application
         viewModel.HidePet = () => _petWindow.Hide();
         viewModel.ExitApplicationAsync = ShutdownAsync;
         _runtime = new TradePetRuntime(viewModel, dependencies);
+        _runtime.ShowQuickReviewCard = _petWindow.ShowQuickReviewCard;
+        _runtime.ShowEntryReasonCard = _petWindow.ShowEntryReasonCard;
+        _runtime.CanShowAutomaticPrompt = () => _petWindow.IsVisible;
         _mainWindow.SaveGuideCompletionAsync = _runtime.CompleteConsoleGuideAsync;
         viewModel.ShowSetup = () =>
         {
@@ -92,7 +95,14 @@ public partial class App : System.Windows.Application
         viewModel.ApplyBehaviorPresetAsync = _runtime.ApplyBehaviorPresetAsync;
         viewModel.SaveBehaviorSettingsAsync = _runtime.SaveBehaviorSettingsAsync;
         viewModel.RefreshReviewAsync = _runtime.RefreshReviewAsync;
-        viewModel.ShowQuickReviewAsync = _runtime.ShowQuickReviewAsync;
+        viewModel.ShowQuickReviewAsync = async () =>
+        {
+            _petWindow.Show();
+            await _runtime.ShowQuickReviewAsync();
+        };
+        viewModel.ShowEntryReasonAsync = async () => { _petWindow.Show(); await _runtime.ShowEntryReasonAsync(); };
+        viewModel.CheckUpdatesAsync = _runtime.CheckForUpdatesAsync;
+        viewModel.OpenReleasePage = _runtime.OpenReleasePage;
         viewModel.ShowDailyTradingReportAsync = _runtime.ShowDailyTradingReportAsync;
         viewModel.ShowMacroCalendar = _runtime.ShowMacroCalendar;
 

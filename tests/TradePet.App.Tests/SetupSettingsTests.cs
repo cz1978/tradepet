@@ -19,6 +19,8 @@ public sealed class SetupSettingsTests
         var settings = JsonSerializer.Deserialize(oldJson, type, ProtocolJson.Options)!;
         Assert.Equal(0, type.GetProperty("SetupVersion")!.GetValue(settings));
         Assert.Equal(TradingPlatform.Mt5, type.GetProperty("Platform")!.GetValue(settings));
+        foreach (var name in new[] { "QuickReviewPromptEnabled", "EntryReasonPromptEnabled", "UpdateNotificationsEnabled" })
+            Assert.Equal(true, type.GetProperty(name)!.GetValue(settings));
         var json = JsonSerializer.SerializeToNode(settings, type, ProtocolJson.Options)!;
         json["platform"] = "mt4";
         json["setupVersion"] = 1;
@@ -27,6 +29,19 @@ public sealed class SetupSettingsTests
         Assert.Equal(1, type.GetProperty("SetupVersion")!.GetValue(restored));
         Assert.Equal(TradingPlatform.Mt4, type.GetProperty("Platform")!.GetValue(restored));
         Assert.Equal(@"D:\MT4\terminal.exe", type.GetProperty("TerminalPath")!.GetValue(restored));
+    }
+
+    [Fact]
+    public void PromptPreferences_DefaultOnAndExplicitOffSurvivesReload()
+    {
+        var vm = new MainViewModel();
+        Assert.True(vm.QuickReviewPromptEnabled);
+        Assert.True(vm.EntryReasonPromptEnabled);
+        var type = typeof(TradePetRuntime).GetNestedType("DesktopSettings", BindingFlags.NonPublic)!;
+        var settings = JsonSerializer.Deserialize("""{"quickReviewPromptEnabled":false,"entryReasonPromptEnabled":false,"updateNotificationsEnabled":false}""", type, ProtocolJson.Options)!;
+        var restored = JsonSerializer.Deserialize(JsonSerializer.Serialize(settings, type, ProtocolJson.Options), type, ProtocolJson.Options)!;
+        foreach (var name in new[] { "QuickReviewPromptEnabled", "EntryReasonPromptEnabled", "UpdateNotificationsEnabled" })
+            Assert.Equal(false, type.GetProperty(name)!.GetValue(restored));
     }
 
     [Fact]

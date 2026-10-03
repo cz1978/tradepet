@@ -28,6 +28,10 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
     private string _comparisonMode = "周期前后";
     private string _filterName = string.Empty;
     private string _statusText = "等待复盘数据";
+    private int _workspaceTabIndex;
+    private int _archiveListIndex;
+    private string _savedReviewsStatus = "选择此页读取已保存的复盘。";
+    private SavedReviewRow? _selectedSavedReview;
     private string _qualitySummary = "尚未计算覆盖率";
     private string _storageStatus = "本地数据库状态等待确认";
     private string _cacheStatus = "行情缓存只包含可重新获取的数据。";
@@ -110,6 +114,7 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
     private DateTimeOffset _replayEndUtc;
     private int _replayCurrentEventIndex = -1;
     private string _exportStatus = "导出使用当前筛选与数据版本";
+    private string _exportRangeText = "尚未查询报告范围；请先在复盘分析中选择日期并查询。";
     private string _exportScope = "全部筛选结果";
     private string _exportPreview = "先生成导出预览；原始附件默认不包含。";
     private bool _canConfirmExport;
@@ -165,6 +170,7 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
         PreviousTradeCommand = Command(() => StepTradeAsync(-1));
         NextTradeCommand = Command(() => StepTradeAsync(1));
         SaveReviewCommand = Command(() => SaveReviewAsync?.Invoke() ?? Task.CompletedTask);
+        RefreshSavedReviewsCommand = Command(() => RefreshSavedReviewsAsync?.Invoke() ?? Task.CompletedTask);
         MarkReviewedCommand = Command(() => MarkReviewedAsync?.Invoke() ?? Task.CompletedTask);
         SaveAssessmentsCommand = Command(() => SaveAssessmentsAsync?.Invoke() ?? Task.CompletedTask);
         ImportAttachmentCommand = Command(() => ImportAttachmentAsync?.Invoke() ?? Task.CompletedTask);
@@ -189,6 +195,7 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
         NextReplayEventCommand = Command(() => StepReplayEventAsync(1));
         ToggleReplayCommand = Command(ToggleReplayAsync);
         ExportCommand = Command(() => ExportAsync?.Invoke() ?? Task.CompletedTask);
+        ExportMarkdownCommand = Command(() => ExportMarkdownAsync?.Invoke() ?? Task.CompletedTask);
         ConfirmExportCommand = Command(() => ConfirmExportAsync?.Invoke() ?? Task.CompletedTask);
         BackupCommand = Command(() => BackupAsync?.Invoke() ?? Task.CompletedTask);
         RestoreCommand = Command(() => RestoreAsync?.Invoke() ?? Task.CompletedTask);
@@ -205,6 +212,7 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
     public Func<ReviewSavedFilter, Task>? ApplySavedFilterAsync { get; set; }
     public Func<long, Task>? OpenTradeAsync { get; set; }
     public Func<Task>? SaveReviewAsync { get; set; }
+    public Func<Task>? RefreshSavedReviewsAsync { get; set; }
     public Func<Task>? AutoSaveReviewAsync { get; set; }
     public Func<Task>? AutoSaveWorkspaceAsync { get; set; }
     public Func<Task>? MarkReviewedAsync { get; set; }
@@ -229,6 +237,7 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
     public Func<Task>? LoadReplayAsync { get; set; }
     public Func<double, Task>? SeekReplayAsync { get; set; }
     public Func<Task>? ExportAsync { get; set; }
+    public Func<Task>? ExportMarkdownAsync { get; set; }
     public Func<Task>? ConfirmExportAsync { get; set; }
     public Func<Task>? BackupAsync { get; set; }
     public Func<Task>? RestoreAsync { get; set; }
@@ -244,6 +253,7 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
     public ICommand PreviousTradeCommand { get; }
     public ICommand NextTradeCommand { get; }
     public ICommand SaveReviewCommand { get; }
+    public ICommand RefreshSavedReviewsCommand { get; }
     public ICommand MarkReviewedCommand { get; }
     public ICommand SaveAssessmentsCommand { get; }
     public ICommand ImportAttachmentCommand { get; }
@@ -268,6 +278,7 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
     public ICommand NextReplayEventCommand { get; }
     public ICommand ToggleReplayCommand { get; }
     public ICommand ExportCommand { get; }
+    public ICommand ExportMarkdownCommand { get; }
     public ICommand ConfirmExportCommand { get; }
     public ICommand BackupCommand { get; }
     public ICommand RestoreCommand { get; }
@@ -308,6 +319,11 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
     public ObservableCollection<TradeDealRow> TradeDeals { get; } = [];
     public ObservableCollection<TradeProcessRow> TradeProcess { get; } = [];
     public ObservableCollection<DailyFactRow> DailyFacts { get; } = [];
+    public ObservableCollection<SavedReviewRow> SavedReviews { get; } = [];
+    public int WorkspaceTabIndex { get => _workspaceTabIndex; set => SetProperty(ref _workspaceTabIndex, value); }
+    public int ArchiveListIndex { get => _archiveListIndex; set => SetProperty(ref _archiveListIndex, value); }
+    public string SavedReviewsStatus { get => _savedReviewsStatus; set => SetProperty(ref _savedReviewsStatus, value); }
+    public SavedReviewRow? SelectedSavedReview { get => _selectedSavedReview; set => SetProperty(ref _selectedSavedReview, value); }
     public ObservableCollection<DailyTimelineRow> DailyTimeline { get; } = [];
     public ObservableCollection<string> ReplayEvents { get; } = [];
 
@@ -342,6 +358,7 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
     public string CacheStatus { get => _cacheStatus; set => SetProperty(ref _cacheStatus, value); }
     public int Page { get => _page; set { if (SetProperty(ref _page, Math.Max(1, value))) RaisePropertyChanged(nameof(PageText)); } }
     public int TotalCount { get => _totalCount; set { if (SetProperty(ref _totalCount, value)) RaisePropertyChanged(nameof(PageText)); } }
+    public string ExportRangeText { get => _exportRangeText; private set => SetProperty(ref _exportRangeText, value); }
     public string PageText => $"第 {Page} 页 · 共 {TotalCount} 笔";
     public long? SelectedPositionId { get => _selectedPositionId; set => SetProperty(ref _selectedPositionId, value); }
     public string SelectedTradeTitle { get => _selectedTradeTitle; set => SetProperty(ref _selectedTradeTitle, value); }
@@ -591,7 +608,7 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
             snapshot.Documents.TryGetValue(trade.PositionId, out var document);
             var status = document?.Status switch
             {
-                ReviewCompletionStatus.Draft => "草稿",
+                ReviewCompletionStatus.Draft => "已保存复盘",
                 ReviewCompletionStatus.Reviewed => "已复盘",
                 ReviewCompletionStatus.NeedsReview => "需重审",
                 _ => "待复盘",
@@ -599,7 +616,7 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
             data.Metadata.TryGetValue(trade.PositionId, out var metadata);
             var row = new WorkspaceTradeRow(trade.PositionId, BrokerTime(trade.ClosedAtUtc)?.ToString("MM-dd HH:mm") ?? "持仓中",
                 trade.Symbol, trade.Side == TradeSide.Buy ? "买" : "卖", Signed(trade.NetPnl), status,
-                metadata?.Strategy ?? "未归类", string.Join("、", metadata?.Tags ?? []),
+                metadata?.Strategy ?? string.Empty, string.Join("、", metadata?.Tags ?? []),
                 FinancialPalette.For(trade.NetPnl), new AsyncRelayCommand(() => OpenTradeAsync?.Invoke(trade.PositionId) ?? Task.CompletedTask));
             row.SelectionChanged += OnTradeSelectionChanged;
             Trades.Add(row);
@@ -827,6 +844,7 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
             ClearTradingSession();
         }
         TotalCount = snapshot.TotalCount;
+        ExportRangeText = $"导出范围：{snapshot.Filter.FromServerDate:yyyy-MM-dd} 至 {snapshot.Filter.ToServerDate:yyyy-MM-dd}（交易服务器日期） · 全部 {snapshot.TotalCount} 笔交易";
         Page = snapshot.Page;
         StatusText = $"{snapshot.Filter.FromServerDate:yyyy-MM-dd} 至 {snapshot.Filter.ToServerDate:yyyy-MM-dd} · 当前页 {snapshot.Trades.Count} 笔";
 
@@ -927,7 +945,8 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
                 : $"{planTiming} · {plan.Strategy}/{plan.Setup} · 入场区 {plan.EntryLow?.ToString() ?? "?"}–{plan.EntryHigh?.ToString() ?? "?"} · 止损 {plan.StopPrice?.ToString() ?? "?"} · 目标 {plan.TargetPrice?.ToString() ?? "?"} · 策略版本 {detail.Playbook?.Name ?? "未绑定"}";
             RiskFacts = FormatRiskFacts(detail.Excursion, detail.Trade.NetPnl);
             var document = detail.Document;
-            EntryReason = pendingDraft?.EntryReason ?? document?.EntryReason ?? string.Empty;
+            EntryReason = pendingDraft?.EntryReason ??
+                          (string.IsNullOrWhiteSpace(document?.EntryReason) ? detail.EntryReasonNote?.Reason : document.EntryReason) ?? string.Empty;
             ExitReason = pendingDraft?.ExitReason ?? document?.ExitReason ?? string.Empty;
             DidWell = pendingDraft?.DidWell ?? document?.DidWell ?? string.Empty;
             ToImprove = pendingDraft?.ToImprove ?? document?.ToImprove ?? string.Empty;
@@ -938,7 +957,7 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
             DocumentRevision = pendingDraft?.ExpectedRevision ?? document?.Revision ?? 0;
             DocumentStatus = document?.Status switch
             {
-                ReviewCompletionStatus.Draft => "草稿",
+                ReviewCompletionStatus.Draft => "已保存复盘",
                 ReviewCompletionStatus.Reviewed => "已复盘",
                 ReviewCompletionStatus.NeedsReview => "需重审",
                 _ => "待复盘",
@@ -1069,7 +1088,7 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
         DocumentRevision = receipt.Value.Revision;
         DocumentStatus = receipt.Value.Status switch
         {
-            ReviewCompletionStatus.Draft => "草稿",
+            ReviewCompletionStatus.Draft => "已保存复盘",
             ReviewCompletionStatus.Reviewed => "已复盘",
             ReviewCompletionStatus.NeedsReview => "需重审",
             _ => "待复盘",
@@ -1194,6 +1213,10 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
             Quality.Clear();
             Calendar.Clear();
             Trades.Clear();
+            SavedReviews.Clear();
+            ExportRangeText = "尚未查询报告范围；请先在复盘分析中选择日期并查询。";
+            SelectedSavedReview = null;
+            SavedReviewsStatus = "选择此页读取已保存的复盘。";
             Curve.Clear();
             Behaviors.Clear();
             BehaviorTradeLinks.Clear();
@@ -1506,6 +1529,38 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
         "4x" => 4d,
         _ => 1d,
     };
+
+    public void ApplySavedReviews(IReadOnlyList<SavedTradeReviewData> records)
+    {
+        var selectedId = SelectedSavedReview?.PositionId;
+        SavedReviews.Clear();
+        foreach (var item in records.OrderByDescending(item => item.Document.UpdatedAtUtc))
+        {
+            var trade = item.Trade;
+            var document = item.Document;
+            SavedReviews.Add(new SavedReviewRow(trade.PositionId,
+                $"{trade.Symbol} · {(trade.Side == TradeSide.Buy ? "买入" : "卖出")} · {Signed(trade.NetPnl)} · #{trade.PositionId}",
+                $"保存于 {BrokerTime(document.UpdatedAtUtc):yyyy-MM-dd HH:mm} 服务器",
+                $"平仓 {BrokerTime(trade.ClosedAtUtc):yyyy-MM-dd HH:mm} 服务器",
+                document.Status switch
+                {
+                    ReviewCompletionStatus.Reviewed => "已复盘",
+                    ReviewCompletionStatus.NeedsReview => "数据更新，需重审",
+                    _ => "已保存复盘",
+                },
+                document.Summary, document.ExitReason, document.ToImprove, document.NextAction,
+                new AsyncRelayCommand(async () =>
+                {
+                    await (OpenTradeAsync?.Invoke(trade.PositionId) ?? Task.CompletedTask);
+                    WorkspaceTabIndex = 2;
+                })));
+        }
+        SelectedSavedReview = SavedReviews.FirstOrDefault(item => item.PositionId == selectedId)
+                              ?? SavedReviews.FirstOrDefault();
+        SavedReviewsStatus = SavedReviews.Count == 0
+            ? "当前账户还没有已保存的复盘。"
+            : $"当前账户已保存 {SavedReviews.Count} 条复盘 · 按保存时间排序";
+    }
 
     public void ApplyDaily(
         DateOnly date,
@@ -2473,6 +2528,8 @@ public sealed record RuleAssessmentDraftRow(
     RuleAssessmentStatus Status,
     string Notes);
 public sealed record DailyFactRow(string Title, string Value, string Detail);
+public sealed record SavedReviewRow(long PositionId, string Title, string SavedAt, string TradeAt,
+    string Status, string Summary, string ExitReason, string Improvement, string NextAction, ICommand OpenCommand);
 public sealed record DailyTimelineRow(string Time, string Kind, string Summary, string Source, string LinkedTrades);
 public sealed class WorkspaceTradeRow : ObservableObject
 {

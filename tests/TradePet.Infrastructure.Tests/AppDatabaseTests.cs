@@ -30,11 +30,63 @@ public sealed class AppDatabaseTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task SavedReviews_AreReadableAfterReopenAndIncludeOldTradesOnlyForTheirAccount()
+    {
+        var at = new DateTimeOffset(2026, 1, 5, 1, 0, 0, TimeSpan.Zero);
+        var date = new DateOnly(2026, 1, 5);
+        foreach (var account in new[] { "Broker|1", "Broker|2" })
+        {
+            await _database.UpsertAccountAsync(new AccountSnapshot(
+                new AccountScope("Broker", account.EndsWith('1') ? 1 : 2), "USD", 1000, 1000, 0, 2, at));
+            foreach (var id in new[] { 1L, 2L })
+            {
+                await _database.UpsertTradeAsync(new TradeRecord(account, id, "TEST", TradeSide.Buy,
+                    at, at.AddMinutes(1), date, date, 100, 101, 1, 1, 0, 1, true));
+                var document = new TradeReviewDocument(new TradeKey(account, id), ReviewCompletionStatus.Draft,
+                    "", "主动平仓", "", "减少回吐", "检查退出条件", $"已保存的快速复盘 {id}", "", "",
+                    0, "source", "rule", null, null, at, at.AddDays(id));
+                Assert.True((await _database.SaveTradeReviewDocumentAsync(document, 0)).IsSaved);
+            }
+        }
+        var reopened = new AppDatabase(Path.Combine(_testDirectory, "test.db"));
+        var records = await reopened.LoadSavedTradeReviewsAsync("Broker|1");
+        Assert.Equal(new[] { 2L, 1L }, records.Select(item => item.Trade.PositionId));
+        Assert.All(records, item => Assert.Equal("Broker|1", item.Document.TradeKey.AccountKey));
+        Assert.Equal("已保存的快速复盘 2", records[0].Document.Summary);
+        Assert.Equal("主动平仓", records[0].Document.ExitReason);
+        Assert.Equal("检查退出条件", records[0].Document.NextAction);
+    }
+
+    [Fact]
     public async Task ProcessedEvents_AreIdempotent()
     {
         Assert.True(await _database.TryMarkEventProcessedAsync("source-a", 7));
         Assert.False(await _database.TryMarkEventProcessedAsync("source-a", 7));
         Assert.True(await _database.TryMarkEventProcessedAsync("source-b", 7));
+    }
+
+    [Fact]
+    public async Task EntryReasons_SurviveReopenAndStayWithTheirAccountAndPosition()
+    {
+        var at = new DateTimeOffset(2026, 10, 3, 8, 0, 0, TimeSpan.Zero);
+        var date = new DateOnly(2026, 10, 3);
+        foreach (var account in new[] { "Broker|1", "Broker|2" })
+        {
+            await _database.UpsertAccountAsync(new AccountSnapshot(
+                new AccountScope("Broker", account.EndsWith('1') ? 1 : 2), "USD", 1000, 1000, 0, 2, at));
+            await _database.UpsertTradeAsync(new TradeRecord(account, 77, "TEST", TradeSide.Buy,
+                at, null, date, null, 100, null, 1, 1, 0, 0, false));
+            var key = new TradeKey(account, 77);
+            await _database.SaveSettingAsync(TradeEntryReasonNote.Scope(account), TradeEntryReasonNote.SettingKey(77),
+                new TradeEntryReasonNote(key, account == "Broker|1" ? "回踩入场" : "突破入场", at));
+        }
+        var reopened = new AppDatabase(Path.Combine(_testDirectory, "test.db"));
+        var detail = await reopened.LoadTradeDetailAsync(new TradeKey("Broker|1", 77));
+        Assert.Equal("回踩入场", detail!.EntryReasonNote!.Reason);
+        Assert.Null(detail.Document);
+        var other = await reopened.LoadTradeDetailsAsync([new TradeKey("Broker|2", 77)]);
+        Assert.Equal("突破入场", Assert.Single(other).EntryReasonNote!.Reason);
+        Assert.Empty(await reopened.LoadSavedTradeReviewsAsync("Broker|1"));
     }
 
     [Fact]

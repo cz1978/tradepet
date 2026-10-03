@@ -43,12 +43,13 @@ public sealed class DailyStateCalculator
         var targetReachedAtUtc = previousState?.TargetReachedAtUtc;
         var targetRuleVersion = previousState?.TargetRuleVersion ?? string.Empty;
         var targetAmountAtReach = previousState?.TargetAmountAtReach;
-        if (!targetAlerted && settings.DailyTarget is > 0m && combined >= settings.DailyTarget.Value)
+        var targetAmount = settings.ResolvedDailyTarget;
+        if (!targetAlerted && targetAmount is > 0m && combined >= targetAmount.Value)
         {
             targetAlerted = true;
             targetReachedAtUtc = observedAtUtc;
-            targetRuleVersion = observedAtUtc is null ? string.Empty : CreateTargetRuleVersion(settings.DailyTarget.Value);
-            targetAmountAtReach = observedAtUtc is null ? null : settings.DailyTarget.Value;
+            targetRuleVersion = observedAtUtc is null ? string.Empty : CreateTargetRuleVersion(targetAmount.Value);
+            targetAmountAtReach = observedAtUtc is null ? null : targetAmount.Value;
             facts.Add(new RuleFact(
                 RuleFactKind.DailyTarget,
                 AlertPriority.Important,
@@ -76,7 +77,7 @@ public sealed class DailyStateCalculator
         }
 
         var givebackThreshold = ResolveGivebackThreshold(settings, highWater);
-        var targetWasReached = settings.DailyTarget is > 0m && highWater >= settings.DailyTarget.Value;
+        var targetWasReached = targetAmount is > 0m && highWater >= targetAmount.Value;
         if (!givebackAlerted && targetWasReached && givebackThreshold > 0m && giveback >= givebackThreshold)
         {
             givebackAlerted = true;

@@ -6,6 +6,25 @@ namespace TradePet.Application.Tests;
 
 public sealed class QuickReviewAnalyzerTests
 {
+    [Fact]
+    public void ProtectionAndRisk_AreReportedFromActualSamplesAndRecordedInitialRisk()
+    {
+        var detail = Detail() with
+        {
+            PnlSamples = [Sample(0, 95, 110, 599), Sample(5, null, 110)],
+            Excursion = new TradeExcursion("Broker|1", 1, -10, 25, 10, null, null,
+                ClosedAt.AddMinutes(-10), ClosedAt, 600_000, 600_000, true, true, 1_000, "position-pnl-v1"),
+        };
+
+        var result = QuickReviewAnalyzer.Analyze(detail);
+
+        Assert.Contains("开仓时 SL 95 / TP 110", result.Explanation);
+        Assert.Contains("最后采样 SL 未设置 / TP 110", result.Explanation);
+        Assert.Contains("变更 1 次", result.Explanation);
+        Assert.Contains("实际 R 0.5", result.Explanation);
+        Assert.DoesNotContain("计划核对", result.Explanation);
+    }
+
     private static readonly DateTimeOffset ClosedAt = new(2026, 9, 24, 4, 0, 0, TimeSpan.Zero);
 
     [Theory]
@@ -96,12 +115,13 @@ public sealed class QuickReviewAnalyzerTests
     }
 
     [Fact]
-    public void Plan_ProvidesFallbackPriceEvidenceWhenNoRecentSampleExists()
+    public void LegacyPlan_IsIgnoredWhenNoActualPositionEvidenceExists()
     {
         var result = QuickReviewAnalyzer.Analyze(Detail(exit: 111) with { Plan = Plan() });
 
-        Assert.Equal("触及止盈价离场（推测）", result.ExitReason);
-        Assert.Contains("绑定计划", result.Explanation);
+        Assert.DoesNotContain("触及止盈", result.ExitReason);
+        Assert.Contains("缺少可用", result.Explanation);
+        Assert.DoesNotContain("计划核对", result.Explanation);
     }
 
     [Fact]
@@ -111,6 +131,7 @@ public sealed class QuickReviewAnalyzerTests
         {
             Plan = Plan(),
             Deals = [Exit(2, 111, ClosedAt), Exit(1, 99, ClosedAt.AddSeconds(-10))],
+            PnlSamples = [Sample(5, 95, 110)],
         };
 
         var result = QuickReviewAnalyzer.Analyze(detail);

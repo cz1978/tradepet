@@ -7,6 +7,34 @@ namespace TradePet.Application.Tests;
 
 public sealed class DailyReportAnalyzerTests
 {
+    [Fact]
+    public void Report_ExportsActualProtectionChangesAndMarketBarsForReview()
+    {
+        var trade = Trade(1, 5);
+        var initial = new PositionPnlSample(new TradeKey(Account, 1), trade.OpenedAtUtc.AddSeconds(1),
+            0, -2, -2, 1, 95, 110, 1_000, "position-pnl-v1");
+        var later = initial with { CapturedAtUtc = trade.ClosedAtUtc!.Value.AddSeconds(-1), NetPnl = 20, StopLoss = null };
+        var dayStart = new DateTimeOffset(Date.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+        var history = new MarketHistoryResult(new("request", "terminal", Account, "TEST", "M5", dayStart,
+            dayStart.AddDays(1), At, At.AddMinutes(5), MarketDataPrecision.Bars, MarketCoverageStatus.Partial,
+            "test", "", At), [new("terminal", Account, "TEST", "M5", At, 100, 110, 95, 105, 10, 2, 0)], []);
+        var data = Data(trade) with
+        {
+            PositionSamples = new Dictionary<long, IReadOnlyList<PositionPnlSample>> { [1] = [initial, later] },
+            DailyMarketData = [history],
+        };
+
+        var report = Analyze(data);
+
+        Assert.Contains("SL 95 / TP 110", report.Trades[0].Protection);
+        Assert.Contains("SL/TP 变更 1 次", report.Markdown);
+        Assert.Contains("实际持仓记录", report.Markdown);
+        Assert.Contains("20 USD", report.Markdown);
+        Assert.Contains("当日 M5 原始行情", report.Markdown);
+        Assert.Contains("局部采样不能代表全程极值", report.Markdown);
+        Assert.DoesNotContain("计划执行", report.Markdown);
+    }
+
     private const string Account = "Broker|1";
     private static readonly DateOnly Date = new(2026, 9, 25);
     private static readonly DateTimeOffset At = new(2026, 9, 25, 10, 0, 0, TimeSpan.Zero);
@@ -148,8 +176,9 @@ public sealed class DailyReportAnalyzerTests
         Assert.Equal(doc.NextAction, report.Trades[0].NextAction);
         Assert.Contains("我的下一步\\|先核对<br>再记录", report.Markdown);
         Assert.Contains("历史数据缺口", report.Markdown);
-        Assert.Contains("计划外交易 1 笔", report.Markdown);
-        Assert.Contains("策略 · 我的策略", report.Markdown);
+        Assert.DoesNotContain("计划外交易", report.Markdown);
+        Assert.DoesNotContain("未分类", report.Markdown);
+        Assert.Contains("SL/TP：缺少持仓采样", report.Markdown);
         Assert.DoesNotContain("1 笔待复盘", report.Markdown);
     }
 

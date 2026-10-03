@@ -6,6 +6,23 @@ public sealed record QuickReviewAnalysis(string ExitReason, string Explanation, 
 
 public static class QuickReviewAnalyzer
 {
+    public static string DescribeProtection(TradeRecord trade, IReadOnlyList<PositionPnlSample> observations)
+    {
+        var samples = observations.Where(sample => sample.TradeKey == new TradeKey(trade.AccountKey, trade.PositionId) &&
+                sample.CapturedAtUtc >= trade.OpenedAtUtc && sample.Volume > 0m && sample.AlgorithmVersion == "position-pnl-v1" &&
+                (trade.ClosedAtUtc is null || sample.CapturedAtUtc <= trade.ClosedAtUtc))
+            .OrderBy(sample => sample.CapturedAtUtc).ToArray();
+        if (samples.Length == 0) return "SL/TP：缺少持仓采样，无法还原实际设置。";
+        static string Price(decimal? price) => price is > 0m ? price.Value.ToString("0.#####", System.Globalization.CultureInfo.InvariantCulture) : "未设置";
+        var first = samples[0];
+        var last = samples[^1];
+        var initial = first.CapturedAtUtc - trade.OpenedAtUtc <= TimeSpan.FromSeconds(5);
+        var changes = samples.Zip(samples.Skip(1)).Count(pair =>
+            pair.First.StopLoss != pair.Second.StopLoss || pair.First.TakeProfit != pair.Second.TakeProfit);
+        return $"{(initial ? "开仓时" : "最早采样，非开仓时")} SL {Price(first.StopLoss)} / TP {Price(first.TakeProfit)}；" +
+            $"最后采样 SL {Price(last.StopLoss)} / TP {Price(last.TakeProfit)}；记录中 SL/TP 变更 {changes} 次。";
+    }
+
     public static QuickReviewAnalysis Analyze(TradeDetailData detail)
     {
         var trade = detail.Trade;
@@ -32,21 +49,13 @@ public static class QuickReviewAnalyzer
         if (exits.Length > 1)
             facts.Add($"共 {exits.Length} 笔退出成交；退出价判断使用最后一笔，盈亏使用整笔交易净值。");
 
+        facts.Add(DescribeProtection(trade, samples));
         var lastSample = samples.LastOrDefault();
         var recentSample = lastSample is not null && closedAt.HasValue &&
             closedAt.Value - lastSample.CapturedAtUtc <= TimeSpan.FromSeconds(5);
-        var plan = detail.Plan;
         decimal? stop = recentSample ? lastSample!.StopLoss : null;
         decimal? target = recentSample ? lastSample!.TakeProfit : null;
         var source = "平仓前持仓记录";
-        if (!recentSample)
-        {
-            source = "绑定计划";
-            stop = plan?.StopPrice;
-            target = plan?.TargetPrice;
-            if (stop is not > 0m || (trade.Side == TradeSide.Buy ? stop >= trade.EntryPrice : stop <= trade.EntryPrice)) stop = null;
-            if (target is not > 0m || (trade.Side == TradeSide.Buy ? target <= trade.EntryPrice : target >= trade.EntryPrice)) target = null;
-        }
 
         var reason = trade.NetPnl switch
         {
@@ -71,17 +80,22 @@ public static class QuickReviewAnalyzer
             facts.Add(hitStop && hitTarget
                 ? "退出依据：止损与止盈记录存在冲突，无法据此判断退出原因。"
                 : $"退出依据：最终平仓价未触及{source}的止损/止盈价，需补充主动退出的依据。");
-            improvements.Add("记录本次退出信号，核对与原定退出条件的差异。");
+            improvements.Add("记录本次实际退出信号，结合当时走势复核退出时机。");
         }
         else
         {
-            facts.Add("退出依据：缺少可用的临近平仓止损/止盈或计划价格，无法从盈亏确定实际退出原因。");
-            improvements.Add("补充本次实际退出原因和原定退出条件，便于下次对照执行。");
+            facts.Add("退出依据：缺少可用的临近平仓止损/止盈记录，无法从盈亏确定实际退出原因。");
+            improvements.Add("补充本次实际退出原因，便于结合行情回看执行。");
         }
 
         var excursion = detail.Excursion;
         var reliable = excursion is not null && excursion.AccountKey == key.AccountKey &&
             excursion.PositionId == key.PositionId && excursion.IsReliable;
+        var hasInitialRisk = excursion is not null && excursion.AccountKey == key.AccountKey &&
+            excursion.PositionId == key.PositionId && excursion.HasReliableInitialRisk;
+        facts.Add(hasInitialRisk
+            ? $"初始货币风险 {excursion!.InitialRiskAmount:0.##}；实际 R {trade.NetPnl / excursion.InitialRiskAmount:0.####}（整笔净盈亏 / 初始风险）。"
+            : "初始风险与 R：缺少开仓时有效止损及货币风险记录，不能事后补算。");
         decimal? peak = reliable ? excursion!.MaximumPnl : samples.Length > 0 ? samples.Max(sample => sample.NetPnl) : null;
         decimal? trough = reliable ? excursion!.MinimumPnl : samples.Length > 0 ? samples.Min(sample => sample.NetPnl) : null;
         if (peak.HasValue && trough.HasValue)
@@ -104,13 +118,6 @@ public static class QuickReviewAnalyzer
         else
             facts.Add("持仓过程：缺少有效盈亏采样，无法判断浮盈回吐和最大浮亏。");
 
-        facts.Add(detail.Metadata?.ComplianceStatus switch
-        {
-            PlanComplianceStatus.Matched => "计划核对：开仓匹配计划，退出是否按计划仍需确认。",
-            PlanComplianceStatus.ManualInside => "计划核对：已人工标记为计划内。",
-            PlanComplianceStatus.OutsidePlan or PlanComplianceStatus.ManualOutside => "计划核对：该交易已标记为计划外。",
-            _ => "计划核对：尚无明确的计划内/外分类。",
-        });
         foreach (var behavior in detail.Behaviors
             .Where(item => item.AccountKey == key.AccountKey && !item.EvidenceInsufficient &&
                 string.IsNullOrWhiteSpace(item.MissingData) && item.TradeLinks.Any(link => link.TradeKey == key) &&

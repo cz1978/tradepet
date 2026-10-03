@@ -131,6 +131,8 @@ public sealed class PetWindowTests
                 Assert.Equal(1, exitCount);
                 window.ContextMenu.IsOpen = false;
 
+                VerifyQuickReview(window);
+                VerifyEntryReason(window);
                 window.DisposeTrayIcon();
                 Assert.False(quickCard.IsOpen);
                 viewModel.IsBubbleVisible = false;
@@ -139,7 +141,6 @@ public sealed class PetWindowTests
                 Assert.False(timer.IsEnabled);
                 Assert.False(bubble.IsOpen);
                 VerifySetupFlow();
-                VerifyQuickReview();
                 VerifyDailyTradingReport();
                 // WPF permits one Application per test host; exercise the console on this STA thread.
                 VerifyMainWindowGuide();
@@ -180,6 +181,12 @@ public sealed class PetWindowTests
         try
         {
             console.Show();
+            Assert.Null(console.FindName("GuideStructuredForm"));
+            Assert.Null(console.FindName("GuideStructuredList"));
+            viewModel.DailyTarget = 2m;
+            viewModel.DailyTargetUnitIndex = 1;
+            Assert.Equal("2%（当日初始余额）", viewModel.DailyTargetDisplay);
+            viewModel.DailyTargetUnitIndex = 0;
             console.EnableGuideOnFirstOpen();
             console.UpdateLayout();
 
@@ -193,7 +200,7 @@ public sealed class PetWindowTests
             Assert.False(previous.IsEnabled);
             Assert.Equal(0, tabs.SelectedIndex);
 
-            foreach (var page in new[] { 1, 1, 2, 3, 4, 5 })
+            foreach (var page in new[] { 1, 2, 3, 4, 6, 5 })
             {
                 next.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
                 console.UpdateLayout();
@@ -244,18 +251,6 @@ public sealed class PetWindowTests
             Assert.Equal(100m, viewModel.DailyTarget);
             Assert.Equal(Visibility.Collapsed, validation.Visibility);
 
-            var structuredSaves = 0;
-            viewModel.CreateStructuredPlanAsync = () =>
-            {
-                structuredSaves++;
-                return Task.CompletedTask;
-            };
-            ((TextBox)console.FindName("StructuredTargetInput")).Text = "105";
-            ((Button)console.FindName("GuideSaveStructuredPlan"))
-                .RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
-            Assert.Equal(1, structuredSaves);
-            Assert.Equal("105", viewModel.NewPlanTarget);
-
             console.Hide();
             console.Show();
             console.EnableGuideOnFirstOpen();
@@ -274,13 +269,16 @@ public sealed class PetWindowTests
             var workspace = (ReviewWorkspaceView)console.FindName("ReviewWorkspace");
             var workspaceTabs = (TabControl)workspace.FindName("WorkspaceTabs");
             var statusPanel = (FrameworkElement)workspace.FindName("ReviewStatusPanel");
-            var expectedTabs = new[] { 0, 2, 3, 4 };
+            var expectedTabs = new[] { 0, 2, 3, 4, -1 };
             for (var step = 0; step < expectedTabs.Length; step++)
             {
                 console.UpdateLayout();
-                Assert.Equal(3, tabs.SelectedIndex);
-                Assert.Equal(expectedTabs[step], workspaceTabs.SelectedIndex);
-                Assert.True(statusPanel.IsVisible);
+                Assert.Equal(expectedTabs[step] < 0 ? 6 : 3, tabs.SelectedIndex);
+                if (expectedTabs[step] >= 0)
+                {
+                    Assert.Equal(expectedTabs[step], workspaceTabs.SelectedIndex);
+                    Assert.True(statusPanel.IsVisible);
+                }
                 Assert.InRange(Canvas.GetLeft(card), 0, overlay.ActualWidth - card.ActualWidth);
                 Assert.InRange(Canvas.GetTop(card), 0, overlay.ActualHeight - card.ActualHeight);
                 var target = (FrameworkElement)typeof(MainWindow).GetMethod("GetGuideTarget",
@@ -296,11 +294,18 @@ public sealed class PetWindowTests
             }
             Assert.Equal(Visibility.Collapsed, overlay.Visibility);
             Assert.Equal(1, saveCount);
+            var daily = (Button)console.FindName("ReportDailyButton");
+            var markdown = (Button)console.FindName("ReportMarkdownButton");
+            Assert.True(daily.IsVisible);
+            Assert.True(markdown.IsVisible);
+            Assert.Same(viewModel.ShowDailyTradingReportCommand, daily.Command);
+            Assert.Same(viewModel.ReviewWorkspace.ExportMarkdownCommand, markdown.Command);
+            Assert.Null(workspace.FindName("ReviewGuideExport"));
         }
         finally { console.Close(); }
     }
 
-    private static void VerifyQuickReview()
+    private static void VerifyQuickReview(PetWindow pet)
     {
         var now = DateTimeOffset.UtcNow;
         var trade = new TradeRecord("Broker|1", 1, "TEST", TradeSide.Buy, now.AddMinutes(-10), now,
@@ -309,15 +314,35 @@ public sealed class PetWindowTests
             [new PositionPnlSample(new TradeKey("Broker|1", 1), now.AddSeconds(-1), 0, 20, 20, 1,
                 null, null, 1_000, "position-pnl-v1")], null, null, [], [], [], null,
             new ReviewDataVersion("Broker|1", 1, 1, 1, "rule-1", "time-1", now));
-        var review = new QuickReviewWindow(detail);
+        var review = new QuickReviewCard(detail);
         try
         {
-            Assert.False(review.Topmost);
-            Assert.False(review.ShowActivated);
-            review.Show();
+            var focus = System.Windows.Input.Keyboard.FocusedElement;
+            pet.ShowQuickReviewCard(review);
             review.UpdateLayout();
+            var popup = (Popup)pet.FindName("ReviewCardPopup");
+            Assert.True(popup.IsOpen);
+            Assert.Same(pet.FindName("PetSprite"), popup.PlacementTarget);
+            Assert.Equal(PlacementMode.Custom, popup.Placement);
+            Assert.Same(focus, System.Windows.Input.Keyboard.FocusedElement);
+            Assert.Null(review.FindName("PlanBox"));
             Assert.Contains("浮盈回吐", review.ExitReason);
             Assert.Contains("回吐 25", review.AnalysisSummary);
+            var attempts = 0;
+            var completed = 0;
+            review.Completed += _ => completed++;
+            review.SaveReviewAsync = _ => Task.FromResult(++attempts == 1 ? "存储失败，请重试" : (string?)null);
+            var saveButton = (Button)review.FindName("QuickSaveButton");
+            saveButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            Assert.False(review.SaveRequested);
+            Assert.True(popup.IsOpen);
+            Assert.False(review.IsCompleted);
+            Assert.Equal("存储失败，请重试", ((TextBlock)review.FindName("SaveStatusText")).Text);
+            saveButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            Assert.True(review.SaveRequested);
+            Assert.False(popup.IsOpen);
+            Assert.True(review.IsCompleted);
+            Assert.Equal(1, completed);
             Assert.False(string.IsNullOrWhiteSpace(review.Improvement));
             ((TextBox)review.FindName("ExitReasonBox")).Text = "主动退出";
             ((TextBox)review.FindName("ImproveBox")).Text = "我的修正";
@@ -325,19 +350,59 @@ public sealed class PetWindowTests
             Assert.Equal("我的修正", review.Improvement);
             Assert.Contains("回吐 25", review.AnalysisSummary);
         }
-        finally { review.Close(); }
+        finally { review.Dismiss(); }
+    }
+
+    private static void VerifyEntryReason(PetWindow pet)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var trade = new TradeRecord("Broker|1", 2, "TEST", TradeSide.Buy, now, null,
+            new(2026, 10, 3), null, 100, null, 1, 1, 0, 0, false);
+        var card = new EntryReasonCard(trade, 0);
+        // Match the runtime subscription order: it may show the next card before the pet's completion handler.
+        var next = new EntryReasonCard(trade with { PositionId = 3 }, 0);
+        card.Completed += _ => pet.ShowEntryReasonCard(next);
+        var focus = System.Windows.Input.Keyboard.FocusedElement;
+        pet.ShowEntryReasonCard(card);
+        card.UpdateLayout();
+        var popup = (Popup)pet.FindName("ReviewCardPopup");
+        Assert.True(popup.IsOpen);
+        Assert.Same(pet.FindName("PetSprite"), popup.PlacementTarget);
+        Assert.Same(focus, System.Windows.Input.Keyboard.FocusedElement);
+        var attempts = 0;
+        card.SaveReasonAsync = response =>
+        {
+            Assert.Equal("回踩入场", response.Reason);
+            return Task.FromResult(++attempts == 1 ? "失败，请重试" : (string?)null);
+        };
+        typeof(EntryReasonCard).GetMethod("Reason_Click", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(card, [new Button { Tag = "回踩入场" }, new RoutedEventArgs()]);
+        Assert.Equal("回踩入场", card.Reason);
+        var save = (Button)card.FindName("RecordReasonButton");
+        save.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        Assert.False(card.IsCompleted);
+        Assert.True(popup.IsOpen);
+        Assert.Equal("失败，请重试", ((TextBlock)card.FindName("StatusText")).Text);
+        save.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        Assert.True(card.IsCompleted);
+        Assert.True(popup.IsOpen);
+        Assert.Same(next, ((ContentControl)pet.FindName("ReviewCardHost")).Content);
+        save.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        Assert.Equal(2, attempts);
+        next.Dismiss();
+        Assert.False(popup.IsOpen);
     }
 
     private static void VerifyDailyTradingReport()
     {
         var analysis = new DailyReportAnalysis(
             [new("风险、回撤与持仓", ["采样内净值回撤 50 USD；历史未覆盖时段不补算。", "可靠初始风险覆盖 1/2 笔；缺失记录不当作零风险。"]),
-             new("下一交易日行动清单", ["补齐 #42 的入场风险与退出原因，并确认计划执行分类。"])],
+             new("下一交易日行动清单", ["补齐 #42 的入场风险与退出原因。"])],
             [new(42, "TEST", "买入", "2026-09-25 10:00:00", "2026-09-25 10:20:00", "0小时 20分 0秒",
                 "0.1", "0.2", "12 USD", "-2 USD", "10 USD", "1.2 R", "-5 USD", "20 USD", "8 USD",
-                "100% · 可靠", "计划内", "按记录中的退出条件平仓", "核对计划执行")], "## 风险分析\n\n完整事实。\n");
+                "100% · 可靠", "开仓时 SL 95 / TP 110", "按记录中的退出条件平仓", "结合走势核对退出")], "## 风险分析\n\n完整事实。\n");
         var report = new DailyTradingReport("测试账户", "USD", new(2026, 9, 25), true,
-            12, -2, 1, 1, 0, 0, 100, null, null, 1, 0, 0, 0, 1, 19, 5,
+            12, -2, 1, 1, 0, 0, 100, null, null, 1, 0, 0, 1, 19, 5,
             "# 2026-09-25 交易日报\n\n" + analysis.Markdown, Analysis: analysis);
         var window = new DailyTradingReportWindow(report);
         try
@@ -352,6 +417,8 @@ public sealed class PetWindowTests
             Assert.Single(grid.Items);
             Assert.Equal(analysis.Trades[0], grid.Items[0]);
             Assert.Equal(report.Markdown, ((TextBox)window.FindName("FullReportText")).Text);
+            Assert.Null(window.FindName("PlanText"));
+            Assert.Contains("全程采样可靠", ((TextBlock)window.FindName("ProcessText")).Text);
             Assert.Equal("19 条风险提醒，其中冷静期触发 5 条（不含正常检查）",
                 ((TextBlock)window.FindName("BehaviorText")).Text);
             var tabs = (TabControl)window.FindName("ReportTabs");

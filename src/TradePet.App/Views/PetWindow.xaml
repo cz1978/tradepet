@@ -85,6 +85,10 @@
             <MenuItem Header="亏损区域" Command="{Binding ShowLossZonesPageCommand}" />
             <MenuItem Header="复盘分析" Command="{Binding ShowReviewPageCommand}" />
             <MenuItem Header="快速复盘" Command="{Binding ShowQuickReviewCommand}" />
+            <MenuItem Header="快速入场原因" Command="{Binding ShowEntryReasonCommand}" />
+            <MenuItem Header="打开新版发布页" Command="{Binding OpenReleasePageCommand}">
+                <MenuItem.Style><Style TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding UpdateAvailable}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></MenuItem.Style>
+            </MenuItem>
             <MenuItem Header="时间线" Command="{Binding ShowTimelinePageCommand}" />
             <MenuItem Header="设置" Command="{Binding ShowSettingsPageCommand}" />
             <Separator />
@@ -257,7 +261,7 @@
 
                     <Grid Grid.Row="6" Margin="0,9,0,0">
                         <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
-                        <Button Grid.Column="0" Content="今日计划" Click="OpenPlan_Click" Margin="0,0,5,0" Padding="8,6" />
+                        <Button Grid.Column="0" Content="快速复盘" Click="OpenQuickReview_Click" Margin="0,0,5,0" Padding="8,6" />
                         <Button Grid.Column="1" Content="打开控制台" Click="OpenConsole_Click" Margin="5,0,0,0" Padding="8,6" />
                     </Grid>
                 </Grid>
@@ -266,6 +270,13 @@
                   Width="13" Height="16" Stretch="Fill" HorizontalAlignment="Right"
                   VerticalAlignment="Bottom" Margin="0,0,0,54" />
         </Grid>
+        </primitives:Popup>
+
+        <primitives:Popup x:Name="ReviewCardPopup" Placement="Custom" CustomPopupPlacementCallback="PlaceQuickCard"
+                          AllowsTransparency="True" PopupAnimation="Fade" StaysOpen="True" Focusable="False">
+            <Border Background="#121923" BorderBrush="#2B3746" BorderThickness="1" CornerRadius="12" Margin="8">
+                <ContentControl x:Name="ReviewCardHost" />
+            </Border>
         </primitives:Popup>
 
         <primitives:Popup x:Name="SpeechBubblePopup"

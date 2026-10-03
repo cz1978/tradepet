@@ -161,6 +161,35 @@ public sealed class ReviewPackageWriter : IReviewPackageWriter
     private const long MaximumGeneratedEntryBytes = 128L * 1024 * 1024;
     private const long MaximumPackageBytes = 512L * 1024 * 1024;
 
+    public async Task<string> WriteMarkdownAsync(
+        ReviewExportPackage package,
+        string? outputDirectory = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(package);
+        var entry = package.Entries.Single(item => item.Path == "review.md");
+        if (entry.SourcePath is not null || entry.Content.LongLength > MaximumGeneratedEntryBytes)
+        {
+            throw new InvalidDataException("Markdown 报告内容无效或超过大小上限。");
+        }
+        var directory = Path.GetFullPath(outputDirectory ?? TradePetPaths.GetExportDirectory());
+        Directory.CreateDirectory(directory);
+        var destination = Path.Combine(directory, Path.ChangeExtension(Path.GetFileName(package.FileName), ".md"));
+        var temp = destination + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await File.WriteAllBytesAsync(temp, entry.Content, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            File.Move(temp, destination, overwrite: false);
+            return destination;
+        }
+        finally
+        {
+            if (File.Exists(temp)) File.Delete(temp);
+        }
+    }
+
     public async Task<string> WriteAsync(
         ReviewExportPackage package,
         string? outputDirectory = null,

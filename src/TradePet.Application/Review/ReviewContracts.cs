@@ -68,7 +68,9 @@ public sealed record ReviewWorkspaceData(
     IReadOnlyDictionary<DateOnly, DailyState>? DailyStates = null,
     IReadOnlyList<EquitySample>? EquitySamples = null,
     IReadOnlyList<AccountCashFlow>? CashFlows = null,
-    IReadOnlyList<TradingSessionDefinition>? TradingSessions = null);
+    IReadOnlyList<TradingSessionDefinition>? TradingSessions = null,
+    IReadOnlyList<MarketHistoryResult>? DailyMarketData = null,
+    IReadOnlyDictionary<long, IReadOnlyList<PositionPnlSample>>? PositionSamples = null);
 
 public sealed record TradeDetailData(
     TradeRecord Trade,
@@ -83,10 +85,22 @@ public sealed record TradeDetailData(
     IReadOnlyList<BehaviorOccurrence> Behaviors,
     IReadOnlyList<ReviewAttachment> Attachments,
     TradeCampaign? Campaign,
-    ReviewDataVersion Version);
+    ReviewDataVersion Version,
+    TradeEntryReasonNote? EntryReasonNote = null);
+
+public sealed record TradeEntryReasonNote(TradeKey TradeKey, string Reason, DateTimeOffset RecordedAtUtc)
+{
+    public static string Scope(string accountKey) => "account:" + accountKey;
+    public static string SettingKey(long positionId) => "trade-entry-reason:" + positionId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+}
+
+public sealed record SavedTradeReviewData(TradeRecord Trade, TradeReviewDocument Document);
 
 public interface IReviewWorkspaceRepository
 {
+    Task<IReadOnlyList<SavedTradeReviewData>> LoadSavedTradeReviewsAsync(
+        string accountKey, CancellationToken cancellationToken = default);
+
     Task<ReviewDataVersion> LoadReviewDataVersionAsync(
         string accountKey,
         CancellationToken cancellationToken = default);
@@ -267,6 +281,11 @@ public sealed record ReviewExportPackage(string FileName, string SnapshotToken, 
 
 public interface IReviewPackageWriter
 {
+    Task<string> WriteMarkdownAsync(
+        ReviewExportPackage package,
+        string? outputDirectory = null,
+        CancellationToken cancellationToken = default);
+
     Task<string> WriteAsync(
         ReviewExportPackage package,
         string? outputDirectory = null,
