@@ -119,7 +119,7 @@ public partial class PetWindow : Window
         _trayIcon = new Forms.NotifyIcon
         {
             Icon = _trayIconImage,
-            Text = "天禄交易助手",
+            Text = TradePet.Core.Localization.UiText.Translate("天禄交易助手"),
             Visible = true,
         };
         _trayIcon.DoubleClick += (_, _) => Dispatcher.Invoke(() =>
@@ -157,6 +157,8 @@ public partial class PetWindow : Window
         _trayMenu.Items.Add(new Forms.ToolStripSeparator());
         _trayMenu.Items.Add("关闭鼠标穿透", null, (_, _) => Dispatcher.Invoke(() => _viewModel.IsMouseThrough = false));
         _trayMenu.Items.Add("退出天禄交易助手", null, (_, _) => Dispatcher.Invoke(() => _viewModel.ExitCommand.Execute(null)));
+        foreach (Forms.ToolStripItem item in _trayMenu.Items)
+            item.Text = TradePet.Core.Localization.UiText.Translate(item.Text);
         _trayIcon.ContextMenuStrip = _trayMenu;
     }
 

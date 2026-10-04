@@ -173,6 +173,16 @@ public sealed class PetWindowTests
         try
         {
             var vm = new MainViewModel();
+            var englishPet = new PetWindow(vm);
+            try
+            {
+                var menu = (System.Windows.Forms.ContextMenuStrip)typeof(PetWindow).GetField("_trayMenu", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(englishPet)!;
+                Assert.All(menu.Items.OfType<System.Windows.Forms.ToolStripMenuItem>(), item =>
+                    Assert.DoesNotContain(item.Text ?? string.Empty, c => c is >= '\u3400' and <= '\u9fff'));
+                var tray = (System.Windows.Forms.NotifyIcon)typeof(PetWindow).GetField("_trayIcon", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(englishPet)!;
+                Assert.DoesNotContain(tray.Text, c => c is >= '\u3400' and <= '\u9fff');
+            }
+            finally { englishPet.DisposeTrayIcon(); englishPet.Close(); }
             Assert.All(vm.ReviewWorkspace.PlaybookRuleDrafts, rule => Assert.DoesNotContain(rule.Name, c => c is >= '\u3400' and <= '\u9fff'));
             vm.ReviewWorkspace.PlaybookRules = "Entry|Check entry|Keep evidence|Critical";
             Assert.True(Assert.Single(vm.ReviewWorkspace.PlaybookRuleDrafts).IsCritical);
