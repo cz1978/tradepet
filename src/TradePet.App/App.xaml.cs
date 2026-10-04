@@ -115,6 +115,12 @@ public partial class App : System.Windows.Application
         await _runtime.StartAsync();
         if (viewModel.NeedsSetup) viewModel.ShowSetup();
         else _mainWindow.EnableGuideOnFirstOpen();
+        if (e.Args.Contains("--review", StringComparer.OrdinalIgnoreCase))
+        {
+            _mainWindow.ShowPage(3);
+            _mainWindow.Show();
+            _mainWindow.Activate();
+        }
     }
 
     private void ToggleGlobalVisibility()

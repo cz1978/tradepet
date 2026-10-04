@@ -4,6 +4,7 @@ using Microsoft.Data.Sqlite;
 using TradePet.Application.Review;
 using TradePet.Core.Domain;
 using TradePet.Core.Protocol;
+using TradePet.Core.Review;
 
 namespace TradePet.Infrastructure.Persistence;
 
@@ -12,6 +13,49 @@ public sealed partial class AppDatabase
     private const int MaximumCachedBarsPerAccount = 250_000;
     private const int MaximumCachedTicksPerAccount = 500_000;
     private const int MaximumMarketRangesPerAccount = 2_000;
+
+    private async Task RepairLegacyQuickReviewsAsync(CancellationToken cancellationToken)
+    {
+        var candidates = new List<TradeReviewDocument>();
+        await using (var connection = await OpenConnectionAsync(cancellationToken))
+        await using (var command = connection.CreateCommand())
+        {
+            command.CommandText = "SELECT payload_json FROM trade_review_documents WHERE status='Draft' AND revision=1;";
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                var document = JsonSerializer.Deserialize<TradeReviewDocument>(reader.GetString(0), ProtocolJson.Options);
+                if (document is null || document.IsQuickReview || document.ReviewedAtUtc is not null ||
+                    document.CreatedAtUtc != document.UpdatedAtUtc || string.IsNullOrWhiteSpace(document.ExitReason) ||
+                    document.ToImprove != document.NextAction || !string.IsNullOrEmpty(document.Emotion) ||
+                    !string.IsNullOrEmpty(document.MarketCondition)) continue;
+
+                // These signatures come from the old quick-review Save handlers, not ordinary editor drafts.
+                var firstLine = document.Summary.Split('\n')[0].TrimEnd('\r');
+                var oldQuickReview = firstLine is "是否按计划：是" or "是否按计划：否" or "是否按计划：不确定";
+                var generatedQuickReview = document.Summary.StartsWith("交易概况：", StringComparison.Ordinal);
+                if ((oldQuickReview && (string.IsNullOrEmpty(document.DidWell) || document.DidWell == firstLine)) ||
+                    (generatedQuickReview && string.IsNullOrEmpty(document.DidWell))) candidates.Add(document);
+            }
+        }
+        var calculator = new ReviewWorkspaceCalculator();
+        foreach (var document in candidates)
+        {
+            var detail = await LoadTradeDetailAsync(document.TradeKey, cancellationToken);
+            if (detail is null || !detail.Trade.IsComplete || detail.Document?.Revision != document.Revision) continue;
+            var basis = calculator.BuildTradeReviewBasis(detail.Trade, detail.Deals, detail.Assessments, detail.Excursion);
+            await SaveTradeReviewDocumentAsync(document with
+            {
+                Status = ReviewCompletionStatus.Reviewed,
+                IsQuickReview = true,
+                SourceVersion = basis.SourceVersion,
+                RuleVersion = basis.RuleVersion,
+                ReviewedSourceVersion = basis.SourceVersion,
+                ReviewedRuleVersion = basis.RuleVersion,
+                ReviewedAtUtc = document.UpdatedAtUtc,
+            }, document.Revision, cancellationToken);
+        }
+    }
 
     public async Task<ReviewDataVersion> LoadReviewDataVersionAsync(
         string accountKey,

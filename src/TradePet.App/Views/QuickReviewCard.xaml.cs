@@ -15,12 +15,14 @@ public partial class QuickReviewCard : System.Windows.Controls.UserControl
         var trade = detail.Trade;
         TradeText.Text = $"{trade.Symbol} · {trade.NetPnl:+0.##;-0.##;0} · {trade.ClosedAtUtc?.ToOffset(TimeSpan.FromSeconds(serverUtcOffsetSeconds)):yyyy-MM-dd HH:mm} 服务器";
         var analysis = QuickReviewAnalyzer.Analyze(detail);
-        ExitReasonBox.Text = analysis.ExitReason;
-        AnalysisText.Text = analysis.Explanation;
-        ImproveBox.Text = analysis.Improvement;
+        DocumentRevision = detail.Document?.Revision ?? 0;
+        ExitReasonBox.Text = detail.Document?.ExitReason ?? analysis.ExitReason;
+        AnalysisText.Text = detail.Document?.Summary ?? analysis.Explanation;
+        ImproveBox.Text = detail.Document?.ToImprove ?? analysis.Improvement;
     }
 
     public bool SaveRequested { get; private set; }
+    public int DocumentRevision { get; }
     public bool RemindLater { get; private set; }
     public bool IsCompleted => _completed;
     public event Action<QuickReviewCard>? Completed;

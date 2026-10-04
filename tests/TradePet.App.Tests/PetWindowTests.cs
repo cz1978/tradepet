@@ -1,4 +1,6 @@
 using System.Reflection;
+using System.Diagnostics;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -144,6 +146,7 @@ public sealed class PetWindowTests
                 VerifyDailyTradingReport();
                 // WPF permits one Application per test host; exercise the console on this STA thread.
                 VerifyMainWindowGuide();
+                ReviewDashboardTests.VerifyView();
             }
             catch (Exception exception)
             {
@@ -301,8 +304,55 @@ public sealed class PetWindowTests
             Assert.Same(viewModel.ShowDailyTradingReportCommand, daily.Command);
             Assert.Same(viewModel.ReviewWorkspace.ExportMarkdownCommand, markdown.Command);
             Assert.Null(workspace.FindName("ReviewGuideExport"));
+            VerifyAllConsolePageBindings(console);
         }
         finally { console.Close(); }
+    }
+
+    private static void VerifyAllConsolePageBindings(MainWindow console)
+    {
+        var log = new StringWriter();
+        var listener = new TextWriterTraceListener(log);
+        PresentationTraceSources.DataBindingSource.Listeners.Add(listener);
+        var count = 0;
+        try
+        {
+            for (var page = 0; page < 7; page++)
+            {
+                console.ShowPage(page);
+                console.UpdateLayout();
+                foreach (var button in Buttons(console))
+                {
+                    if (System.Windows.Data.BindingOperations.GetBindingExpressionBase(button, Button.CommandProperty) is null) continue;
+                    Assert.True(button.Command is not null, $"Unbound action on page {page}: {button.Content}");
+                    count++;
+                }
+            }
+            Assert.True(count >= 30, $"Insufficient console action coverage: {count}");
+            Assert.DoesNotContain("Error:", log.ToString(), StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            PresentationTraceSources.DataBindingSource.Listeners.Remove(listener);
+            listener.Dispose();
+        }
+
+        static IEnumerable<Button> Buttons(DependencyObject parent)
+        {
+            var pending = new Stack<DependencyObject>();
+            var seen = new HashSet<DependencyObject>();
+            pending.Push(parent);
+            while (pending.TryPop(out var current))
+            {
+                if (!seen.Add(current)) continue;
+                if (current is Button button) yield return button;
+                foreach (var child in LogicalTreeHelper.GetChildren(current))
+                    if (child is DependencyObject dependency) pending.Push(dependency);
+                if (current is not System.Windows.Media.Visual) continue;
+                for (var index = 0; index < System.Windows.Media.VisualTreeHelper.GetChildrenCount(current); index++)
+                    pending.Push(System.Windows.Media.VisualTreeHelper.GetChild(current, index));
+            }
+        }
     }
 
     private static void VerifyQuickReview(PetWindow pet)
@@ -315,6 +365,14 @@ public sealed class PetWindowTests
                 null, null, 1_000, "position-pnl-v1")], null, null, [], [], [], null,
             new ReviewDataVersion("Broker|1", 1, 1, 1, "rule-1", "time-1", now));
         var review = new QuickReviewCard(detail);
+        var existing = new TradeReviewDocument(new("Broker|1", 1), ReviewCompletionStatus.Reviewed,
+            "入场记录", "保存过的平仓原因", "", "保存过的改进", "下一步", "保存过的总结", "", "",
+            3, "source", "rule", "source", "rule", now, now, now, IsQuickReview: true);
+        var reopenedCard = new QuickReviewCard(detail with { Document = existing });
+        Assert.Equal(3, reopenedCard.DocumentRevision);
+        Assert.Equal(existing.ExitReason, reopenedCard.ExitReason);
+        Assert.Equal(existing.ToImprove, reopenedCard.Improvement);
+        Assert.Equal(existing.Summary, reopenedCard.AnalysisSummary);
         try
         {
             var focus = System.Windows.Input.Keyboard.FocusedElement;

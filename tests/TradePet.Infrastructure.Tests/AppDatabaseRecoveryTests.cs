@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using TradePet.Application.Review;
 using TradePet.Core.Domain;
 using TradePet.Infrastructure.Persistence;
 using Xunit;
@@ -9,6 +10,58 @@ public sealed class AppDatabaseRecoveryTests : IDisposable
 {
     private readonly string _testDirectory = Path.Combine(
         Path.GetTempPath(), "TradePetRecoveryTests", Guid.NewGuid().ToString("N"));
+
+    [Fact]
+    public async Task LegacyQuickReviews_AreCompletedOnRestartWithoutChangingContentOrManualDrafts()
+    {
+        var path = Path.Combine(_testDirectory, "quick-review.db");
+        var database = new AppDatabase(path);
+        await database.InitializeAsync();
+        var at = new DateTimeOffset(2026, 9, 20, 10, 0, 0, TimeSpan.Zero);
+        var date = new DateOnly(2026, 9, 20);
+        var scope = new AccountScope("Broker", 1001);
+        await database.UpsertAccountAsync(new AccountSnapshot(scope, "USD", 1000, 1000, 0, 2, at));
+        var originals = new Dictionary<long, TradeReviewDocument>();
+        foreach (var id in new[] { 1L, 2L, 3L })
+        {
+            await database.UpsertTradeAsync(new TradeRecord(scope.AccountKey, id, "TEST", TradeSide.Buy,
+                at, at.AddMinutes(1), date, date, 100, 101, 1, 1, 0, 1, true));
+            var summary = id == 1 ? "是否按计划：不确定" : id == 3 ? "交易概况：净盈亏 +1" : "未完成的人工复盘";
+            var document = new TradeReviewDocument(new(scope.AccountKey, id), ReviewCompletionStatus.Draft,
+                "", "主动平仓", "", "", "", summary, "", "", 1, "old-source", "old-rule", null, null, at, at);
+            originals[id] = (await database.SaveTradeReviewDocumentAsync(document, 0)).Value!;
+        }
+        var reopened = new AppDatabase(path);
+        await reopened.InitializeAsync();
+        await reopened.InitializeAsync();
+        foreach (var id in new[] { 1L, 2L, 3L })
+        {
+            var saved = (await reopened.LoadTradeDetailAsync(new(scope.AccountKey, id)))!.Document!;
+            Assert.Equal(originals[id].Summary, saved.Summary);
+            Assert.Equal(originals[id].ExitReason, saved.ExitReason);
+            Assert.Equal(originals[id].NextAction, saved.NextAction);
+            Assert.Equal(id == 2 ? ReviewCompletionStatus.Draft : ReviewCompletionStatus.Reviewed, saved.Status);
+            Assert.Equal(id == 2 ? 1 : 2, saved.Revision);
+            Assert.Equal(id != 2, saved.IsQuickReview);
+            if (id != 2) Assert.StartsWith("trade-v1:", saved.ReviewedSourceVersion);
+        }
+        await reopened.UpsertTradeAsync(new TradeRecord(scope.AccountKey, 4, "TEST", TradeSide.Buy,
+            at, at.AddMinutes(1), date, date, 100, 101, 1, 1, 0, 1, true));
+        var quickSaved = await new JournalService(reopened).SaveTradeReviewAsync(
+            new SaveTradeReviewCommand(new(scope.AccountKey, 4), "", "确认平仓原因", "", "", "", "快速复盘已确认",
+                "", "", "source", "rule", ReviewCompletionStatus.Reviewed, IsQuickReview: true), 0);
+        Assert.True(quickSaved.IsSaved);
+        var freshRepository = new AppDatabase(path);
+        var query = await new ReviewQueryService(freshRepository).QueryAsync(
+            new ReviewQueryContext("quick-review-roundtrip", 1, scope.AccountKey),
+            new ReviewWorkspaceFilter(scope.AccountKey, date, date), () => 1);
+        Assert.True(query.IsCurrentSession);
+        var facts = query.Snapshot.DailyFacts![date];
+        Assert.Equal(4, facts.CompleteTradeCount);
+        Assert.Equal(3, facts.ReviewedTradeCount);
+        Assert.Equal(75m, facts.ReviewCompletionPercentage);
+        Assert.True(query.Data.Documents[4].IsQuickReview);
+    }
 
     [Fact]
     public async Task HealthyDatabase_IsNotArchived_AndPersistsAcrossInstances()

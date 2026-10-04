@@ -258,15 +258,26 @@ public sealed class JournalService
 
         var existing = detail.Document;
         var now = _timeProvider.GetUtcNow();
-        var status = command.RequestedStatus == ReviewCompletionStatus.Reviewed
+        if (command.IsQuickReview && (string.IsNullOrWhiteSpace(command.ExitReason) ||
+                                      string.IsNullOrWhiteSpace(command.Summary)))
+        {
+            return ReviewSaveResult<TradeReviewDocument>.Validation("请确认平仓原因后保存快速复盘。");
+        }
+        var basis = command.IsQuickReview
+            ? new ReviewWorkspaceCalculator().BuildTradeReviewBasis(
+                detail.Trade, detail.Deals, detail.Assessments, detail.Excursion)
+            : null;
+        var status = command.IsQuickReview ? ReviewCompletionStatus.Reviewed
+            : command.RequestedStatus == ReviewCompletionStatus.Reviewed
             ? ReviewCompletionStatus.Draft
             : command.RequestedStatus;
         var document = new TradeReviewDocument(
             command.TradeKey, status, command.EntryReason, command.ExitReason, command.DidWell,
             command.ToImprove, command.NextAction, command.Summary, command.Emotion, command.MarketCondition,
-            expectedRevision + 1, command.SourceVersion, command.RuleVersion,
-            existing?.ReviewedSourceVersion, existing?.ReviewedRuleVersion,
-            existing?.CreatedAtUtc ?? now, now, existing?.ReviewedAtUtc).Normalize();
+            expectedRevision + 1, basis?.SourceVersion ?? command.SourceVersion, basis?.RuleVersion ?? command.RuleVersion,
+            basis?.SourceVersion ?? existing?.ReviewedSourceVersion, basis?.RuleVersion ?? existing?.ReviewedRuleVersion,
+            existing?.CreatedAtUtc ?? now, now, command.IsQuickReview ? now : existing?.ReviewedAtUtc,
+            command.IsQuickReview || existing?.IsQuickReview == true).Normalize();
         return await _repository.SaveTradeReviewDocumentAsync(document, expectedRevision, cancellationToken);
     }
 

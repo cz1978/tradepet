@@ -176,6 +176,49 @@ public sealed class ReviewWorkspaceCalculatorTests
     }
 
     [Fact]
+    public void DailyFacts_LossStreakOpeningsResetAfterProfitAndBreakevenAndCountEachOpeningOnce()
+    {
+        var date = new DateOnly(2026, 9, 1);
+        var pnls = new[] { -1m, -1m, 1m, -1m, -1m, -1m, 0m, -1m };
+        var trades = pnls.Select((pnl, index) => Trade(index + 1, "TEST", pnl) with
+        {
+            OpenedAtUtc = Start.AddMinutes(index * 2), ClosedAtUtc = Start.AddMinutes(index * 2 + 1),
+            OpenServerDate = date, CloseServerDate = date,
+        }).ToArray();
+        var state = new DailyState("Broker|1", date, 0m, 0m, 0m, 0m, 8, 8, 0, 0, 1m, false, false, false)
+            { ConsecutiveLossThresholdAtObservation = 2 };
+        var facts = _calculator.BuildDailyFacts("Broker|1", date, date, trades, [],
+            new Dictionary<long, TradeReviewDocument>(), [], new Dictionary<DateOnly, DailyState> { [date] = state }, 0)[date];
+        Assert.Equal(3, facts.OpeningsAfterLossStreakCount);
+
+        var noThresholdReached = _calculator.BuildDailyFacts("Broker|1", date, date, trades, [],
+            new Dictionary<long, TradeReviewDocument>(), [],
+            new Dictionary<DateOnly, DailyState> { [date] = state with { ConsecutiveLossThresholdAtObservation = 10 } }, 0)[date];
+        Assert.Equal(0, noThresholdReached.OpeningsAfterLossStreakCount);
+        var missingThreshold = _calculator.BuildDailyFacts("Broker|1", date, date, trades, [],
+            new Dictionary<long, TradeReviewDocument>(), [], new Dictionary<DateOnly, DailyState>(), 0)[date];
+        Assert.Null(missingThreshold.OpeningsAfterLossStreakCount);
+    }
+
+    [Fact]
+    public void DailyFacts_LossStreakProcessesSameTimeTradeOrderWithoutUsingAnOpeningsOwnClose()
+    {
+        var date = new DateOnly(2026, 9, 1);
+        var trades = new[]
+        {
+            Trade(1, "TEST", -1m) with { OpenedAtUtc = Start, ClosedAtUtc = Start.AddMinutes(1) },
+            Trade(2, "TEST", -1m) with { OpenedAtUtc = Start.AddMinutes(1), ClosedAtUtc = Start.AddMinutes(2) },
+            Trade(3, "TEST", 1m) with { OpenedAtUtc = Start.AddMinutes(2), ClosedAtUtc = Start.AddMinutes(2) },
+            Trade(4, "TEST", -1m) with { OpenedAtUtc = Start.AddMinutes(2), ClosedAtUtc = Start.AddMinutes(3) },
+        };
+        var state = new DailyState("Broker|1", date, 0m, 0m, 0m, 0m, 4, 4, 0, 0, 1m, false, false, false)
+            { ConsecutiveLossThresholdAtObservation = 2 };
+        var facts = _calculator.BuildDailyFacts("Broker|1", date, date, trades, [],
+            new Dictionary<long, TradeReviewDocument>(), [], new Dictionary<DateOnly, DailyState> { [date] = state }, 0)[date];
+        Assert.Equal(1, facts.OpeningsAfterLossStreakCount);
+    }
+
+    [Fact]
     public void Analysis_SeparatesRawFeesUnallocatedCostsDailyCashAndMissingRiskPoints()
     {
         var date = new DateOnly(2026, 9, 1);

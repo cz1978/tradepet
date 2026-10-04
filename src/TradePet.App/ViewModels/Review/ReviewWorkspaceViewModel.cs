@@ -11,7 +11,7 @@ using TradePet.Core.Domain;
 
 namespace TradePet.App.ViewModels.Review;
 
-public sealed class ReviewWorkspaceViewModel : ObservableObject
+public sealed partial class ReviewWorkspaceViewModel : ObservableObject
 {
     public int ServerUtcOffsetSeconds { get; set; }
     private DateTimeOffset BrokerTime(DateTimeOffset value) => value.ToOffset(TimeSpan.FromSeconds(ServerUtcOffsetSeconds));
@@ -159,6 +159,7 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
         _scheduler = scheduler ?? new SystemAsyncScheduler();
         var clock = timeProvider ?? TimeProvider.System;
         _dailyDate = DateOnly.FromDateTime(clock.GetLocalNow().DateTime).ToString("yyyy-MM-dd");
+        InitializePlaybookRuleEditor();
         RefreshCommand = Command(async () =>
         {
             Page = 1;
@@ -411,7 +412,7 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
     public string Emotion { get => _emotion; set => SetReviewField(ref _emotion, value); }
     public string MarketCondition { get => _marketCondition; set => SetReviewField(ref _marketCondition, value); }
 
-    public string DailyDate { get => _dailyDate; set => SetProperty(ref _dailyDate, value); }
+    public string DailyDate { get => _dailyDate; set { if (SetProperty(ref _dailyDate, value)) UpdateCalendarSelection(); } }
     public string PreMarketPlan { get => _preMarketPlan; set => SetEditorField(ref _preMarketPlan, value, EditEntityKind.DailyJournal); }
     public string IntradayNotes { get => _intradayNotes; set => SetEditorField(ref _intradayNotes, value, EditEntityKind.DailyJournal); }
     public string PostMarketSummary { get => _postMarketSummary; set => SetEditorField(ref _postMarketSummary, value, EditEntityKind.DailyJournal); }
@@ -424,7 +425,7 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
     public string PlaybookSymbols { get => _playbookSymbols; set => SetProperty(ref _playbookSymbols, value); }
     public string PlaybookConditions { get => _playbookConditions; set => SetProperty(ref _playbookConditions, value); }
     public string PlaybookInvalidWhen { get => _playbookInvalidWhen; set => SetProperty(ref _playbookInvalidWhen, value); }
-    public string PlaybookRules { get => _playbookRules; set => SetProperty(ref _playbookRules, value); }
+    public string PlaybookRules { get => _playbookRules; set { if (SetProperty(ref _playbookRules, value) && !_updatingRuleDrafts) ReloadPlaybookRuleDrafts(); } }
     public string CampaignName { get => _campaignName; set => SetProperty(ref _campaignName, value); }
     public string CampaignThesis { get => _campaignThesis; set => SetProperty(ref _campaignThesis, value); }
     public string CampaignMembers { get => _campaignMembers; set => SetProperty(ref _campaignMembers, value); }
@@ -440,13 +441,13 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
     public string OpportunityKind { get => _opportunityKind; set => SetEditorField(ref _opportunityKind, value, EditEntityKind.Opportunity); }
     public string OpportunitySymbol { get => _opportunitySymbol; set => SetEditorField(ref _opportunitySymbol, value, EditEntityKind.Opportunity); }
     public string OpportunitySide { get => _opportunitySide; set => SetEditorField(ref _opportunitySide, value, EditEntityKind.Opportunity); }
-    public string OpportunityPlaybook { get => _opportunityPlaybook; set => SetEditorField(ref _opportunityPlaybook, value, EditEntityKind.Opportunity); }
+    public string OpportunityPlaybook { get => _opportunityPlaybook; set { SetEditorField(ref _opportunityPlaybook, value, EditEntityKind.Opportunity); RaisePropertyChanged(nameof(OpportunityPlaybookLabel)); } }
     public string OpportunityEntry { get => _opportunityEntry; set => SetEditorField(ref _opportunityEntry, value, EditEntityKind.Opportunity); }
     public string OpportunityStop { get => _opportunityStop; set => SetEditorField(ref _opportunityStop, value, EditEntityKind.Opportunity); }
     public string OpportunityTarget { get => _opportunityTarget; set => SetEditorField(ref _opportunityTarget, value, EditEntityKind.Opportunity); }
     public string OpportunityReason { get => _opportunityReason; set => SetEditorField(ref _opportunityReason, value, EditEntityKind.Opportunity); }
     public string OpportunityConditions { get => _opportunityConditions; set => SetEditorField(ref _opportunityConditions, value, EditEntityKind.Opportunity); }
-    public string OpportunityLinkedTrade { get => _opportunityLinkedTrade; set => SetEditorField(ref _opportunityLinkedTrade, value, EditEntityKind.Opportunity); }
+    public string OpportunityLinkedTrade { get => _opportunityLinkedTrade; set { SetEditorField(ref _opportunityLinkedTrade, value, EditEntityKind.Opportunity); RaisePropertyChanged(nameof(OpportunityLinkedTradeLabel)); } }
     public string OpportunityNotes { get => _opportunityNotes; set => SetEditorField(ref _opportunityNotes, value, EditEntityKind.Opportunity); }
     public string? OpportunityId { get => _opportunityId; private set => SetProperty(ref _opportunityId, value); }
     public int OpportunityRevision { get => _opportunityRevision; private set => SetProperty(ref _opportunityRevision, value); }
@@ -530,19 +531,8 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
         _workspaceSessionGeneration = sessionGeneration;
         _periodFactsSnapshot = snapshot.PeriodFacts;
         _periodComparisonSnapshot = snapshot.PeriodComparison;
-        Metrics.Clear();
-        var performance = snapshot.Analytics.Performance;
-        Metrics.Add(new("净盈亏", Signed(performance.NetPnl), "完整交易，含费用", FinancialPalette.For(performance.NetPnl)));
-        Metrics.Add(new("胜率", $"{performance.WinRate:0.##}%", $"{performance.WinCount} 盈 / {performance.LossCount} 亏"));
-        Metrics.Add(new("盈亏因子", performance.ProfitFactor?.ToString("0.##") ?? "无亏损样本", "总盈利 ÷ 总亏损绝对值"));
-        Metrics.Add(new("期望值", Signed(performance.Expectancy), "每笔完整交易平均", FinancialPalette.For(performance.Expectancy)));
-        Metrics.Add(new("利润峰值回吐", $"{performance.MaximumDrawdown:0.##}{(performance.MaximumDrawdownPercentage is null ? "" : $" / {performance.MaximumDrawdownPercentage:0.##}%")}", "按累计已实现利润峰值计算"));
-        Metrics.Add(new("平均持仓", FormatDuration(performance.AverageHoldingTime), "首次入场到最终平仓"));
-        Metrics.Add(new("初始风险覆盖", $"{snapshot.DataQuality.InitialRiskCoveragePercentage:0.##}%", "可靠开仓风险证据"));
-        Metrics.Add(new("过程采样覆盖", $"{snapshot.DataQuality.ExcursionCoveragePercentage:0.##}%", "与 R 覆盖分开"));
+        ApplyDashboard(snapshot, data);
         var feeSummary = snapshot.Fees ?? new ReviewFeeSummary(0, 0m, 0m, 0m, 0, 0m, []);
-        Metrics.Add(new("费用合计", Signed(feeSummary.GrandTotal), "当前筛选交易费用；未分配费用单列",
-            FinancialPalette.For(feeSummary.GrandTotal)));
         FeeBreakdown.ReplaceWith([
             new FeeBreakdownRow("Commission", Signed(feeSummary.Commission), $"{feeSummary.AllocatedDealCount} 笔已分配成交"),
             new FeeBreakdownRow("Swap", Signed(feeSummary.Swap), "保留返还或扣费的原始符号"),
@@ -601,6 +591,7 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
                 new AsyncRelayCommand(() => OpenDailyOrApplyAsync(
                     day.ServerDate, journal, facts, facts?.SourceVersion ?? string.Empty))));
         }
+        ApplyCalendar(snapshot, data);
 
         Trades.Clear();
         foreach (var trade in snapshot.Trades)
@@ -710,7 +701,8 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
                         "行为规则未命中样本", behaviorEvidence.UnhitSample.Trades, data))),
             ]);
         Playbooks.ReplaceWith(data.Playbooks.OrderByDescending(item => item.Version).Select(item =>
-            new PlaybookRow(item.Name, $"v{item.Version}", item.Rules.Count, item.IsActive ? "启用" : "历史", item.EffectiveFromUtc.ToString("yyyy-MM-dd"))));
+            new PlaybookRow(item.Name, $"v{item.Version}", item.Rules.Count, item.IsActive ? "启用" : "历史", item.EffectiveFromUtc.ToString("yyyy-MM-dd"), new RelayCommand(() => LoadPlaybookDraft(item)))));
+        RefreshFormReferences(data);
         Campaigns.ReplaceWith(data.Campaigns.Select(item => new CampaignRow(item.Name, item.Symbol, item.PositionIds.Count, item.Thesis)));
         var goalProgress = (snapshot.GoalProgress ?? []).ToDictionary(item => item.Goal.Id);
         Goals.ReplaceWith(data.Goals.Select(item =>
@@ -754,6 +746,7 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
         AddGroups("策略", snapshot.Analytics.StrategyPerformance);
         AddGroups("形态", snapshot.Analytics.SetupPerformance);
         AddGroups("标签", snapshot.Analytics.TagPerformance);
+        UpdateAnalysisGroups();
         RiskExcursions.ReplaceWith((snapshot.RiskSamples ?? []).Select(sample =>
             new RiskExcursionRow(sample.Trade.PositionId, sample.Symbol, sample.NetPnl, sample.OpeningVolume,
                 sample.InitialRiskAmount, sample.Mae, sample.Mfe, sample.ActualRiskMultiple,
@@ -847,6 +840,18 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
         ExportRangeText = $"导出范围：{snapshot.Filter.FromServerDate:yyyy-MM-dd} 至 {snapshot.Filter.ToServerDate:yyyy-MM-dd}（交易服务器日期） · 全部 {snapshot.TotalCount} 笔交易";
         Page = snapshot.Page;
         StatusText = $"{snapshot.Filter.FromServerDate:yyyy-MM-dd} 至 {snapshot.Filter.ToServerDate:yyyy-MM-dd} · 当前页 {snapshot.Trades.Count} 笔";
+        if (DateOnly.TryParseExact(DailyDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None,
+                out var selectedDate) && snapshot.DailyFacts?.TryGetValue(selectedDate, out var selectedFacts) == true)
+        {
+            ApplyDaily(selectedDate, data.DailyJournals.GetValueOrDefault(selectedDate),
+                selectedFacts, selectedFacts.SourceVersion);
+        }
+        else
+        {
+            DailyFacts.Clear();
+            DailyTimeline.Clear();
+            DailyFacts.Add(new DailyFactRow("每日事实", "请选择日期", "点击当前查询范围内的日历日期查看事实。"));
+        }
 
         void AddGroups(string dimension, IEnumerable<GroupMetricRow> groups)
         {
@@ -1106,6 +1111,9 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
 
     public void ResetAccountState(string message, bool preserveTradeDraft = true)
     {
+        TotalCount = 0;
+        Page = 1;
+        QualitySummary = message;
         ClearExportPreview();
         CancelPendingReviewAutoSave();
         CancelPendingWorkspaceAutoSave();
@@ -1230,6 +1238,8 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
             FeeBreakdown.Clear();
             DailyCashSeries.Clear();
             EquityCurve.Clear();
+            ClearDashboard();
+            ClearFormReferences();
             TradingSessions.Clear();
             AnalysisDrilldown.Clear();
             RiskScatterPoints.Clear();
@@ -1255,6 +1265,16 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
             RaisePropertyChanged(nameof(HasUnsavedWorkspaceChanges));
             StatusText = message;
         }
+    }
+
+    public void MarkDataUnavailable(string message)
+    {
+        ResetAccountState(message);
+        DashboardScope = message;
+        DashboardBreakdownSummary = message;
+        CalendarMonthSummary = message;
+        DailyFacts.Add(new DailyFactRow("每日事实", "读取失败", message));
+        EditorSaveStatus = "历史数据暂不可读；未提交编辑已保留，恢复后可继续。";
     }
 
     public void CancelPendingReviewAutoSave()
@@ -1622,7 +1642,7 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
             facts.OpeningsAfterLossStreakCount?.ToString(CultureInfo.InvariantCulture) ?? "无法判断",
             facts.OpeningsAfterLossStreakCount is null
                 ? $"当日末连续亏损 {facts.ConsecutiveLosses} 笔；缺少当时有效的连亏阈值记录。"
-                : $"达到当时连亏阈值后又首次开仓 {facts.OpeningsAfterLossStreakCount} 笔；当日末连续亏损 {facts.ConsecutiveLosses} 笔。"));
+                : $"开仓前连续亏损已达到当时阈值的开仓 {facts.OpeningsAfterLossStreakCount} 笔；盈利或保本后重置，重新达到阈值再计数。"));
         DailyFacts.Add(new DailyFactRow("冷静期内开仓", facts.CooldownViolationCount.ToString(CultureInfo.InvariantCulture),
             "仅统计已有 CooldownViolation 规则证据的开仓。"));
         if (!facts.HasReliableTargetMilestone)
@@ -1678,6 +1698,7 @@ public sealed class ReviewWorkspaceViewModel : ObservableObject
                 item.Side == TradeSide.Buy ? "买" : "卖",
                 Signed(item.NetPnl),
                 new AsyncRelayCommand(() => OpenTradeAsync?.Invoke(item.PositionId) ?? Task.CompletedTask))));
+        RaisePropertyChanged(nameof(HasAnalysisDrilldown));
     }
 
     private void SelectBehavior(BehaviorOccurrence occurrence, ReviewWorkspaceData data)
@@ -2613,7 +2634,7 @@ public sealed record BehaviorTradeLinkRow(
     long PositionId, string Role, string Symbol, string Side, string NetPnl, ICommand OpenCommand);
 public sealed record BehaviorSampleRow(
     string Label, int TradeCount, string NetPnl, string Detail, ICommand OpenCommand);
-public sealed record PlaybookRow(string Name, string Version, int RuleCount, string Status, string EffectiveFrom);
+public sealed record PlaybookRow(string Name, string Version, int RuleCount, string Status, string EffectiveFrom, ICommand? OpenCommand = null);
 public sealed record CampaignRow(string Name, string Symbol, int TradeCount, string Thesis);
 public sealed record GoalRow(
     string Name,

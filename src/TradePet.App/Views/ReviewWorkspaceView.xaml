@@ -1,6 +1,7 @@
 <UserControl x:Class="TradePet.App.Views.ReviewWorkspaceView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:TradePet.App.Controls"
              UseLayoutRounding="True">
     <UserControl.InputBindings>
         <KeyBinding Key="S" Modifiers="Control" Command="{Binding SaveReviewCommand}" />
@@ -39,6 +40,21 @@
             <Setter Property="Margin" Value="0" />
             <Setter Property="Padding" Value="11,0" />
         </Style>
+        <DataTemplate x:Key="DashboardBarTemplate">
+            <Button Command="{Binding OpenCommand}" HorizontalContentAlignment="Stretch" Padding="5,7" Margin="0,0,0,3" ToolTip="{Binding Detail}">
+                <StackPanel>
+                    <Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" Margin="0,0,8,0"/>
+                        <TextBlock Grid.Column="1" Text="{Binding Value}" Foreground="{Binding Color}" FontWeight="SemiBold"/>
+                    </Grid>
+                    <Grid Height="5" Margin="0,6,0,4" Background="#263142">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="{Binding FilledWidth}"/><ColumnDefinition Width="{Binding EmptyWidth}"/></Grid.ColumnDefinitions>
+                        <Border Background="{Binding Color}" CornerRadius="2"/>
+                    </Grid>
+                    <TextBlock Text="{Binding Detail}" Style="{StaticResource MutedTextStyle}" FontSize="10" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Button>
+        </DataTemplate>
     </UserControl.Resources>
 
     <Grid>
@@ -56,10 +72,15 @@
     <TabControl x:Name="WorkspaceTabs" Grid.Row="1" Background="Transparent" BorderThickness="0" Padding="0"
                 SelectedIndex="{Binding WorkspaceTabIndex, Mode=TwoWay}" SelectionChanged="WorkspaceTabs_SelectionChanged">
         <TabItem Header="总览">
-            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <ScrollViewer x:Name="OverviewScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <StackPanel>
+                    <TextBlock Text="{Binding DashboardScope}" Style="{StaticResource MutedTextStyle}" Margin="3,7,3,10" TextWrapping="Wrap"/>
                     <Border x:Name="ReviewGuideFilters" Style="{StaticResource PageCardStyle}" Padding="10" Margin="0,0,0,8">
-                        <StackPanel>
+                        <Grid>
+                            <Button Content="应用筛选" Command="{Binding RefreshCommand}" Style="{StaticResource FilterPrimaryButton}" HorizontalAlignment="Right" VerticalAlignment="Top"/>
+                            <Expander IsExpanded="False" Margin="0,0,100,0">
+                                <Expander.Header><TextBlock Text="筛选、保存方案与样本对照" FontWeight="SemiBold" Margin="0,7,0,7"/></Expander.Header>
+                                <StackPanel Margin="0,10,-100,0">
                             <WrapPanel>
                                 <StackPanel Width="190" Margin="0,0,8,6"><TextBlock Text="搜索（票号/仓位/笔记）" Style="{StaticResource FilterLabel}"/><TextBox Text="{Binding Search, UpdateSourceTrigger=PropertyChanged}" ToolTip="搜索 ticket、position、笔记正文" Style="{StaticResource FilterTextInput}"/></StackPanel>
                                 <StackPanel Width="110" Margin="0,0,8,6"><TextBlock Text="策略" Style="{StaticResource FilterLabel}"/><TextBox Text="{Binding Strategy}" ToolTip="策略" Style="{StaticResource FilterTextInput}"/></StackPanel>
@@ -74,7 +95,9 @@
                                 <StackPanel Margin="0,0,0,6"><TextBlock Text="执行" Style="{StaticResource FilterLabel}"/><Button Content="应用筛选" Command="{Binding RefreshCommand}" Style="{StaticResource FilterPrimaryButton}"/></StackPanel>
                             </WrapPanel>
                             <WrapPanel><StackPanel Width="170" Margin="0,0,8,6"><TextBlock Text="筛选方案名称" Style="{StaticResource FilterLabel}"/><TextBox Text="{Binding FilterName}" ToolTip="给当前筛选方案命名" Style="{StaticResource FilterTextInput}"/></StackPanel><StackPanel Margin="0,0,8,6"><TextBlock Text="保存" Style="{StaticResource FilterLabel}"/><Button Content="保存筛选" Command="{Binding SaveFilterCommand}" Style="{StaticResource FilterButton}"/></StackPanel><ItemsControl ItemsSource="{Binding SavedFilters}" VerticalAlignment="Bottom"><ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate><Button Content="{Binding Name}" ToolTip="{Binding Scope}" Command="{Binding ApplyCommand}" Margin="0,3,5,6" Padding="7,3"/></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></WrapPanel>
-                        </StackPanel>
+                                </StackPanel>
+                            </Expander>
+                        </Grid>
                     </Border>
 
                     <ItemsControl x:Name="ReviewGuideMetrics" ItemsSource="{Binding Metrics}" ToolTip="指标使用全部筛选交易。净盈亏包含费用；胜率＝盈利笔数÷盈利与亏损笔数之和，保本交易不计入分母；盈亏因子＝总盈利÷总亏损绝对值；期望值＝每笔平均净盈亏。">
@@ -92,22 +115,59 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
+                    <Border Style="{StaticResource PageCardStyle}" Padding="12" Margin="0,0,0,8">
+                        <StackPanel>
+                            <DockPanel>
+                                <ComboBox x:Name="PerformanceChartSelector" DockPanel.Dock="Right" Width="175" ItemsSource="{Binding PerformanceCharts}" DisplayMemberPath="Name" SelectedItem="{Binding SelectedPerformanceChart}" AutomationProperties.Name="收益与风险图表类型"/>
+                                <TextBlock Text="收益与风险" Style="{StaticResource SectionTitleStyle}" VerticalAlignment="Center"/>
+                            </DockPanel>
+                            <TextBlock Text="{Binding SelectedPerformanceChart.Description}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,7,0,0"/>
+                            <controls:ReviewPerformanceChart x:Name="PerformanceChart" Height="245" Series="{Binding SelectedPerformanceChart}" AutomationProperties.Name="收益与风险曲线"/>
+                            <TextBlock Text="{Binding SelectedPerformanceChart.SampleSummary}" Style="{StaticResource MutedTextStyle}" FontSize="10" HorizontalAlignment="Right"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource PageCardStyle}" Padding="12" Margin="0,0,0,8" Visibility="{Binding HasDashboardSelection, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding AnalysisDrilldownTitle}" Style="{StaticResource SectionTitleStyle}" TextWrapping="Wrap"/>
+                            <TextBlock Text="打开档案查看成交、笔记和回放。" Style="{StaticResource MutedTextStyle}" Margin="0,4,0,8"/>
+                            <ListView ItemsSource="{Binding AnalysisDrilldown}" MaxHeight="195"><ListView.View><GridView>
+                                <GridViewColumn Header="Position" Width="80" DisplayMemberBinding="{Binding PositionId}"/>
+                                <GridViewColumn Header="最终平仓" Width="125" DisplayMemberBinding="{Binding ClosedAt}"/>
+                                <GridViewColumn Header="品种" Width="95" DisplayMemberBinding="{Binding Symbol}"/>
+                                <GridViewColumn Header="方向" Width="50" DisplayMemberBinding="{Binding Side}"/>
+                                <GridViewColumn Header="净盈亏" Width="85" DisplayMemberBinding="{Binding NetPnl}"/>
+                                <GridViewColumn Header="档案" Width="60"><GridViewColumn.CellTemplate><DataTemplate><Button Content="打开" Command="{Binding OpenCommand}" Padding="7,2"/></DataTemplate></GridViewColumn.CellTemplate></GridViewColumn>
+                            </GridView></ListView.View></ListView>
+                        </StackPanel>
+                    </Border>
+
+                    <ItemsControl ItemsSource="{Binding DashboardRiskMetrics}" Margin="0,0,0,4">
+                        <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="4"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate><DataTemplate>
+                            <Border Style="{StaticResource MetricCardStyle}" Margin="0,0,8,8" Padding="10">
+                                <StackPanel><TextBlock Text="{Binding Label}" Style="{StaticResource MutedTextStyle}" FontSize="10"/>
+                                    <TextBlock Text="{Binding Value}" Foreground="{Binding ValueColor}" FontSize="16" FontWeight="SemiBold" Margin="0,4,0,3"/>
+                                    <TextBlock Text="{Binding Hint}" Style="{StaticResource MutedTextStyle}" FontSize="9" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate></ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
                     <Grid>
                         <Grid.ColumnDefinitions><ColumnDefinition Width="1.15*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                         <Border Style="{StaticResource PageCardStyle}" Padding="12" Margin="0,0,8,8">
                             <StackPanel>
-                                <TextBlock Text="最近 7 个交易日的累计利润与峰值回吐" Style="{StaticResource SectionTitleStyle}" />
-                                <TextBlock Text="每天一个点；柱高按这 7 天的累计利润区间缩放。" Style="{StaticResource MutedTextStyle}" Margin="0,3,0,0" />
-                                <ItemsControl ItemsSource="{Binding Curve}" Height="125" Margin="0,10,0,0">
-                                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" VerticalAlignment="Bottom" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Button Command="{Binding OpenCommand}" Padding="0" Margin="0,0,5,0" BorderThickness="0" Background="Transparent" ToolTip="{Binding ToolTipText}">
-                                                <StackPanel VerticalAlignment="Bottom" Width="58"><TextBlock Text="{Binding ValueText}" Foreground="{Binding ValueColor}" FontSize="9" HorizontalAlignment="Center"/><Border Height="{Binding Height}" Width="20" Background="{Binding ValueColor}" CornerRadius="3,3,0,0" HorizontalAlignment="Center"/><TextBlock Text="{Binding Date}" FontSize="8" Foreground="#718091" HorizontalAlignment="Center"/><TextBlock Text="{Binding DrawdownText}" FontSize="8" Foreground="#8491A0" HorizontalAlignment="Center"/></StackPanel>
-                                            </Button>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
+                                <TextBlock Text="本期复盘重点" Style="{StaticResource SectionTitleStyle}"/>
+                                <TextBlock Text="从统计事实定位值得核对的交易。" Style="{StaticResource MutedTextStyle}" Margin="0,3,0,8"/>
+                                <ItemsControl ItemsSource="{Binding DashboardInsights}"><ItemsControl.ItemTemplate><DataTemplate>
+                                    <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="0,7">
+                                        <StackPanel><DockPanel><Button DockPanel.Dock="Right" Content="查看交易" Command="{Binding OpenCommand}" Visibility="{Binding CanOpen, Converter={StaticResource BoolToVisibility}}" Padding="6,2"/>
+                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" VerticalAlignment="Center"/></DockPanel>
+                                            <TextBlock Text="{Binding Detail}" Style="{StaticResource MutedTextStyle}" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
                             </StackPanel>
                         </Border>
                         <Border Grid.Column="1" Style="{StaticResource PageCardStyle}" Padding="12" Margin="0,0,0,8">
@@ -131,10 +191,51 @@
                             </StackPanel>
                         </Border>
                     </Grid>
+                    <Border Style="{StaticResource PageCardStyle}" Padding="12" Margin="0,0,0,8">
+                        <StackPanel><TextBlock Text="月度表现" Style="{StaticResource SectionTitleStyle}"/>
+                            <TextBlock Text="当前筛选范围内，完整交易按最终平仓月汇总；点击月份查看交易。" Style="{StaticResource MutedTextStyle}" Margin="0,3,0,8" TextWrapping="Wrap"/>
+                            <ItemsControl ItemsSource="{Binding DashboardMonths}">
+                                <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate><DataTemplate>
+                                    <Button Command="{Binding OpenCommand}" Padding="0" Margin="0,0,6,6" ToolTip="{Binding Detail}">
+                                        <Border Background="{Binding Background}" CornerRadius="6" Padding="12,8" MinWidth="104">
+                                            <StackPanel><TextBlock Text="{Binding Month}" Style="{StaticResource MutedTextStyle}" FontSize="10"/>
+                                                <TextBlock Text="{Binding Value}" Foreground="{Binding Color}" FontSize="16" FontWeight="SemiBold" Margin="0,5,0,4"/>
+                                                <TextBlock Text="{Binding Detail}" Style="{StaticResource MutedTextStyle}" FontSize="9"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </Button>
+                                </DataTemplate></ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
+                        <Border Style="{StaticResource PageCardStyle}" Padding="12" Margin="0,0,8,0">
+                            <StackPanel><DockPanel><ComboBox DockPanel.Dock="Right" Width="100" ItemsSource="{Binding DashboardBreakdownDimensions}" SelectedItem="{Binding DashboardBreakdownDimension}" AutomationProperties.Name="盈亏归因维度"/>
+                                    <TextBlock Text="盈亏来源" Style="{StaticResource SectionTitleStyle}" VerticalAlignment="Center"/></DockPanel>
+                                <TextBlock Text="{Binding DashboardBreakdownSummary}" Style="{StaticResource MutedTextStyle}" Margin="0,6,0,8" TextWrapping="Wrap"/>
+                                <ScrollViewer MaxHeight="360" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                    <ItemsControl ItemsSource="{Binding DashboardBreakdown}" ItemTemplate="{StaticResource DashboardBarTemplate}"/>
+                                </ScrollViewer>
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="1" Style="{StaticResource PageCardStyle}" Padding="12">
+                            <StackPanel><TextBlock Text="每笔盈亏分布" Style="{StaticResource SectionTitleStyle}"/>
+                                <TextBlock Text="横条表示笔数；红盈绿亏。点击区间核对大赚、大亏和保本交易。" Style="{StaticResource MutedTextStyle}" Margin="0,6,0,8" TextWrapping="Wrap"/>
+                                <ItemsControl ItemsSource="{Binding PnlDistribution}" ItemTemplate="{StaticResource DashboardBarTemplate}"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
                     <Grid>
                         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="1.15*"/></Grid.ColumnDefinitions>
                         <Border Style="{StaticResource PageCardStyle}" Padding="12" Margin="0,0,8,8"><StackPanel><TextBlock Text="原始费用拆分" Style="{StaticResource SectionTitleStyle}"/><TextBlock Text="仅汇总当前筛选 position 的成交；未映射费用保持账户级。" Style="{StaticResource MutedTextStyle}" Margin="0,3,0,6"/><ItemsControl ItemsSource="{Binding FeeBreakdown}"><ItemsControl.ItemTemplate><DataTemplate><Grid Margin="0,3"><Grid.ColumnDefinitions><ColumnDefinition Width="145"/><ColumnDefinition Width="85"/><ColumnDefinition/></Grid.ColumnDefinitions><TextBlock Text="{Binding Label}"/><TextBlock Grid.Column="1" Text="{Binding Value}" Foreground="{StaticResource AccentBrush}"/><TextBlock Grid.Column="2" Text="{Binding Hint}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap"/></Grid></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></StackPanel></Border>
-                        <Border Grid.Column="1" Style="{StaticResource PageCardStyle}" Padding="12" Margin="0,0,0,8"><StackPanel><TextBlock Text="最近 7 个有成交日的现金盈亏" Style="{StaticResource SectionTitleStyle}"/><TextBlock Text="按成交发生服务器日；点击柱形查看对应 position。" Style="{StaticResource MutedTextStyle}" Margin="0,3,0,6"/><ItemsControl ItemsSource="{Binding DailyCashSeries}" Height="118"><ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" VerticalAlignment="Bottom"/></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate><Button Command="{Binding OpenCommand}" Margin="0,0,5,0" Padding="4" VerticalAlignment="Bottom"><StackPanel VerticalAlignment="Bottom" Width="42"><TextBlock Text="{Binding CashPnlText}" Foreground="{Binding ValueColor}" FontSize="9" HorizontalAlignment="Center"/><Border Height="{Binding Height}" Width="20" Background="{Binding ValueColor}" CornerRadius="3,3,0,0" HorizontalAlignment="Center"/><TextBlock Text="{Binding Date}" FontSize="8" HorizontalAlignment="Center"/><TextBlock Text="{Binding DealCount, StringFormat={}{0} 成交}" FontSize="8" HorizontalAlignment="Center"/></StackPanel></Button></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></StackPanel></Border>
+                        <Border Grid.Column="1" Style="{StaticResource PageCardStyle}" Padding="12" Margin="0,0,0,8">
+                            <StackPanel><TextBlock Text="账户净值观测" Style="{StaticResource SectionTitleStyle}"/>
+                                <TextBlock Text="账户级实际采样，含浮盈亏与出入金。" Style="{StaticResource MutedTextStyle}" Margin="0,3,0,6" TextWrapping="Wrap"/>
+                                <controls:ReviewPerformanceChart Height="205" Series="{Binding AccountEquityChart}" AutomationProperties.Name="账户净值观测曲线"/>
+                            </StackPanel>
+                        </Border>
                     </Grid>
                 </StackPanel>
             </ScrollViewer>
@@ -142,24 +243,36 @@
 
         <TabItem Header="日历与日记" ToolTip="在日历选择日期，核对当日事实，填写日记并保存。完成日记需要盘后总结、做得好、需改进和下一次动作。现金盈亏按成交日汇总。">
             <Grid Margin="0,6,0,0">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="1.2*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="1.5*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                 <Border x:Name="ReviewGuideCalendar" Style="{StaticResource PageCardStyle}" Padding="10" Margin="0,0,8,0">
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <ItemsControl ItemsSource="{Binding Calendar}">
-                            <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="4" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate><DataTemplate>
-                                <Button Command="{Binding OpenCommand}" Margin="3" Padding="8" HorizontalContentAlignment="Stretch">
-                                    <StackPanel>
-                                        <TextBlock Text="{Binding Date}" FontWeight="SemiBold" />
-                                        <TextBlock Text="{Binding CashPnl}" Foreground="{StaticResource AccentBrush}" FontSize="15" />
-                                        <TextBlock Text="{Binding Closed, StringFormat=完整交易 {0}}" FontSize="9" Foreground="#8491A0" />
-                                        <TextBlock Text="{Binding Pending, StringFormat=待复盘 {0}}" FontSize="9" Foreground="#8491A0" />
-                                        <TextBlock Text="{Binding Journal}" FontSize="9" />
-                                        <TextBlock Text="{Binding Gap}" FontSize="9" Foreground="#F0B35A" />
-                                    </StackPanel>
-                                </Button>
-                            </DataTemplate></ItemsControl.ItemTemplate>
-                        </ItemsControl>
+                        <StackPanel>
+                            <DockPanel Margin="0,0,0,8"><Button DockPanel.Dock="Left" Content="‹" Command="{Binding PreviousCalendarMonthCommand}" IsEnabled="{Binding CanPreviousCalendarMonth}" Padding="8,4"/>
+                                <Button DockPanel.Dock="Right" Content="›" Command="{Binding NextCalendarMonthCommand}" IsEnabled="{Binding CanNextCalendarMonth}" Padding="8,4"/>
+                                <ComboBox ItemsSource="{Binding CalendarMonths}" SelectedItem="{Binding SelectedCalendarMonth}" Margin="6,0" AutomationProperties.Name="盈亏日历月份"/>
+                            </DockPanel>
+                            <TextBlock Text="{Binding CalendarMonthSummary}" Style="{StaticResource MutedTextStyle}" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,10"/>
+                            <TextBlock Text="日历使用账户全部成交；品种与策略筛选用于交易统计。" Style="{StaticResource MutedTextStyle}" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,10"/>
+                            <ItemsControl ItemsSource="{Binding CalendarWeekdays}" Margin="0,0,0,5"><ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="7"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate><DataTemplate><TextBlock Text="{Binding}" HorizontalAlignment="Center" Style="{StaticResource MutedTextStyle}" FontSize="11"/></DataTemplate></ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <ItemsControl x:Name="PnlCalendar" ItemsSource="{Binding CalendarMonthCells}">
+                                <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="7"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate><DataTemplate>
+                                    <Button Command="{Binding OpenCommand}" IsEnabled="{Binding CanOpen}" Margin="1" Padding="0" HorizontalContentAlignment="Stretch" ToolTip="{Binding Detail}">
+                                        <Border Background="{Binding Background}" BorderBrush="{Binding BorderColor}" BorderThickness="1" CornerRadius="5" Padding="4" MinHeight="91">
+                                            <StackPanel><TextBlock Text="{Binding Day}" FontSize="11"/>
+                                                <TextBlock Text="{Binding Pnl}" Foreground="{Binding Color}" FontWeight="SemiBold" FontSize="11" TextTrimming="CharacterEllipsis" Margin="0,5,0,4"/>
+                                                <TextBlock Text="{Binding Trades}" Style="{StaticResource MutedTextStyle}" FontSize="8"/>
+                                                <TextBlock Text="{Binding Pending}" Style="{StaticResource MutedTextStyle}" FontSize="8"/>
+                                                <TextBlock Text="{Binding Journal}" Style="{StaticResource MutedTextStyle}" FontSize="8" TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Text="{Binding Gap}" Foreground="#E5B965" FontSize="8"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </Button>
+                                </DataTemplate></ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
                     </ScrollViewer>
                 </Border>
                 <Border Grid.Column="1" Style="{StaticResource PageCardStyle}" Padding="14">
@@ -362,35 +475,35 @@
         <TabItem Header="分析">
             <ScrollViewer x:Name="ReviewGuideAnalysis" VerticalScrollBarVisibility="Auto"><StackPanel Margin="0,6,0,0">
                 <Border Style="{StaticResource PageCardStyle}" Padding="12" Margin="0,0,0,8">
+                    <StackPanel><DockPanel><ComboBox DockPanel.Dock="Right" Width="130" ItemsSource="{Binding AnalysisDimensions}" SelectedItem="{Binding AnalysisDimension}" AutomationProperties.Name="统计分析维度"/><TextBlock Text="分类表现" Style="{StaticResource SectionTitleStyle}" VerticalAlignment="Center"/></DockPanel><TextBlock Text="费用、R 与风险覆盖各用独立有效样本；样本少提示不表示统计显著性。" Style="{StaticResource MutedTextStyle}" Margin="0,3,0,6"/><ListView ItemsSource="{Binding FilteredGroupPerformance}" MaxHeight="270"><ListView.View><GridView><GridViewColumn Header="维度" Width="80" DisplayMemberBinding="{Binding Dimension}"/><GridViewColumn Header="分组" Width="125" DisplayMemberBinding="{Binding Group}"/><GridViewColumn Header="样本" Width="48" DisplayMemberBinding="{Binding Trades}"/><GridViewColumn Header="胜率" Width="62" DisplayMemberBinding="{Binding WinRate}"/><GridViewColumn Header="净盈亏" Width="72" DisplayMemberBinding="{Binding NetPnl}"/><GridViewColumn Header="均值" Width="65" DisplayMemberBinding="{Binding AveragePnl}"/><GridViewColumn Header="期望" Width="65" DisplayMemberBinding="{Binding Expectancy}"/><GridViewColumn Header="平均 R" Width="65" DisplayMemberBinding="{Binding AverageR}"/><GridViewColumn Header="风险覆盖" Width="105" DisplayMemberBinding="{Binding RiskCoverage}"/><GridViewColumn Header="费用" Width="65" DisplayMemberBinding="{Binding Fees}"/><GridViewColumn Header="提示" Width="65" DisplayMemberBinding="{Binding Warning}"/><GridViewColumn Header="下钻" Width="55"><GridViewColumn.CellTemplate><DataTemplate><Button Content="查看" Command="{Binding OpenCommand}" Padding="6,2"/></DataTemplate></GridViewColumn.CellTemplate></GridViewColumn></GridView></ListView.View></ListView></StackPanel>
+                </Border>
+                <Border Style="{StaticResource PageCardStyle}" Padding="12" Margin="0,0,0,8" Visibility="{Binding HasAnalysisDrilldown, Converter={StaticResource BoolToVisibility}}"><StackPanel><TextBlock Text="{Binding AnalysisDrilldownTitle}" Style="{StaticResource SectionTitleStyle}"/><ListView ItemsSource="{Binding AnalysisDrilldown}" MaxHeight="220"><ListView.View><GridView><GridViewColumn Header="Position" Width="90" DisplayMemberBinding="{Binding PositionId}"/><GridViewColumn Header="最终平仓" Width="125" DisplayMemberBinding="{Binding ClosedAt}"/><GridViewColumn Header="品种" Width="110" DisplayMemberBinding="{Binding Symbol}"/><GridViewColumn Header="方向" Width="55" DisplayMemberBinding="{Binding Side}"/><GridViewColumn Header="净盈亏" Width="80" DisplayMemberBinding="{Binding NetPnl}"/><GridViewColumn Header="档案" Width="65"><GridViewColumn.CellTemplate><DataTemplate><Button Content="打开" Command="{Binding OpenCommand}" Padding="7,2"/></DataTemplate></GridViewColumn.CellTemplate></GridViewColumn></GridView></ListView.View></ListView></StackPanel></Border>
+                <Border Style="{StaticResource PageCardStyle}" Padding="12" Margin="0,0,0,8">
+                    <StackPanel>
+                        <Grid x:Name="ReviewGuideComparison"><TextBlock Text="同口径两组对照" Style="{StaticResource SectionTitleStyle}"/><WrapPanel HorizontalAlignment="Right"><ComboBox Width="115" ItemsSource="{Binding ComparisonModeOptions}" SelectedItem="{Binding ComparisonMode}"/><Button Content="更新对照" Command="{Binding RefreshCommand}" Margin="6,0,0,0"/></WrapPanel></Grid>
+                        <TextBlock Text="显示确切筛选定义、首开量和已知初始风险；少于 30 笔仅提示样本少，不解释因果。" Style="{StaticResource MutedTextStyle}" Margin="0,3,0,6"/>
+                        <ItemsControl ItemsSource="{Binding Comparisons}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="2"/></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate>
+                            <Button Command="{Binding OpenCommand}" Margin="3" Padding="0" HorizontalContentAlignment="Stretch"><Border BorderBrush="#253244" BorderThickness="1" CornerRadius="7" Padding="9"><StackPanel><TextBlock Text="{Binding Label}" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock Text="{Binding Trades, StringFormat=样本 {0} 笔}"/><TextBlock Text="{Binding NetPnl, StringFormat=净盈亏 {0}}"/><TextBlock Text="{Binding WinRate, StringFormat=胜率 {0}}"/><TextBlock Text="{Binding ExpectancyText, StringFormat=期望 {0}}"/><TextBlock Text="{Binding AverageOpeningVolume, StringFormat=平均首开量 {0}}"/><TextBlock Text="{Binding AverageInitialRisk, StringFormat=平均已知初始风险 {0}}"/><TextBlock Text="{Binding RiskCoverage, StringFormat=风险覆盖 {0}}"/><TextBlock Text="{Binding Warning}" Foreground="#F0B35A"/></StackPanel></Border></Button>
+                        </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource PageCardStyle}" Padding="12" Margin="0,0,0,8">
+                    <StackPanel><TextBlock x:Name="ReviewGuideRisk" Text="风险倍数与 MAE/MFE 样本" Style="{StaticResource SectionTitleStyle}"/><TextBlock Text="全部筛选交易都保留在表内；可靠采样缺失时不造 MAE/MFE，初始风险缺失时实际 R 保持未知。" Style="{StaticResource MutedTextStyle}" Margin="0,3,0,6"/><Border BorderBrush="#253244" BorderThickness="1" Height="205" Padding="8" Margin="0,0,0,7"><Grid><TextBlock Text="MFE ↑" VerticalAlignment="Top" Style="{StaticResource MutedTextStyle}"/><TextBlock Text="MAE 绝对值 →" VerticalAlignment="Bottom" HorizontalAlignment="Right" Style="{StaticResource MutedTextStyle}"/><ItemsControl ItemsSource="{Binding RiskScatterPoints}" Width="410" Height="180" HorizontalAlignment="Left" VerticalAlignment="Top"><ItemsControl.ItemsPanel><ItemsPanelTemplate><Canvas/></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemContainerStyle><Style TargetType="ContentPresenter"><Setter Property="Canvas.Left" Value="{Binding X}"/><Setter Property="Canvas.Top" Value="{Binding Y}"/></Style></ItemsControl.ItemContainerStyle><ItemsControl.ItemTemplate><DataTemplate><Button Command="{Binding OpenCommand}" ToolTip="{Binding ToolTip}" Padding="0" BorderThickness="0" Background="Transparent"><Ellipse Width="10" Height="10" Fill="{Binding Color}" Stroke="#DCE5EE" StrokeThickness="1"/></Button></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></Grid></Border><ListView ItemsSource="{Binding RiskExcursions}" MaxHeight="240"><ListView.View><GridView><GridViewColumn Header="Position" Width="82" DisplayMemberBinding="{Binding PositionId}"/><GridViewColumn Header="品种" Width="90" DisplayMemberBinding="{Binding Symbol}"/><GridViewColumn Header="首开量" Width="62" DisplayMemberBinding="{Binding OpeningVolumeText}"/><GridViewColumn Header="初始风险" Width="72" DisplayMemberBinding="{Binding InitialRiskText}"/><GridViewColumn Header="净盈亏" Width="72" DisplayMemberBinding="{Binding NetPnlText}"/><GridViewColumn Header="MAE" Width="65" DisplayMemberBinding="{Binding MaeText}"/><GridViewColumn Header="MFE" Width="65" DisplayMemberBinding="{Binding MfeText}"/><GridViewColumn Header="实际 R" Width="65" DisplayMemberBinding="{Binding ActualRText}"/><GridViewColumn Header="覆盖" Width="65" DisplayMemberBinding="{Binding Coverage}"/><GridViewColumn Header="下钻" Width="55"><GridViewColumn.CellTemplate><DataTemplate><Button Content="查看" Command="{Binding OpenCommand}" Padding="6,2"/></DataTemplate></GridViewColumn.CellTemplate></GridViewColumn></GridView></ListView.View></ListView></StackPanel>
+                </Border>
+                <Border Style="{StaticResource PageCardStyle}" Padding="12" Margin="0,0,0,8">
                     <StackPanel>
                         <TextBlock x:Name="ReviewGuideEquity" Text="账户净值观测与回撤" Style="{StaticResource SectionTitleStyle}"/>
                         <TextBlock Text="{Binding EquitySummary}" Style="{StaticResource MutedTextStyle}" Margin="0,3,0,7" TextWrapping="Wrap"/>
                         <TextBlock Text="仅连接实际采样点；观测回撤、已实现利润回吐和排除资金流后的单位化回撤使用不同口径。" Style="{StaticResource MutedTextStyle}" Margin="0,0,0,6" TextWrapping="Wrap"/>
+                        <controls:ReviewPerformanceChart Height="245" Series="{Binding AccountEquityChart}" AutomationProperties.Name="账户净值分析曲线"/>
                         <ListView ItemsSource="{Binding EquityCurve}" MaxHeight="220"><ListView.View><GridView>
-                            <GridViewColumn Header="本机时间" Width="112" DisplayMemberBinding="{Binding Time}"/>
+                            <GridViewColumn Header="服务器时间" Width="112" DisplayMemberBinding="{Binding Time}"/>
                             <GridViewColumn Header="净值" Width="82" DisplayMemberBinding="{Binding Equity}"/>
                             <GridViewColumn Header="观测回撤额" Width="88" DisplayMemberBinding="{Binding ObservedDrawdown}"/>
                             <GridViewColumn Header="观测回撤率" Width="88" DisplayMemberBinding="{Binding ObservedDrawdownPercentage}"/>
                             <GridViewColumn Header="单位化净值" Width="82" DisplayMemberBinding="{Binding UnitizedValue}"/>
                             <GridViewColumn Header="连续段" Width="55" DisplayMemberBinding="{Binding Segment}"/>
                             <GridViewColumn Header="数据说明" Width="145" DisplayMemberBinding="{Binding Gap}"/>
-                        </GridView></ListView.View></ListView>
-                    </StackPanel>
-                </Border>
-                <Border Style="{StaticResource PageCardStyle}" Padding="12" Margin="0,0,0,8">
-                    <StackPanel>
-                        <Grid><TextBlock Text="自定义交易时段" Style="{StaticResource SectionTitleStyle}"/><Button Content="新建时段" Command="{Binding NewTradingSessionCommand}" HorizontalAlignment="Right"/></Grid>
-                        <TextBlock Text="具名时区会按每个交易日期应用夏令时；跨午夜时段归入开始日。时段重叠时按顺序较小者优先。" Style="{StaticResource MutedTextStyle}" Margin="0,3,0,7" TextWrapping="Wrap"/>
-                        <Grid>
-                            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition Width="0.8*"/></Grid.ColumnDefinitions>
-                            <StackPanel Margin="0,0,6,0"><TextBlock Text="名称" Style="{StaticResource EditorLabel}"/><TextBox Text="{Binding TradingSessionName, UpdateSourceTrigger=PropertyChanged}"/></StackPanel>
-                            <StackPanel Grid.Column="1" Margin="0,0,6,0"><TextBlock Text="具名时区" Style="{StaticResource EditorLabel}"/><TextBox Text="{Binding TradingSessionTimeZone, UpdateSourceTrigger=PropertyChanged}" ToolTip="例如 China Standard Time 或 America/New_York"/></StackPanel>
-                            <StackPanel Grid.Column="2" Margin="0,0,6,0"><TextBlock Text="开始 / 结束" Style="{StaticResource EditorLabel}"/><Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions><TextBox Text="{Binding TradingSessionStart, UpdateSourceTrigger=PropertyChanged}"/><TextBox Grid.Column="1" Text="{Binding TradingSessionEnd, UpdateSourceTrigger=PropertyChanged}" Margin="4,0,0,0"/></Grid></StackPanel>
-                            <StackPanel Grid.Column="3"><TextBlock Text="顺序" Style="{StaticResource EditorLabel}"/><TextBox Text="{Binding TradingSessionOrder, UpdateSourceTrigger=PropertyChanged}"/></StackPanel>
-                        </Grid>
-                        <Grid Margin="0,6,0,8"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="开始日（每天，或周一、周二…）" Style="{StaticResource EditorLabel}"/><TextBox Text="{Binding TradingSessionDays, UpdateSourceTrigger=PropertyChanged}"/></StackPanel><CheckBox Grid.Column="1" Content="启用" IsChecked="{Binding TradingSessionActive}" VerticalAlignment="Bottom" Margin="10,0"/><Button Grid.Column="2" Content="保存时段" Command="{Binding SaveTradingSessionCommand}" Style="{StaticResource PrimaryButtonStyle}" VerticalAlignment="Bottom"/></Grid>
-                        <ListView ItemsSource="{Binding TradingSessions}" MaxHeight="170"><ListView.View><GridView>
-                            <GridViewColumn Header="名称" Width="110" DisplayMemberBinding="{Binding Name}"/><GridViewColumn Header="当地时间" Width="95" DisplayMemberBinding="{Binding Time}"/><GridViewColumn Header="时区" Width="165" DisplayMemberBinding="{Binding TimeZone}"/><GridViewColumn Header="开始日" Width="190" DisplayMemberBinding="{Binding Days}"/><GridViewColumn Header="状态" Width="55" DisplayMemberBinding="{Binding Status}"/><GridViewColumn Header="编辑" Width="55"><GridViewColumn.CellTemplate><DataTemplate><Button Content="选择" Command="{Binding OpenCommand}" Padding="6,2"/></DataTemplate></GridViewColumn.CellTemplate></GridViewColumn>
                         </GridView></ListView.View></ListView>
                     </StackPanel>
                 </Border>
@@ -421,26 +534,10 @@
                     </StackPanel>
                 </Border>
                 <Border Style="{StaticResource PageCardStyle}" Padding="12" Margin="0,0,0,8">
-                    <StackPanel><TextBlock Text="分类表现" Style="{StaticResource SectionTitleStyle}"/><TextBlock Text="费用、R 与风险覆盖各用独立有效样本；样本少提示不表示统计显著性。" Style="{StaticResource MutedTextStyle}" Margin="0,3,0,6"/><ListView ItemsSource="{Binding GroupPerformance}" MaxHeight="270"><ListView.View><GridView><GridViewColumn Header="维度" Width="80" DisplayMemberBinding="{Binding Dimension}"/><GridViewColumn Header="分组" Width="125" DisplayMemberBinding="{Binding Group}"/><GridViewColumn Header="样本" Width="48" DisplayMemberBinding="{Binding Trades}"/><GridViewColumn Header="胜率" Width="62" DisplayMemberBinding="{Binding WinRate}"/><GridViewColumn Header="净盈亏" Width="72" DisplayMemberBinding="{Binding NetPnl}"/><GridViewColumn Header="均值" Width="65" DisplayMemberBinding="{Binding AveragePnl}"/><GridViewColumn Header="期望" Width="65" DisplayMemberBinding="{Binding Expectancy}"/><GridViewColumn Header="平均 R" Width="65" DisplayMemberBinding="{Binding AverageR}"/><GridViewColumn Header="风险覆盖" Width="105" DisplayMemberBinding="{Binding RiskCoverage}"/><GridViewColumn Header="费用" Width="65" DisplayMemberBinding="{Binding Fees}"/><GridViewColumn Header="提示" Width="65" DisplayMemberBinding="{Binding Warning}"/><GridViewColumn Header="下钻" Width="55"><GridViewColumn.CellTemplate><DataTemplate><Button Content="查看" Command="{Binding OpenCommand}" Padding="6,2"/></DataTemplate></GridViewColumn.CellTemplate></GridViewColumn></GridView></ListView.View></ListView></StackPanel>
-                </Border>
-                <Border Style="{StaticResource PageCardStyle}" Padding="12" Margin="0,0,0,8">
-                    <StackPanel><TextBlock x:Name="ReviewGuideRisk" Text="风险倍数与 MAE/MFE 样本" Style="{StaticResource SectionTitleStyle}"/><TextBlock Text="全部筛选交易都保留在表内；可靠采样缺失时不造 MAE/MFE，初始风险缺失时实际 R 保持未知。" Style="{StaticResource MutedTextStyle}" Margin="0,3,0,6"/><Border BorderBrush="#253244" BorderThickness="1" Height="205" Padding="8" Margin="0,0,0,7"><Grid><TextBlock Text="MFE ↑" VerticalAlignment="Top" Style="{StaticResource MutedTextStyle}"/><TextBlock Text="MAE 绝对值 →" VerticalAlignment="Bottom" HorizontalAlignment="Right" Style="{StaticResource MutedTextStyle}"/><ItemsControl ItemsSource="{Binding RiskScatterPoints}" Width="410" Height="180" HorizontalAlignment="Left" VerticalAlignment="Top"><ItemsControl.ItemsPanel><ItemsPanelTemplate><Canvas/></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemContainerStyle><Style TargetType="ContentPresenter"><Setter Property="Canvas.Left" Value="{Binding X}"/><Setter Property="Canvas.Top" Value="{Binding Y}"/></Style></ItemsControl.ItemContainerStyle><ItemsControl.ItemTemplate><DataTemplate><Button Command="{Binding OpenCommand}" ToolTip="{Binding ToolTip}" Padding="0" BorderThickness="0" Background="Transparent"><Ellipse Width="10" Height="10" Fill="{Binding Color}" Stroke="#DCE5EE" StrokeThickness="1"/></Button></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></Grid></Border><ListView ItemsSource="{Binding RiskExcursions}" MaxHeight="240"><ListView.View><GridView><GridViewColumn Header="Position" Width="82" DisplayMemberBinding="{Binding PositionId}"/><GridViewColumn Header="品种" Width="90" DisplayMemberBinding="{Binding Symbol}"/><GridViewColumn Header="首开量" Width="62" DisplayMemberBinding="{Binding OpeningVolumeText}"/><GridViewColumn Header="初始风险" Width="72" DisplayMemberBinding="{Binding InitialRiskText}"/><GridViewColumn Header="净盈亏" Width="72" DisplayMemberBinding="{Binding NetPnlText}"/><GridViewColumn Header="MAE" Width="65" DisplayMemberBinding="{Binding MaeText}"/><GridViewColumn Header="MFE" Width="65" DisplayMemberBinding="{Binding MfeText}"/><GridViewColumn Header="实际 R" Width="65" DisplayMemberBinding="{Binding ActualRText}"/><GridViewColumn Header="覆盖" Width="65" DisplayMemberBinding="{Binding Coverage}"/><GridViewColumn Header="下钻" Width="55"><GridViewColumn.CellTemplate><DataTemplate><Button Content="查看" Command="{Binding OpenCommand}" Padding="6,2"/></DataTemplate></GridViewColumn.CellTemplate></GridViewColumn></GridView></ListView.View></ListView></StackPanel>
-                </Border>
-                <Border Style="{StaticResource PageCardStyle}" Padding="12" Margin="0,0,0,8">
                     <StackPanel><TextBlock Text="交易想法分组" Style="{StaticResource SectionTitleStyle}"/><ItemsControl ItemsSource="{Binding Campaigns}"><ItemsControl.ItemTemplate><DataTemplate>
                         <Grid Margin="0,4"><Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="100"/><ColumnDefinition Width="65"/><ColumnDefinition/></Grid.ColumnDefinitions><TextBlock Text="{Binding Name}"/><TextBlock Grid.Column="1" Text="{Binding Symbol}"/><TextBlock Grid.Column="2" Text="{Binding TradeCount, StringFormat={}{0} 笔}"/><TextBlock Grid.Column="3" Text="{Binding Thesis}" TextTrimming="CharacterEllipsis"/></Grid>
                     </DataTemplate></ItemsControl.ItemTemplate></ItemsControl></StackPanel>
                 </Border>
-                <Border Style="{StaticResource PageCardStyle}" Padding="12" Margin="0,0,0,8">
-                    <StackPanel>
-                        <Grid x:Name="ReviewGuideComparison"><TextBlock Text="同口径两组对照" Style="{StaticResource SectionTitleStyle}"/><WrapPanel HorizontalAlignment="Right"><ComboBox Width="115" ItemsSource="{Binding ComparisonModeOptions}" SelectedItem="{Binding ComparisonMode}"/><Button Content="更新对照" Command="{Binding RefreshCommand}" Margin="6,0,0,0"/></WrapPanel></Grid>
-                        <TextBlock Text="显示确切筛选定义、首开量和已知初始风险；少于 30 笔仅提示样本少，不解释因果。" Style="{StaticResource MutedTextStyle}" Margin="0,3,0,6"/>
-                        <ItemsControl ItemsSource="{Binding Comparisons}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="2"/></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate>
-                            <Button Command="{Binding OpenCommand}" Margin="3" Padding="0" HorizontalContentAlignment="Stretch"><Border BorderBrush="#253244" BorderThickness="1" CornerRadius="7" Padding="9"><StackPanel><TextBlock Text="{Binding Label}" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock Text="{Binding Trades, StringFormat=样本 {0} 笔}"/><TextBlock Text="{Binding NetPnl, StringFormat=净盈亏 {0}}"/><TextBlock Text="{Binding WinRate, StringFormat=胜率 {0}}"/><TextBlock Text="{Binding ExpectancyText, StringFormat=期望 {0}}"/><TextBlock Text="{Binding AverageOpeningVolume, StringFormat=平均首开量 {0}}"/><TextBlock Text="{Binding AverageInitialRisk, StringFormat=平均已知初始风险 {0}}"/><TextBlock Text="{Binding RiskCoverage, StringFormat=风险覆盖 {0}}"/><TextBlock Text="{Binding Warning}" Foreground="#F0B35A"/></StackPanel></Border></Button>
-                        </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
-                    </StackPanel>
-                </Border>
-                <Border Style="{StaticResource PageCardStyle}" Padding="12" Margin="0,0,0,8"><StackPanel><TextBlock Text="{Binding AnalysisDrilldownTitle}" Style="{StaticResource SectionTitleStyle}"/><ListView ItemsSource="{Binding AnalysisDrilldown}" MaxHeight="220"><ListView.View><GridView><GridViewColumn Header="Position" Width="90" DisplayMemberBinding="{Binding PositionId}"/><GridViewColumn Header="最终平仓" Width="125" DisplayMemberBinding="{Binding ClosedAt}"/><GridViewColumn Header="品种" Width="110" DisplayMemberBinding="{Binding Symbol}"/><GridViewColumn Header="方向" Width="55" DisplayMemberBinding="{Binding Side}"/><GridViewColumn Header="净盈亏" Width="80" DisplayMemberBinding="{Binding NetPnl}"/><GridViewColumn Header="档案" Width="65"><GridViewColumn.CellTemplate><DataTemplate><Button Content="打开" Command="{Binding OpenCommand}" Padding="7,2"/></DataTemplate></GridViewColumn.CellTemplate></GridViewColumn></GridView></ListView.View></ListView></StackPanel></Border>
                 <Border Style="{StaticResource PageCardStyle}" Padding="12">
                     <StackPanel>
                         <Grid x:Name="ReviewGuidePeriod"><TextBlock Text="周期总结" Style="{StaticResource SectionTitleStyle}"/><Button Content="按当前快照生成事实草稿" Command="{Binding GeneratePeriodDraftCommand}" HorizontalAlignment="Right"/></Grid>
@@ -449,6 +546,23 @@
                         <TextBlock Text="下一周期唯一动作" Style="{StaticResource EditorLabel}"/><TextBox Text="{Binding PeriodNextAction}" AcceptsReturn="True" Height="55" TextWrapping="Wrap"/>
                         <Button Content="保存周期总结" Command="{Binding SavePeriodReviewCommand}" Style="{StaticResource PrimaryButtonStyle}" HorizontalAlignment="Left" Margin="0,8,0,0"/>
                     </StackPanel>
+                </Border>
+                <Border Style="{StaticResource PageCardStyle}" Padding="12" Margin="0,0,0,8">
+                    <Expander Header="配置交易时段" IsExpanded="False"><StackPanel>
+                        <Grid><TextBlock Text="自定义交易时段" Style="{StaticResource SectionTitleStyle}"/><Button Content="新建时段" Command="{Binding NewTradingSessionCommand}" HorizontalAlignment="Right"/></Grid>
+                        <TextBlock Text="具名时区会按每个交易日期应用夏令时；跨午夜时段归入开始日。时段重叠时按顺序较小者优先。" Style="{StaticResource MutedTextStyle}" Margin="0,3,0,7" TextWrapping="Wrap"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition Width="0.8*"/></Grid.ColumnDefinitions>
+                            <StackPanel Margin="0,0,6,0"><TextBlock Text="名称" Style="{StaticResource EditorLabel}"/><TextBox Text="{Binding TradingSessionName, UpdateSourceTrigger=PropertyChanged}"/></StackPanel>
+                            <StackPanel Grid.Column="1" Margin="0,0,6,0"><TextBlock Text="具名时区" Style="{StaticResource EditorLabel}"/><TextBox Text="{Binding TradingSessionTimeZone, UpdateSourceTrigger=PropertyChanged}" ToolTip="例如 China Standard Time 或 America/New_York"/></StackPanel>
+                            <StackPanel Grid.Column="2" Margin="0,0,6,0"><TextBlock Text="开始 / 结束" Style="{StaticResource EditorLabel}"/><Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions><TextBox Text="{Binding TradingSessionStart, UpdateSourceTrigger=PropertyChanged}"/><TextBox Grid.Column="1" Text="{Binding TradingSessionEnd, UpdateSourceTrigger=PropertyChanged}" Margin="4,0,0,0"/></Grid></StackPanel>
+                            <StackPanel Grid.Column="3"><TextBlock Text="顺序" Style="{StaticResource EditorLabel}"/><TextBox Text="{Binding TradingSessionOrder, UpdateSourceTrigger=PropertyChanged}"/></StackPanel>
+                        </Grid>
+                        <Grid Margin="0,6,0,8"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><TextBlock Text="开始日（每天，或周一、周二…）" Style="{StaticResource EditorLabel}"/><TextBox Text="{Binding TradingSessionDays, UpdateSourceTrigger=PropertyChanged}"/></StackPanel><CheckBox Grid.Column="1" Content="启用" IsChecked="{Binding TradingSessionActive}" VerticalAlignment="Bottom" Margin="10,0"/><Button Grid.Column="2" Content="保存时段" Command="{Binding SaveTradingSessionCommand}" Style="{StaticResource PrimaryButtonStyle}" VerticalAlignment="Bottom"/></Grid>
+                        <ListView ItemsSource="{Binding TradingSessions}" MaxHeight="170"><ListView.View><GridView>
+                            <GridViewColumn Header="名称" Width="110" DisplayMemberBinding="{Binding Name}"/><GridViewColumn Header="当地时间" Width="95" DisplayMemberBinding="{Binding Time}"/><GridViewColumn Header="时区" Width="165" DisplayMemberBinding="{Binding TimeZone}"/><GridViewColumn Header="开始日" Width="190" DisplayMemberBinding="{Binding Days}"/><GridViewColumn Header="状态" Width="55" DisplayMemberBinding="{Binding Status}"/><GridViewColumn Header="编辑" Width="55"><GridViewColumn.CellTemplate><DataTemplate><Button Content="选择" Command="{Binding OpenCommand}" Padding="6,2"/></DataTemplate></GridViewColumn.CellTemplate></GridViewColumn>
+                        </GridView></ListView.View></ListView>
+                    </StackPanel></Expander>
                 </Border>
             </StackPanel></ScrollViewer>
         </TabItem>
@@ -459,22 +573,41 @@
                 <StackPanel Margin="0,0,5,0">
                     <Border Style="{StaticResource PageCardStyle}" Padding="12" Margin="0,0,0,8"><StackPanel>
                         <TextBlock x:Name="ReviewGuidePlaybook" Text="策略规则模板（保存即新版本）" Style="{StaticResource SectionTitleStyle}"/>
-                        <TextBox Text="{Binding PlaybookName}" ToolTip="模板名称" Style="{StaticResource CompactInput}"/><TextBox Text="{Binding PlaybookSymbols}" ToolTip="适用品种" Style="{StaticResource CompactInput}"/><TextBox Text="{Binding PlaybookConditions}" ToolTip="市场环境" Style="{StaticResource CompactInput}"/><TextBox Text="{Binding PlaybookInvalidWhen}" ToolTip="失效条件" Style="{StaticResource CompactInput}"/>
-                        <TextBlock Text="每行：分区|规则名|说明|关键/普通" Style="{StaticResource MutedTextStyle}"/><TextBox Text="{Binding PlaybookRules}" AcceptsReturn="True" Height="110" TextWrapping="Wrap"/>
-                        <Button Content="保存策略版本" Command="{Binding SavePlaybookCommand}" Style="{StaticResource PrimaryButtonStyle}" Margin="0,8,0,0"/>
-                        <ItemsControl ItemsSource="{Binding Playbooks}" Margin="0,8,0,0"><ItemsControl.ItemTemplate><DataTemplate><StackPanel Orientation="Horizontal"><TextBlock Text="{Binding Name}"/><TextBlock Text=" · "/><TextBlock Text="{Binding Version}" Foreground="#8491A0"/></StackPanel></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+                        <TextBlock Text="策略名称" Style="{StaticResource EditorLabel}"/><TextBox Text="{Binding PlaybookName}" ToolTip="模板名称" Style="{StaticResource CompactInput}"/><TextBlock Text="适用品种（逗号分隔）" Style="{StaticResource EditorLabel}"/><TextBox Text="{Binding PlaybookSymbols}" ToolTip="适用品种" Style="{StaticResource CompactInput}"/><TextBlock Text="适用市场环境" Style="{StaticResource EditorLabel}"/><TextBox Text="{Binding PlaybookConditions}" ToolTip="市场环境" Style="{StaticResource CompactInput}"/><TextBlock Text="策略失效条件" Style="{StaticResource EditorLabel}"/><TextBox Text="{Binding PlaybookInvalidWhen}" ToolTip="失效条件" Style="{StaticResource CompactInput}"/>
+                        <DockPanel Margin="0,10,0,7"><Button DockPanel.Dock="Right" Content="添加规则" Command="{Binding AddPlaybookRuleCommand}" Padding="7,3"/>
+                            <TextBlock Text="执行规则" FontWeight="SemiBold" VerticalAlignment="Center"/></DockPanel>
+                        <ItemsControl ItemsSource="{Binding PlaybookRuleDrafts}"><ItemsControl.ItemTemplate><DataTemplate>
+                            <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,0,0,6">
+                                <StackPanel>
+                                    <DockPanel><Button DockPanel.Dock="Right" Content="删除" Command="{Binding RemoveCommand}" Padding="6,3" Margin="5,0,0,0"/>
+                                        <CheckBox DockPanel.Dock="Right" Content="关键规则" IsChecked="{Binding IsCritical}" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                                        <ComboBox ItemsSource="{Binding Sections}" SelectedItem="{Binding Section}" AutomationProperties.Name="规则阶段"/>
+                                    </DockPanel>
+                                    <TextBlock Text="规则名称" Style="{StaticResource EditorLabel}"/><TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"/>
+                                    <TextBlock Text="核对依据" Style="{StaticResource EditorLabel}"/><TextBox Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}"/>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+                        <TextBlock Text="{Binding RuleEditorError}" Foreground="#E5B965" TextWrapping="Wrap"/>
+                        <Button Content="保存策略版本" Command="{Binding SavePlaybookCommand}" IsEnabled="{Binding CanSavePlaybookRules}" Style="{StaticResource PrimaryButtonStyle}" Margin="0,8,0,0"/>
+                        <TextBlock Text="已保存策略（选择后可继续完善）" Style="{StaticResource EditorLabel}"/><ItemsControl ItemsSource="{Binding Playbooks}" Margin="0,8,0,0"><ItemsControl.ItemTemplate><DataTemplate><Button Command="{Binding OpenCommand}" HorizontalContentAlignment="Stretch" Padding="8,6" Margin="0,0,0,5"><Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="{Binding Name}"/><TextBlock Grid.Column="1" Text="{Binding Version}" Foreground="#8491A0"/></Grid></Button></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
                     </StackPanel></Border>
                     <Border Style="{StaticResource PageCardStyle}" Padding="12"><StackPanel>
-                        <TextBlock Text="交易想法分组" Style="{StaticResource SectionTitleStyle}"/><TextBox Text="{Binding CampaignName}" ToolTip="分组名称" Style="{StaticResource CompactInput}"/><TextBox Text="{Binding CampaignMembers}" ToolTip="position ID，逗号分隔" Style="{StaticResource CompactInput}"/><TextBox Text="{Binding CampaignThesis}" ToolTip="共同交易想法" AcceptsReturn="True" Height="65" TextWrapping="Wrap"/><Button Content="保存分组" Command="{Binding SaveCampaignCommand}" Margin="0,8,0,0"/>
+                        <TextBlock Text="交易想法分组" Style="{StaticResource SectionTitleStyle}"/>
+                        <TextBlock Text="把围绕同一判断的多笔交易放在一起复盘。" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,4,0,7"/>
+                        <TextBlock Text="分组名称" Style="{StaticResource EditorLabel}"/><TextBox Text="{Binding CampaignName}" Style="{StaticResource CompactInput}"/>
+                        <Button Content="加入档案中勾选的交易" Command="{Binding UseSelectedCampaignTradesCommand}" Margin="0,5,0,5"/>
+                        <TextBlock Text="成员交易编号（可补填）" Style="{StaticResource EditorLabel}"/><TextBox Text="{Binding CampaignMembers}" ToolTip="position ID，逗号分隔" Style="{StaticResource CompactInput}"/>
+                        <TextBlock Text="共同交易想法" Style="{StaticResource EditorLabel}"/><TextBox Text="{Binding CampaignThesis}" AcceptsReturn="True" Height="65" TextWrapping="Wrap"/><Button Content="保存分组" Command="{Binding SaveCampaignCommand}" Margin="0,8,0,0"/>
                     </StackPanel></Border>
                 </StackPanel>
                 <StackPanel Grid.Column="1" Margin="5,0,0,0">
                     <Border Style="{StaticResource PageCardStyle}" Padding="12"><StackPanel>
                         <Grid x:Name="ReviewGuideGoals"><TextBlock Text="个人改进目标" Style="{StaticResource SectionTitleStyle}"/><Button Content="新建" Command="{Binding NewGoalCommand}" HorizontalAlignment="Right" Padding="8,2"/></Grid>
                         <TextBlock Text="选择活动目标后保存会建立新版本；旧基线和观察保持不变。" Style="{StaticResource MutedTextStyle}" Margin="0,3,0,5" TextWrapping="Wrap"/>
-                        <TextBox Text="{Binding GoalName}" ToolTip="目标名称" Style="{StaticResource CompactInput}"/><ComboBox ItemsSource="{Binding GoalRuleOptions}" SelectedItem="{Binding GoalRule}" ToolTip="自动规则或人工检查" Margin="0,3,8,6"/><TextBox Text="{Binding GoalMeasurement}" ToolTip="明确测量口径及分母" Style="{StaticResource CompactInput}"/><TextBox Text="{Binding GoalTarget}" ToolTip="目标值，可留空人工检查" Style="{StaticResource CompactInput}"/>
-                        <WrapPanel><TextBox Width="130" Text="{Binding GoalSymbols}" ToolTip="适用品种，逗号分隔；留空表示全部" Style="{StaticResource CompactInput}"/><TextBox Width="105" Text="{Binding GoalObservationWindow}" ToolTip="观察窗口（天）" Style="{StaticResource CompactInput}"/></WrapPanel>
-                        <TextBox Text="{Binding GoalEndCondition}" ToolTip="结束条件" Style="{StaticResource CompactInput}"/><CheckBox Content="启用桌宠提醒（仅自动规则目标可用）" IsChecked="{Binding GoalNotificationEnabled}" Margin="0,5"/><Button Content="保存新目标 / 新版本" Command="{Binding SaveGoalCommand}" Style="{StaticResource PrimaryButtonStyle}" Margin="0,5,0,8"/>
+                        <TextBlock Text="改进目标名称" Style="{StaticResource EditorLabel}"/><TextBox Text="{Binding GoalName}" ToolTip="目标名称" Style="{StaticResource CompactInput}"/><ComboBox ItemsSource="{Binding GoalRuleOptions}" SelectedItem="{Binding GoalRule}" ToolTip="自动规则或人工检查" Margin="0,3,8,6"/><TextBlock Text="检查方式与统计口径" Style="{StaticResource EditorLabel}"/><TextBox Text="{Binding GoalMeasurement}" ToolTip="明确测量口径及分母" Style="{StaticResource CompactInput}"/><TextBlock Text="目标值（人工检查可留空）" Style="{StaticResource EditorLabel}"/><TextBox Text="{Binding GoalTarget}" ToolTip="目标值，可留空人工检查" Style="{StaticResource CompactInput}"/>
+                        <WrapPanel><StackPanel><TextBlock Text="适用品种（可留空）" Style="{StaticResource EditorLabel}"/><TextBox Width="130" Text="{Binding GoalSymbols}" ToolTip="多个品种用逗号分隔；留空表示全部" Style="{StaticResource CompactInput}"/></StackPanel><StackPanel><TextBlock Text="观察天数" Style="{StaticResource EditorLabel}"/><TextBox Width="105" Text="{Binding GoalObservationWindow}" Style="{StaticResource CompactInput}"/></StackPanel></WrapPanel>
+                        <TextBlock Text="完成或结束条件" Style="{StaticResource EditorLabel}"/><TextBox Text="{Binding GoalEndCondition}" ToolTip="结束条件" Style="{StaticResource CompactInput}"/><CheckBox Content="启用桌宠提醒（仅自动规则目标可用）" IsChecked="{Binding GoalNotificationEnabled}" Margin="0,5"/><Button Content="保存新目标 / 新版本" Command="{Binding SaveGoalCommand}" Style="{StaticResource PrimaryButtonStyle}" Margin="0,5,0,8"/>
                         <ItemsControl ItemsSource="{Binding Goals}"><ItemsControl.ItemTemplate><DataTemplate><Border BorderBrush="#253244" BorderThickness="0,0,0,1" Padding="0,5"><Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><WrapPanel><TextBlock Text="{Binding Name}" FontWeight="SemiBold"/><TextBlock Text=" · "/><TextBlock Text="{Binding Status}" Foreground="#8491A0"/></WrapPanel><TextBlock Text="{Binding Measurement}" Style="{StaticResource MutedTextStyle}"/><TextBlock Text="{Binding Target, StringFormat=目标：{0}}"/><TextBlock Text="{Binding ObservationSummary}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap"/></StackPanel><Button Grid.Column="1" Content="查看/升级" Command="{Binding OpenCommand}" Margin="8,0,0,0" VerticalAlignment="Top" Padding="7,2"/><Button Grid.Column="2" Content="归档" Command="{Binding ArchiveCommand}" IsEnabled="{Binding CanArchive}" Margin="5,0,0,0" VerticalAlignment="Top" Padding="7,2"/></Grid></Border></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
                     </StackPanel></Border>
                 </StackPanel>
@@ -484,15 +617,16 @@
         <TabItem Header="机会记录" ToolTip="记录没成交的机会：新建后填写品种、预设条件和未参与原因，保存后可补截图。报告导出与备份在控制台“报告与数据”页。">
             <Grid Margin="0,6,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="1.05*"/><ColumnDefinition Width="1.3*"/></Grid.ColumnDefinitions>
                 <Border Style="{StaticResource PageCardStyle}" Padding="14" Margin="0,0,8,0"><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel>
-                    <Grid x:Name="ReviewGuideOpportunity"><TextBlock Text="记录未成交机会或合理放弃" Style="{StaticResource SectionTitleStyle}"/><Button Content="新建记录" Command="{Binding NewOpportunityCommand}" HorizontalAlignment="Right"/></Grid>
+                    <Grid x:Name="ReviewGuideOpportunity"><TextBlock Text="未成交机会" Style="{StaticResource SectionTitleStyle}"/><Button Content="新建记录" Command="{Binding NewOpportunityCommand}" HorizontalAlignment="Right"/></Grid>
+                    <TextBlock Text="记录错过的机会和主动放弃的交易，回看计划与执行。" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,6,0,4"/>
                     <ComboBox ItemsSource="{Binding OpportunityKindOptions}" SelectedItem="{Binding OpportunityKind}" Margin="0,8,0,5"/>
-                    <WrapPanel><TextBox Width="120" Text="{Binding OpportunitySymbol}" ToolTip="精确品种" Style="{StaticResource CompactInput}"/><ComboBox Width="85" ItemsSource="{Binding OpportunitySideOptions}" SelectedItem="{Binding OpportunitySide}" Margin="0,3,8,6"/></WrapPanel>
-                    <TextBox Text="{Binding OpportunityPlaybook}" ToolTip="策略版本 ID，可留空" Style="{StaticResource CompactInput}"/>
-                    <WrapPanel><TextBox Width="90" Text="{Binding OpportunityEntry}" ToolTip="参考入场" Style="{StaticResource CompactInput}"/><TextBox Width="90" Text="{Binding OpportunityStop}" ToolTip="参考止损" Style="{StaticResource CompactInput}"/><TextBox Width="90" Text="{Binding OpportunityTarget}" ToolTip="参考目标" Style="{StaticResource CompactInput}"/></WrapPanel>
+                    <WrapPanel><StackPanel><TextBlock Text="交易品种" Style="{StaticResource EditorLabel}"/><TextBox Width="120" Text="{Binding OpportunitySymbol}" ToolTip="例如 EURUSD；使用账户中的精确品种名" Style="{StaticResource CompactInput}"/></StackPanel><StackPanel><TextBlock Text="计划方向" Style="{StaticResource EditorLabel}"/><ComboBox Width="85" ItemsSource="{Binding OpportunitySideOptions}" SelectedItem="{Binding OpportunitySide}" Margin="0,3,8,6"/></StackPanel></WrapPanel>
+                    <TextBlock Text="关联策略（可选）" Style="{StaticResource EditorLabel}"/><TextBlock Text="{Binding OpportunityPlaybookLabel}" TextWrapping="Wrap"/><Button Content="关联选中的已保存策略" Command="{Binding UseLoadedOpportunityPlaybookCommand}" Margin="0,5,0,3" Padding="7,5"/>
+                    <WrapPanel><StackPanel><TextBlock Text="参考入场" Style="{StaticResource EditorLabel}"/><TextBox Width="80" Text="{Binding OpportunityEntry}" Style="{StaticResource CompactInput}" MinWidth="80"/></StackPanel><StackPanel><TextBlock Text="参考止损" Style="{StaticResource EditorLabel}"/><TextBox Width="80" Text="{Binding OpportunityStop}" Style="{StaticResource CompactInput}" MinWidth="80"/></StackPanel><StackPanel><TextBlock Text="参考目标" Style="{StaticResource EditorLabel}"/><TextBox Width="80" Text="{Binding OpportunityTarget}" Style="{StaticResource CompactInput}" MinWidth="80"/></StackPanel></WrapPanel>
                     <TextBlock Text="预设条件" Style="{StaticResource EditorLabel}"/><TextBox Text="{Binding OpportunityConditions}" ToolTip="当时预先观察的条件" AcceptsReturn="True" Height="55" TextWrapping="Wrap"/>
                     <TextBlock Text="未参与原因" Style="{StaticResource EditorLabel}"/><ComboBox ItemsSource="{Binding OpportunityReasonOptions}" Text="{Binding OpportunityReason, UpdateSourceTrigger=PropertyChanged}" IsEditable="True"/>
-                    <TextBox Text="{Binding OpportunityLinkedTrade}" ToolTip="后续关联 position ID，可留空" Style="{StaticResource CompactInput}" Margin="0,7,0,0"/>
-                    <TextBox Text="{Binding OpportunityNotes}" ToolTip="观察与后续复盘" AcceptsReturn="True" Height="85" TextWrapping="Wrap"/>
+                    <TextBlock Text="后续成交关联（可选）" Style="{StaticResource EditorLabel}"/><TextBlock Text="{Binding OpportunityLinkedTradeLabel}" TextWrapping="Wrap"/><Button Content="关联档案中当前交易" Command="{Binding UseSelectedOpportunityTradeCommand}" Margin="0,5,0,3" Padding="7,5"/><Expander Header="手动填写关联编号（可选）" Margin="0,6,0,6"><StackPanel><TextBlock Text="策略版本编号；清空可解除关联" Style="{StaticResource EditorLabel}"/><TextBox Text="{Binding OpportunityPlaybook}" Style="{StaticResource CompactInput}"/><TextBlock Text="交易编号；清空可解除关联" Style="{StaticResource EditorLabel}"/><TextBox Text="{Binding OpportunityLinkedTrade}" Style="{StaticResource CompactInput}"/></StackPanel></Expander>
+                    <TextBlock Text="观察与后续复盘" Style="{StaticResource EditorLabel}"/><TextBox Text="{Binding OpportunityNotes}" ToolTip="观察与后续复盘" AcceptsReturn="True" Height="85" TextWrapping="Wrap"/>
                     <WrapPanel Margin="0,8,0,0"><Button Content="保存机会记录" Command="{Binding SaveOpportunityCommand}" Style="{StaticResource PrimaryButtonStyle}"/><Button Content="导入机会截图" Command="{Binding ImportOpportunityAttachmentCommand}" Margin="7,0,0,0"/></WrapPanel>
                     <TextBlock Text="已选记录的证据" Style="{StaticResource EditorLabel}" Margin="0,8,0,0"/>
                     <ListBox ItemsSource="{Binding OpportunityAttachments}" MaxHeight="150" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" ScrollViewer.CanContentScroll="True"><ListBox.ItemTemplate><DataTemplate><Grid Margin="0,2"><Grid.ColumnDefinitions><ColumnDefinition Width="56"/><ColumnDefinition/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Image Source="{Binding Thumbnail}" Width="50" Height="38" Stretch="Uniform"/><TextBlock Grid.Column="1" Text="{Binding FileName}" ToolTip="{Binding Source}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/><Button Grid.Column="2" Content="打开" Command="{Binding OpenCommand}" Padding="6,2"/><Button Grid.Column="3" Content="删除" Command="{Binding DeleteCommand}" Padding="6,2" Margin="4,0,0,0"/></Grid></DataTemplate></ListBox.ItemTemplate></ListBox>

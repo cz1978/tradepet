@@ -168,7 +168,8 @@ public sealed record TradeReviewDocument(
     string? ReviewedRuleVersion,
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset UpdatedAtUtc,
-    DateTimeOffset? ReviewedAtUtc = null)
+    DateTimeOffset? ReviewedAtUtc = null,
+    bool IsQuickReview = false)
 {
     [JsonIgnore]
     public bool HasRequiredReviewContent =>

@@ -54,6 +54,7 @@ public sealed partial class AppDatabase : IReviewWorkspaceRepository
                 migration, cancellationToken);
         }
         await migrationTransaction.CommitAsync(cancellationToken);
+        await RepairLegacyQuickReviewsAsync(cancellationToken);
     }
 
     private async Task EnsureSupportedSchemaAsync(CancellationToken cancellationToken)

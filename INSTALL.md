@@ -1,10 +1,10 @@
 # TradePet 安装与升级说明
 
-适用于 **1.0.0-rc.8 / Windows 10、11 x64**。当前是候选版，支持 MT5 与 MT4；MT4 支持订单存档、有证据的部分平仓归集及实际报价回放。TradePet 不执行下单、平仓或改单。
+适用于 **1.0.0-rc.9 / Windows 10、11 x64**。支持 MT5 与 MT4；MT4 支持订单存档、有证据的部分平仓归集及实际报价回放。TradePet 不执行下单、平仓或改单。
 
-`rc.8` 增加宠物旁入场原因、快速复盘与独立开关、已保存复盘档案、实际行情背景和 GitHub 更新提醒，继续内置 Python 和采集依赖。从更早版本升级后应核对所选终端，并按需安装、重新挂载包内的桥接插件。
+`rc.9` 的本地修改更新复盘工作台的曲线、盈亏日历、月度表现、分类归因、策略规则表单与机会关联。保留 `rc.8` 的宠物旁入场原因、快速复盘与独立开关、已保存复盘档案、实际行情背景和 GitHub 更新提醒，继续内置 Python 和采集依赖。从更早版本升级后应核对所选终端，并按需安装、重新挂载包内的桥接插件。
 
-旧版 `rc.5` 及更早版本仍需手动配置 Python；建议下载 `rc.8` 完整便携包。
+旧版 `rc.5` 及更早版本仍需手动配置 Python；建议下载 `rc.9` 完整便携包。
 
 ## 图文快速安装
 
@@ -16,10 +16,12 @@
 
 ## 下载并启动
 
-1. 打开 [GitHub 发布页](https://github.com/cz1978/tradepet/releases/tag/v1.0.0-rc.8)。
-2. 在 Assets 中下载 `TradePet-1.0.0-rc.8-win-x64.zip`。`Source code` 是开发用源码，不是可运行安装包。
-3. 将 ZIP **完整解压**到自己的应用目录，例如 `D:\Apps\TradePet-1.0.0-rc.8`。
+1. 打开 [GitHub 发布页](https://github.com/cz1978/tradepet/releases/tag/v1.0.0-rc.9)。
+2. 在 Assets 中下载 `TradePet-1.0.0-rc.9-win-x64.zip`。`Source code` 是开发用源码，不是可运行安装包。
+3. 将 ZIP **完整解压**到自己的应用目录，例如 `D:\Apps\TradePet-1.0.0-rc.9`。
 4. 运行解压目录内的 `TradePet.exe`，跟随四步设置向导完成配置。不要在压缩包内直接运行，也不要只复制 EXE。
+
+需要直接打开复盘分析时，可运行 `TradePet.exe --review`；先从托盘退出已运行的旧版助手。
 
 便携包已包含 .NET 8、Python 和采集依赖，无需安装 .NET SDK 或 Python。保留同目录的 DLL、`Runtime` 和 `Assets` 文件夹。
 

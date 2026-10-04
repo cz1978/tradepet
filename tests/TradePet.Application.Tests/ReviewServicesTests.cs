@@ -10,6 +10,49 @@ public sealed class ReviewServicesTests
     private static readonly DateTimeOffset Now = new(2026, 9, 6, 4, 0, 0, TimeSpan.Zero);
 
     [Fact]
+    public async Task QuickReview_SaveCountsAsCompletedWithoutFullReviewAssessmentsAndUsesTradeBasis()
+    {
+        var repository = FakeRepository.Create();
+        var service = new JournalService(repository, new FixedTimeProvider(Now));
+        var command = new SaveTradeReviewCommand(new("Broker|1", 1), "", "主动平仓", "", "", "",
+            "已确认平仓原因", "", "", "source-1", "rule-1", ReviewCompletionStatus.Reviewed, IsQuickReview: true);
+        var result = await service.SaveTradeReviewAsync(command, 0);
+
+        Assert.True(result.IsSaved);
+        var document = result.Value!;
+        Assert.True(document.IsQuickReview);
+        Assert.Equal(ReviewCompletionStatus.Reviewed, document.Status);
+        Assert.Equal(Now, document.ReviewedAtUtc);
+        Assert.StartsWith("trade-v1:", document.ReviewedSourceVersion);
+        Assert.StartsWith("assessment-v1:", document.ReviewedRuleVersion);
+        var trade = repository.Trades[0];
+        var calculator = new ReviewWorkspaceCalculator();
+        var facts = calculator.BuildDailyFacts(trade.AccountKey, trade.CloseServerDate!.Value,
+            trade.CloseServerDate.Value, [trade], [], new Dictionary<long, TradeReviewDocument> { [1] = document },
+            [], new Dictionary<DateOnly, DailyState>(), 0)[trade.CloseServerDate.Value];
+        Assert.Equal(1, facts.ReviewedTradeCount);
+        Assert.Equal(100m, facts.ReviewCompletionPercentage);
+
+        var updated = await service.SaveTradeReviewAsync(command with { ExitReason = "修正平仓原因" }, 1);
+        Assert.True(updated.IsSaved);
+        Assert.Equal(2, updated.Value!.Revision);
+        var late = await service.SaveTradeReviewAsync(command, 1);
+        Assert.Equal(ReviewSaveStatus.Conflict, late.Status);
+        Assert.Equal("修正平仓原因", repository.Document!.ExitReason);
+    }
+
+    [Fact]
+    public async Task QuickReview_DoesNotCompleteWhenExitReasonIsEmpty()
+    {
+        var repository = FakeRepository.Create();
+        var command = new SaveTradeReviewCommand(new("Broker|1", 1), "", " ", "", "", "", "总结", "", "",
+            "source-1", "rule-1", ReviewCompletionStatus.Reviewed, IsQuickReview: true);
+        var result = await new JournalService(repository).SaveTradeReviewAsync(command, 0);
+        Assert.Equal(ReviewSaveStatus.ValidationFailed, result.Status);
+        Assert.Null(repository.Document);
+    }
+
+    [Fact]
     public async Task Journal_RequiresPersistedDraftAssessmentAndCompleteTradeBeforeReviewed()
     {
         var repository = FakeRepository.Create();

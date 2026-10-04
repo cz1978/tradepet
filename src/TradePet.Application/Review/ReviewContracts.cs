@@ -264,7 +264,8 @@ public sealed record SaveTradeReviewCommand(
     string MarketCondition,
     string SourceVersion,
     string RuleVersion,
-    ReviewCompletionStatus RequestedStatus);
+    ReviewCompletionStatus RequestedStatus,
+    bool IsQuickReview = false);
 
 public sealed record TradeReviewEditSubmission(
     EditSnapshot<SaveTradeReviewCommand> Snapshot,

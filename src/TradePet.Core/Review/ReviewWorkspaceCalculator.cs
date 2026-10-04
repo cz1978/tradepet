@@ -186,10 +186,8 @@ public sealed class ReviewWorkspaceCalculator
             var reviewedCount = completed.Count(item =>
                 documents.TryGetValue(item.PositionId, out var document) &&
                 document.Status == ReviewCompletionStatus.Reviewed);
-            var lossThresholdAt = FindLossThresholdReachedAt(completed, state?.ConsecutiveLossThresholdAtObservation ?? 0);
-            var openingsAfterLoss = lossThresholdAt is null
-                ? (int?)null
-                : opened.Count(item => item.OpenedAtUtc > lossThresholdAt.Value);
+            var openingsAfterLoss = CountOpeningsAfterLossStreak(
+                completed, opened, state?.ConsecutiveLossThresholdAtObservation ?? 0);
             var cooldown = dailyBehaviors.Where(item => item.Rule == BehaviorRuleKind.CooldownViolation &&
                 item.Level is BehaviorRiskLevel.Attention or BehaviorRiskLevel.Critical).ToArray();
             var timeline = BuildDailyTimeline(
@@ -675,8 +673,9 @@ public sealed class ReviewWorkspaceCalculator
         !string.IsNullOrWhiteSpace(state.TargetRuleVersion) &&
         DateOnly.FromDateTime(state.TargetReachedAtUtc.Value.ToOffset(offset).DateTime) == date;
 
-    private static DateTimeOffset? FindLossThresholdReachedAt(
+    private static int? CountOpeningsAfterLossStreak(
         IReadOnlyCollection<TradeRecord> completed,
+        IReadOnlyCollection<TradeRecord> opened,
         int threshold)
     {
         if (threshold <= 0)
@@ -685,15 +684,21 @@ public sealed class ReviewWorkspaceCalculator
         }
 
         var streak = 0;
-        foreach (var trade in completed.OrderBy(item => item.ClosedAtUtc))
+        var count = 0;
+        var events = completed.Select(item =>
+                (AtUtc: item.ClosedAtUtc!.Value, item.PositionId, IsClose: true, item.NetPnl))
+            .Concat(opened.Select(item =>
+                (AtUtc: item.OpenedAtUtc, item.PositionId, IsClose: false, NetPnl: 0m)))
+            .OrderBy(item => item.AtUtc).ThenBy(item => item.PositionId).ThenBy(item => item.IsClose);
+        foreach (var item in events)
         {
-            streak = trade.NetPnl < -BreakevenEpsilon ? streak + 1 : 0;
-            if (streak >= threshold)
+            if (item.IsClose)
             {
-                return trade.ClosedAtUtc;
+                streak = item.NetPnl < -BreakevenEpsilon ? streak + 1 : 0;
             }
+            else if (streak >= threshold) count++;
         }
-        return null;
+        return count;
     }
 
     private static int GetConsecutiveLossCount(IReadOnlyCollection<TradeRecord> completed)

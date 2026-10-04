@@ -1893,11 +1893,15 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
     {
         var key = new TradeKey(trade.AccountKey, trade.PositionId);
         var detail = await _reviewRepository.LoadTradeDetailAsync(key, _cancellation.Token);
-        var command = new SaveTradeReviewCommand(key, detail?.EntryReasonNote?.Reason ?? string.Empty,
-            dialog.ExitReason, string.Empty,
-            dialog.Improvement, dialog.Improvement, dialog.AnalysisSummary, string.Empty, string.Empty,
-            version.SourceVersion.ToString(CultureInfo.InvariantCulture), version.RuleVersion, ReviewCompletionStatus.Draft);
-        var result = await _journalService.SaveTradeReviewAsync(command, 0, _cancellation.Token);
+        var existing = detail?.Document;
+        var command = new SaveTradeReviewCommand(key, existing?.EntryReason ?? detail?.EntryReasonNote?.Reason ?? string.Empty,
+            dialog.ExitReason, existing?.DidWell ?? string.Empty,
+            dialog.Improvement, existing is not null && existing.NextAction != existing.ToImprove
+                ? existing.NextAction : dialog.Improvement, dialog.AnalysisSummary,
+            existing?.Emotion ?? string.Empty, existing?.MarketCondition ?? string.Empty,
+            version.SourceVersion.ToString(CultureInfo.InvariantCulture), version.RuleVersion,
+            ReviewCompletionStatus.Reviewed, IsQuickReview: true);
+        var result = await _journalService.SaveTradeReviewAsync(command, dialog.DocumentRevision, _cancellation.Token);
         if (!result.IsSaved) return result.Message;
         try
         {
@@ -4015,6 +4019,11 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         {
             return;
         }
+        if (!review.CanSavePlaybookRules)
+        {
+            review.StatusText = review.RuleEditorError;
+            return;
+        }
         var parsedRules = new List<PlaybookRule>();
         var order = 0;
         foreach (var line in review.PlaybookRules.Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
@@ -5032,6 +5041,9 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
 
     private async Task ApplyInMemoryReviewFallbackAsync(Exception? exception = null)
     {
+        _lastWorkspaceQuery = null;
+        await OnUiAsync(() => _viewModel.ReviewWorkspace.MarkDataUnavailable(
+            "本地历史数据读取失败，统计暂不可用；请恢复数据库或重新查询。"));
         if (exception is not null)
         {
             AppLog.Write($"Review database query failed; using current-session data: {exception}");

@@ -2,9 +2,9 @@
 
 > 陪你交易，不替你交易。
 
-**当前版本：1.0.0-rc.8（候选版，2026-10-04）** · [下载 Windows 便携版](https://github.com/cz1978/tradepet/releases/tag/v1.0.0-rc.8) · [安装与升级说明](INSTALL.md) · [更新日志](CHANGELOG.md) · [MIT 许可证](LICENSE)
+**当前版本：1.0.0-rc.9** · [下载 Windows 便携版](https://github.com/cz1978/tradepet/releases/tag/v1.0.0-rc.9) · [安装与升级说明](INSTALL.md) · [更新日志](CHANGELOG.md) · [MIT 许可证](LICENSE)
 
-`rc.8` 将快速复盘与入场原因记录放到宠物旁，默认自动提示、各自可关闭；已保存的快速复盘直接进入交易档案。每日盈利目标支持金额或百分比，日报增加实际 M5 行情背景，周期报告直接导出全部筛选交易，并新增 GitHub 版本检查。继续内置 Python、MT4/MT5 只读插件和安装说明。
+`rc.9` 的本地修改包括快速复盘完成率、连亏后开仓计数和当前日期刷新修复，以及新版复盘工作台：可下钻的收益、回撤与净值曲线，盈亏日历、月度表现、盈亏分布与多维归因，结构化策略规则表单和机会关联。保留 `rc.8` 的宠物旁快速复盘、入场原因、已保存复盘档案与 GitHub 更新提醒。继续内置 Python、MT4/MT5 只读插件和安装说明。
 
 TradePet 是一款面向 Windows 的本地交易桌宠。它以只读方式连接 MT5 或 MT4，把持仓、风险、快速记录、复盘、宏观事件和每日报告收进桌面助手里。
 
@@ -74,11 +74,11 @@ TradePet 会把完整亏损交易投影为可追溯的价格区域，记录进�
 
 **[查看图文安装教程（含 Bridge 安装与挂图）](docs/images/tradepet-rc6-install-guide.png)**。Python 已内置，Bridge 仍需点击安装，再手动拖到交易终端的图表上运行。
 
-普通用户请下载发布页中的 **`TradePet-1.0.0-rc.8-win-x64.zip`**，完整解压后运行 `TradePet.exe`。不要下载 GitHub 自动生成的 `Source code` 源码包作为安装包，也不要单独移动 EXE。
+普通用户请下载发布页中的 **`TradePet-1.0.0-rc.9-win-x64.zip`**，完整解压后运行 `TradePet.exe`。不要下载 GitHub 自动生成的 `Source code` 源码包作为安装包，也不要单独移动 EXE。
 
-`rc.8` 便携包已包含 .NET 8、64 位 Python 3.13、MetaTrader5/NumPy 依赖、MT4/MT5 只读插件和安装文档，无需另装 Python 或联网下载依赖。旧版 `rc.5` 及更早版本未包含 Python，建议升级；MT4 无需 Python。首次配置、升级保留数据、校验安装包和排障步骤见 [INSTALL.md](INSTALL.md)。
+`rc.9` 便携包已包含 .NET 8、64 位 Python 3.13、MetaTrader5/NumPy 依赖、MT4/MT5 只读插件和安装文档，无需另装 Python 或联网下载依赖。旧版 `rc.5` 及更早版本未包含 Python，建议升级；MT4 无需 Python。首次配置、升级保留数据、校验安装包和排障步骤见 [INSTALL.md](INSTALL.md)。
 
-### 平台支持范围（rc.8）
+### 平台支持范围（rc.9）
 
 | 功能 | MT5 | MT4 |
 | --- | --- | --- |
