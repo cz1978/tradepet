@@ -31,7 +31,7 @@ try {
         'CHANGELOG.md', 'CHANGELOG.en.md', 'Runtime/python-runtime/python.exe', 'Runtime/TradePetBridge.ex5', 'Runtime/mt4/TradePetBridge.ex4')) {
         if ($required -notin $entries) { throw "Package is missing $required." }
     }
-    if ($entries -match '(?i)(^|/)(\.git|bin|obj|TestResults)(/|$)|\.(db|sqlite|log|pfx|pem|key)$|(^|/)(\.env|appsettings\.Local\.json)$') {
+    if ($entries -match '(?i)(^|/)(\.git|TestResults)(/|$)|^(bin|obj)/|\.(db|sqlite|sqlite3|log|pfx|pem|key)$|\.db-[^/]+$|(^|/)(\.env(\.[^/]+)?|appsettings\.Local\.json)$') {
         throw 'Package contains user data or development files.'
     }
     New-Item -ItemType Directory -Path $verificationDirectory | Out-Null
