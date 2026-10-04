@@ -2,6 +2,19 @@
 
 English | [简体中文](CHANGELOG.md)
 
+## 1.0.0-rc.10 — 2026-10-05
+
+- Pet popups now capture execution, emotional state, skipped opportunities and trading summaries alongside quick entry reasons/reviews.
+- Seven automatically observed seven-day goals cover cooldown, size increases after a loss, dense entries, rushing back after a loss, loss-zone reentry, repeated price-area entries and price concentration. Recent reminders determine ordering; details collapse so choices remain visible. Disabled rules, missing evidence and inapplicable entries do not become passes.
+- Saving a quick review completes it; subsequent summary edits retain completion. Reports, calendar and workspace share completion semantics, explicit account/date scope and deduplicated trade P/L associations.
+- Exit-reason choices show the same selection highlight as execution/emotion choices. Inferred reasons, manual corrections and reopening saved reviews remain synchronized while preserving inference labels and handwritten text.
+- Eight top-level pet menu entries retain direct access to common popups; review tools and display/settings are grouped. Tray menus match.
+- SL/TP and volume changes retain sampled timing; unsampled edit times and unreconstructed opening-day positions are not invented.
+- Local updates deploy to the existing shortcut installation. GitHub publishing verifies the source commit, tag, package version and assets.
+- The complete Windows x64 ZIP and SHA256 checksum retain .NET 8, isolated Python, MetaTrader5/NumPy, MT4/MT5 read-only bridges and bilingual docs. Schema 11 and protocols remain compatible.
+
+Validation: 411 .NET tests and 23 Python tests passed, covering review accounting, goal applicability, localization, WPF pet interaction and backup recovery. Portable-package verification results appear in this version's GitHub release notes.
+
 ## 1.0.0-rc.9 — 2026-10-04
 
 - Simplified Chinese / English UI preference, saved across restart. Pages, pet cards, tray menus, dynamic messages, field descriptions and new reports use the selected language. Raw trade data, handwritten reviews and existing reports retain their original content.
