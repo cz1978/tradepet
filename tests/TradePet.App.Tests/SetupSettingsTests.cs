@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.IO;
 using System.Reflection;
 using System.Text.Json;
 using TradePet.App.Runtime;
@@ -19,6 +20,7 @@ public sealed class SetupSettingsTests
         var settings = JsonSerializer.Deserialize(oldJson, type, ProtocolJson.Options)!;
         Assert.Equal(0, type.GetProperty("SetupVersion")!.GetValue(settings));
         Assert.Equal(TradingPlatform.Mt5, type.GetProperty("Platform")!.GetValue(settings));
+        Assert.Equal("zh-CN", type.GetProperty("UiLanguage")!.GetValue(settings));
         foreach (var name in new[] { "QuickReviewPromptEnabled", "EntryReasonPromptEnabled", "UpdateNotificationsEnabled" })
             Assert.Equal(true, type.GetProperty(name)!.GetValue(settings));
         var json = JsonSerializer.SerializeToNode(settings, type, ProtocolJson.Options)!;
@@ -42,6 +44,37 @@ public sealed class SetupSettingsTests
         var restored = JsonSerializer.Deserialize(JsonSerializer.Serialize(settings, type, ProtocolJson.Options), type, ProtocolJson.Options)!;
         foreach (var name in new[] { "QuickReviewPromptEnabled", "EntryReasonPromptEnabled", "UpdateNotificationsEnabled" })
             Assert.Equal(false, type.GetProperty(name)!.GetValue(restored));
+    }
+
+    [Fact]
+    public async Task UiLanguage_IsPersistedWithDesktopSettingsAndLoadedBeforeWindowCreation()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "tradepet-language-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, "tradepet.db");
+        try
+        {
+            var database = new TradePet.Infrastructure.Persistence.AppDatabase(path);
+            await database.InitializeAsync();
+            Assert.Equal("zh-CN", await TradePet.App.Localization.UiLanguagePreference.LoadAsync(path));
+            var settingsType = typeof(TradePetRuntime).GetNestedType("DesktopSettings", BindingFlags.NonPublic)!;
+            var settings = JsonSerializer.Deserialize("""{"uiLanguage":"en-US","quickReviewPromptEnabled":false,"platform":"mt4"}""", settingsType, ProtocolJson.Options)!;
+            await database.SaveSettingAsync("global", "desktop", settings);
+            Assert.Equal("en-US", await TradePet.App.Localization.UiLanguagePreference.LoadAsync(path));
+            var restored = JsonSerializer.Deserialize(JsonSerializer.Serialize(settings, settingsType, ProtocolJson.Options), settingsType, ProtocolJson.Options)!;
+            Assert.Equal(false, settingsType.GetProperty("QuickReviewPromptEnabled")!.GetValue(restored));
+            Assert.Equal(TradingPlatform.Mt4, settingsType.GetProperty("Platform")!.GetValue(restored));
+            var vm = new MainViewModel { UiLanguage = "en-GB" };
+            Assert.Equal("en-US", vm.UiLanguage);
+            Assert.Equal(new[] { "zh-CN", "en-US" }, vm.UiLanguageOptions.Select(option => option.Code));
+            vm.UiLanguage = "unsupported";
+            Assert.Equal("zh-CN", vm.UiLanguage);
+        }
+        finally
+        {
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            Directory.Delete(directory, recursive: true);
+        }
     }
 
     [Fact]

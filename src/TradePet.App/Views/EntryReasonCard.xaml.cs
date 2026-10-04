@@ -15,11 +15,11 @@ public partial class EntryReasonCard : System.Windows.Controls.UserControl
     public EntryReasonCard(TradeRecord trade, int serverUtcOffsetSeconds)
     {
         InitializeComponent();
-        TradeText.Text = $"{trade.Symbol} · {(trade.Side == TradeSide.Buy ? "买入" : "卖出")} · #{trade.PositionId} · {trade.OpenedAtUtc.ToOffset(TimeSpan.FromSeconds(serverUtcOffsetSeconds)):HH:mm:ss} 服务器";
+        TradeText.Text = TradePet.Core.Localization.UiText.Translate($"{trade.Symbol} · {(trade.Side == TradeSide.Buy ? "买入" : "卖出")} · #{trade.PositionId} · {trade.OpenedAtUtc.ToOffset(TimeSpan.FromSeconds(serverUtcOffsetSeconds)):HH:mm:ss} 服务器");
     }
     private void Reason_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is System.Windows.Controls.Button { Tag: string reason }) ReasonBox.Text = reason;
+        if (sender is System.Windows.Controls.Button { Tag: string reason }) ReasonBox.Text = TradePet.Core.Localization.UiText.Translate(reason);
     }
     private void Reason_TextChanged(object sender, TextChangedEventArgs e)
     {
@@ -28,15 +28,15 @@ public partial class EntryReasonCard : System.Windows.Controls.UserControl
     private async void Save_Click(object sender, RoutedEventArgs e)
     {
         if (_saving || IsCompleted) return;
-        if (Reason.Length == 0) { StatusText.Text = "请选择原因，或点击跳过。"; return; }
+        if (Reason.Length == 0) { StatusText.Text = TradePet.Core.Localization.UiText.Translate("请选择原因，或点击跳过。"); return; }
         _saving = true;
         FooterButtons.IsEnabled = false;
-        StatusText.Text = "正在记录…";
+        StatusText.Text = TradePet.Core.Localization.UiText.Translate("正在记录…");
         string? error;
         try { error = SaveReasonAsync is null ? "本地记录尚未就绪，请稍后重试。" : await SaveReasonAsync(this); }
         catch (Exception) { error = "记录失败，内容仍保留，请重试。"; }
         finally { _saving = false; FooterButtons.IsEnabled = true; }
-        if (error is not null) { StatusText.Text = error; return; }
+        if (error is not null) { StatusText.Text = TradePet.Core.Localization.UiText.Translate(error); return; }
         Dismiss();
     }
     private void Skip_Click(object sender, RoutedEventArgs e) => Dismiss();

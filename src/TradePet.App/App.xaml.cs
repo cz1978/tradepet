@@ -43,6 +43,8 @@ public partial class App : System.Windows.Application
         }
 
         var dependencies = TradePetRuntimeDependencies.CreateDefault();
+        TradePet.Core.Localization.UiText.Configure(await Localization.UiLanguagePreference.LoadAsync(
+            TradePet.Infrastructure.Persistence.TradePetPaths.GetDatabasePath()));
         var viewModel = new MainViewModel(dependencies.Scheduler, dependencies.TimeProvider);
         viewModel.PropertyChanged += (_, args) =>
         {
@@ -192,8 +194,8 @@ public partial class App : System.Windows.Application
                     if (preparation.DraftPath is null)
                     {
                         var retry = System.Windows.MessageBox.Show(
-                            $"{preparation.Message}\n\n恢复草稿也未能写入。选择“是”重试保存；选择“否”返回程序。",
-                            "仍有内容未保存",
+                            TradePet.Core.Localization.UiText.Translate($"{preparation.Message}\n\n恢复草稿也未能写入。选择“是”重试保存；选择“否”返回程序。"),
+                            TradePet.Core.Localization.UiText.Translate("仍有内容未保存"),
                             MessageBoxButton.YesNo,
                             MessageBoxImage.Warning,
                             MessageBoxResult.No);
@@ -205,8 +207,8 @@ public partial class App : System.Windows.Application
                     }
 
                     var choice = System.Windows.MessageBox.Show(
-                        $"{preparation.Message}\n\n恢复草稿已写入：\n{preparation.DraftPath}\n\n“是”重试保存；“否”保留该文件并退出；“取消”返回程序。",
-                        "仍有内容未保存",
+                        TradePet.Core.Localization.UiText.Translate($"{preparation.Message}\n\n恢复草稿已写入：\n{preparation.DraftPath}\n\n“是”重试保存；“否”保留该文件并退出；“取消”返回程序。"),
+                        TradePet.Core.Localization.UiText.Translate("仍有内容未保存"),
                         MessageBoxButton.YesNoCancel,
                         MessageBoxImage.Warning,
                         MessageBoxResult.Cancel);

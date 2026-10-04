@@ -45,13 +45,13 @@ public static class DailyMarketContextAnalyzer
             lines.Add($"{symbol} · 已覆盖行情 O/H/L/C {N(bars[0].Open)} / {N(high)} / {N(low)} / {N(bars[^1].Close)}；" +
                 $"价格变化 {N(change)}（{N(change / bars[0].Open * 100m)}%）；高低差 {N(range)}；末价位于区间 {Maybe(closeLocation)}%。");
             lines.Add($"{symbol} · 最高价所在 M5 开始 {Time(bars.First(b => b.High == high).OpenedAtUtc)}；最低价所在 M5 开始 {Time(bars.First(b => b.Low == low).OpenedAtUtc)}。");
-            markdown.AppendLine($"### {Cell(symbol)} · 当日 M5 原始行情").AppendLine();
-            markdown.AppendLine("价格使用所连终端的 K 线口径；开平仓成交价可能受买卖价差影响。时间为交易服务器时间。末根可能尚未收盘，覆盖不足时不能视为全天 OHLC。").AppendLine();
-            markdown.AppendLine("| M5 开始 | 开 | 高 | 低 | 收 | Tick量 | 点差（终端点） |");
+            markdown.AppendLine(TradePet.Core.Localization.UiText.Translate($"### {Cell(symbol)} · 当日 M5 原始行情")).AppendLine();
+            markdown.AppendLine(TradePet.Core.Localization.UiText.Translate("价格使用所连终端的 K 线口径；开平仓成交价可能受买卖价差影响。时间为交易服务器时间。末根可能尚未收盘，覆盖不足时不能视为全天 OHLC。")).AppendLine();
+            markdown.AppendLine(TradePet.Core.Localization.UiText.Translate("| M5 开始 | 开 | 高 | 低 | 收 | Tick量 | 点差（终端点） |"));
             markdown.AppendLine("|---|---:|---:|---:|---:|---:|---:|");
             foreach (var bar in bars)
                 markdown.AppendLine($"| {Time(bar.OpenedAtUtc)} | {N(bar.Open)} | {N(bar.High)} | {N(bar.Low)} | {N(bar.Close)} | {bar.TickVolume} | {bar.Spread} |");
-            markdown.AppendLine().AppendLine("交易与行情位置（M5 边界 K 线含持仓窗口外价格；下列价格范围不等同于持仓货币 MAE/MFE）：").AppendLine();
+            markdown.AppendLine().AppendLine(TradePet.Core.Localization.UiText.Translate("交易与行情位置（M5 边界 K 线含持仓窗口外价格；下列价格范围不等同于持仓货币 MAE/MFE）：")).AppendLine();
             foreach (var trade in trades.Where(t => t.Symbol.Equals(symbol, StringComparison.OrdinalIgnoreCase)))
             {
                 var entry = bars.FirstOrDefault(b => b.OpenedAtUtc <= trade.OpenedAtUtc && b.OpenedAtUtc.AddMinutes(5) > trade.OpenedAtUtc);
@@ -59,10 +59,10 @@ public static class DailyMarketContextAnalyzer
                 var during = bars.Where(b => b.OpenedAtUtc < holdingEnd && b.OpenedAtUtc.AddMinutes(5) > trade.OpenedAtUtc).ToArray();
                 var after = trade.ClosedAtUtc is { } closed
                     ? bars.Where(b => b.OpenedAtUtc >= closed && b.OpenedAtUtc < closed.AddHours(1)).ToArray() : [];
-                markdown.AppendLine($"- #{trade.PositionId} · {(trade.Side == TradeSide.Buy ? "买入" : "卖出")} · 入场 {Time(trade.OpenedAtUtc)} @ {N(trade.EntryPrice)}；" +
+                markdown.AppendLine(TradePet.Core.Localization.UiText.Translate($"- #{trade.PositionId} · {(trade.Side == TradeSide.Buy ? "买入" : "卖出")} · 入场 {Time(trade.OpenedAtUtc)} @ {N(trade.EntryPrice)}；" +
                     (entry is null ? "缺少入场所在 M5。" : $"入场所在 M5 O/H/L/C {N(entry.Open)}/{N(entry.High)}/{N(entry.Low)}/{N(entry.Close)}。") +
                     (during.Length == 0 ? " 缺少持仓重叠 M5。" : $" 持仓重叠 M5 价格范围 {N(during.Min(b => b.Low))}–{N(during.Max(b => b.High))}（{during.Length} 根）。") +
-                    (after.Length == 0 ? " 缺少平仓后1小时 M5。" : $" 已覆盖平仓后1小时价格范围 {N(after.Min(b => b.Low))}–{N(after.Max(b => b.High))}（{after.Length} 根）；这是事后行情，不能单凭它判定过早平仓。"));
+                    (after.Length == 0 ? " 缺少平仓后1小时 M5。" : $" 已覆盖平仓后1小时价格范围 {N(after.Min(b => b.Low))}–{N(after.Max(b => b.High))}（{after.Length} 根）；这是事后行情，不能单凭它判定过早平仓。")));
             }
             markdown.AppendLine();
         }

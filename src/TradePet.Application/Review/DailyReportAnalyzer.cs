@@ -202,22 +202,22 @@ public static class DailyReportAnalyzer
         var markdown = new StringBuilder();
         foreach (var section in sections)
         {
-            markdown.AppendLine($"## {section.Title}").AppendLine();
-            foreach (var line in section.Lines) markdown.AppendLine($"- {Cell(line)}");
+            markdown.AppendLine($"## {TradePet.Core.Localization.UiText.Translate(section.Title)}").AppendLine();
+            foreach (var line in section.Lines) markdown.AppendLine($"- {Cell(TradePet.Core.Localization.UiText.Translate(line))}");
             markdown.AppendLine();
         }
         if (!string.IsNullOrWhiteSpace(market.Markdown))
-            markdown.AppendLine("## M5 行情与交易位置").AppendLine().Append(market.Markdown);
-        markdown.AppendLine("## 逐笔风险与退出复核").AppendLine();
+            markdown.AppendLine(TradePet.Core.Localization.UiText.Translate("## M5 行情与交易位置")).AppendLine().Append(market.Markdown);
+        markdown.AppendLine(TradePet.Core.Localization.UiText.Translate("## 逐笔风险与退出复核")).AppendLine();
         foreach (var row in rows)
         {
             markdown.AppendLine($"### {Cell(row.Symbol)} · #{row.PositionId}").AppendLine();
-            markdown.AppendLine($"- {row.Direction} · 开仓 {row.OpenedAt} · 平仓 {row.ClosedAt} · 持仓 {row.Holding}");
-            markdown.AppendLine($"- 开仓 / 最大手数：{row.OpeningVolume} / {row.MaximumVolume}；净盈亏 {row.NetPnl}；已记录费用 {row.Fees}");
-            markdown.AppendLine($"- 初始风险 {row.InitialRisk}；实际 R {row.ActualR}；MAE {row.Mae}；MFE {row.Mfe}；浮盈回吐 {row.Giveback}");
-            markdown.AppendLine($"- 极值采样覆盖：{row.Coverage}；{row.Protection}");
-            markdown.AppendLine($"- 已记录退出原因：{Cell(row.ExitReason)}");
-            markdown.AppendLine($"- 下一步：{Cell(row.NextAction)}").AppendLine();
+            markdown.AppendLine(TradePet.Core.Localization.UiText.Translate($"- {row.Direction} · 开仓 {row.OpenedAt} · 平仓 {row.ClosedAt} · 持仓 {row.Holding}"));
+            markdown.AppendLine(TradePet.Core.Localization.UiText.Translate($"- 开仓 / 最大手数：{row.OpeningVolume} / {row.MaximumVolume}；净盈亏 {row.NetPnl}；已记录费用 {row.Fees}"));
+            markdown.AppendLine(TradePet.Core.Localization.UiText.Translate($"- 初始风险 {row.InitialRisk}；实际 R {row.ActualR}；MAE {row.Mae}；MFE {row.Mfe}；浮盈回吐 {row.Giveback}"));
+            markdown.AppendLine(TradePet.Core.Localization.UiText.Translate($"- 极值采样覆盖：{row.Coverage}；{row.Protection}"));
+            markdown.AppendLine(TradePet.Core.Localization.UiText.Translate($"- 已记录退出原因：{Cell(row.ExitReason)}"));
+            markdown.AppendLine(TradePet.Core.Localization.UiText.Translate($"- 下一步：{Cell(row.NextAction)}")).AppendLine();
             var trade = completed.First(item => item.PositionId == row.PositionId);
             var observations = (data.PositionSamples?.GetValueOrDefault(row.PositionId) ?? [])
                 .Where(s => s.TradeKey == new TradeKey(data.AccountKey, row.PositionId) && s.Volume > 0m &&
@@ -233,15 +233,15 @@ public static class DailyReportAnalyzer
                 evidence.AddRange(observations.Zip(observations.Skip(1))
                     .Where(pair => pair.First.StopLoss != pair.Second.StopLoss || pair.First.TakeProfit != pair.Second.TakeProfit)
                     .Select(pair => pair.Second));
-                markdown.AppendLine("实际持仓记录（首尾、采样内最高/最低净盈亏、所有已记录 SL/TP 变化；局部采样不能代表全程极值）：").AppendLine();
-                markdown.AppendLine("| 采样时间（服务器） | 净盈亏 | 持仓手数 | SL | TP |");
+                markdown.AppendLine(TradePet.Core.Localization.UiText.Translate("实际持仓记录（首尾、采样内最高/最低净盈亏、所有已记录 SL/TP 变化；局部采样不能代表全程极值）：")).AppendLine();
+                markdown.AppendLine(TradePet.Core.Localization.UiText.Translate("| 采样时间（服务器） | 净盈亏 | 持仓手数 | SL | TP |"));
                 markdown.AppendLine("|---|---:|---:|---:|---:|");
                 foreach (var observation in evidence.Distinct().OrderBy(s => s.CapturedAtUtc))
                     markdown.AppendLine($"| {Time(observation.CapturedAtUtc)} | {Money(observation.NetPnl)} | {Number(observation.Volume)} | {MaybePrice(observation.StopLoss)} | {MaybePrice(observation.TakeProfit)} |");
                 markdown.AppendLine();
             }
         }
-        if (rows.Count == 0) markdown.AppendLine("无完整平仓交易。").AppendLine();
+        if (rows.Count == 0) markdown.AppendLine(TradePet.Core.Localization.UiText.Translate("无完整平仓交易。")).AppendLine();
         return new(sections, rows, markdown.ToString());
     }
 

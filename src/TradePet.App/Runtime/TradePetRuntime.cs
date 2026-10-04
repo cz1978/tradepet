@@ -284,8 +284,8 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
                 _viewModel.DiagnosticText = "本地资料待恢复；实时提醒可继续，但本次运行不会写入复盘库。";
                 _viewModel.ShowMainWindow?.Invoke();
                 System.Windows.MessageBox.Show(
-                    $"{exception.Message}\n\n{salvageText}\n保护副本：{exception.SafetySnapshotDirectory ?? "未创建；原库仍在原位"}\n\n请先保留这些文件，并从有效的完整备份恢复；不要继续在旧程序中写入该工作区。",
-                    "TradePet 数据库需要恢复", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    TradePet.Core.Localization.UiText.Translate($"{exception.Message}\n\n{salvageText}\n保护副本：{exception.SafetySnapshotDirectory ?? "未创建；原库仍在原位"}\n\n请先保留这些文件，并从有效的完整备份恢复；不要继续在旧程序中写入该工作区。"),
+                    TradePet.Core.Localization.UiText.Translate("TradePet 数据库需要恢复"), MessageBoxButton.OK, MessageBoxImage.Warning);
             });
         }
         catch (Exception exception)
@@ -297,8 +297,8 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
                     "本地数据初始化或中断恢复未完成；复盘写入已停用。若存在恢复记录，原文件已保留且采集暂停，请先处理再继续。";
                 _viewModel.ShowMainWindow?.Invoke();
                 System.Windows.MessageBox.Show(
-                    $"{exception.Message}\n\n工作区尚未进入可写状态；现有数据未被自动重建。请先检查备份、版本和数据目录权限。",
-                    "TradePet 工作区暂不可写", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    TradePet.Core.Localization.UiText.Translate($"{exception.Message}\n\n工作区尚未进入可写状态；现有数据未被自动重建。请先检查备份、版本和数据目录权限。"),
+                    TradePet.Core.Localization.UiText.Translate("TradePet 工作区暂不可写"), MessageBoxButton.OK, MessageBoxImage.Warning);
             });
             await ReportPersistenceFailureAsync("初始化本地数据库", exception);
         }
@@ -805,7 +805,8 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
             setupVersion,
             _viewModel.QuickReviewPromptEnabled,
             _viewModel.EntryReasonPromptEnabled,
-            _viewModel.UpdateNotificationsEnabled);
+            _viewModel.UpdateNotificationsEnabled,
+            _viewModel.UiLanguage);
 
 
     public async Task InstallBridgeAsync()
@@ -3696,8 +3697,8 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         }
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
-            Title = "导入复盘附件",
-            Filter = "复盘附件|*.png;*.jpg;*.jpeg;*.webp;*.gif;*.bmp;*.pdf;*.txt;*.md;*.csv",
+            Title = TradePet.Core.Localization.UiText.Translate("导入复盘附件"),
+            Filter = TradePet.Core.Localization.UiText.Translate("复盘附件|*.png;*.jpg;*.jpeg;*.webp;*.gif;*.bmp;*.pdf;*.txt;*.md;*.csv"),
             Multiselect = false,
             CheckFileExists = true,
         };
@@ -3827,8 +3828,8 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
             return;
         }
         var answer = System.Windows.MessageBox.Show(
-            $"删除当前记录中的附件“{attachment.Title}”？同一文件的其他记录链接会保留。",
-            "删除复盘附件", MessageBoxButton.OKCancel, MessageBoxImage.Question);
+            TradePet.Core.Localization.UiText.Translate($"删除当前记录中的附件“{attachment.Title}”？同一文件的其他记录链接会保留。"),
+            TradePet.Core.Localization.UiText.Translate("删除复盘附件"), MessageBoxButton.OKCancel, MessageBoxImage.Question);
         if (answer != MessageBoxResult.OK)
         {
             return;
@@ -4049,7 +4050,8 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
             }
             parsedRules.Add(new PlaybookRule(
                 $"rule-{Guid.NewGuid():N}", section.Value, parts[1], parts.Length > 2 ? parts[2] : string.Empty,
-                parts.Length > 3 && parts[3].Equals("关键", StringComparison.OrdinalIgnoreCase), order++));
+                parts.Length > 3 && (parts[3].Equals("关键", StringComparison.OrdinalIgnoreCase)
+                    || parts[3].Equals("Critical", StringComparison.OrdinalIgnoreCase)), order++));
         }
         var existing = _lastWorkspaceQuery?.Data.Playbooks
             .Where(item => item.Name.Equals(review.PlaybookName.Trim(), StringComparison.OrdinalIgnoreCase))
@@ -4328,8 +4330,8 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
             _ => $"把复盘状态设为“{value}”",
         };
         var answer = System.Windows.MessageBox.Show(
-            $"将对当前账户已选择的 {positionIds.Count} 笔交易{action}。\n任一交易校验或修订冲突时整批不写入。",
-            "确认批量复盘操作", MessageBoxButton.OKCancel, MessageBoxImage.Question);
+            TradePet.Core.Localization.UiText.Translate($"将对当前账户已选择的 {positionIds.Count} 笔交易{action}。\n任一交易校验或修订冲突时整批不写入。"),
+            TradePet.Core.Localization.UiText.Translate("确认批量复盘操作"), MessageBoxButton.OKCancel, MessageBoxImage.Question);
         if (answer != MessageBoxResult.OK)
         {
             review.StatusText = "已取消批量操作。";
@@ -4381,8 +4383,8 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         }
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
-            Title = "导入机会截图或证据",
-            Filter = "机会附件|*.png;*.jpg;*.jpeg;*.webp;*.gif;*.bmp;*.pdf;*.txt;*.md;*.csv",
+            Title = TradePet.Core.Localization.UiText.Translate("导入机会截图或证据"),
+            Filter = TradePet.Core.Localization.UiText.Translate("机会附件|*.png;*.jpg;*.jpeg;*.webp;*.gif;*.bmp;*.pdf;*.txt;*.md;*.csv"),
             Multiselect = false,
             CheckFileExists = true,
         };
@@ -4861,7 +4863,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         var confirmation = System.Windows.MessageBox.Show(
             $"{review.ExportPreview}\n\n本次包含原始附件 {selectedAttachments.Length} 件。" +
             "公开包会隐藏内部 ID、账户和已识别路径，但自由文本及主动选入的图片可能仍含私人信息，请自行检查。确认写出？",
-            "确认公开分享范围", MessageBoxButton.YesNo, MessageBoxImage.Warning,
+            TradePet.Core.Localization.UiText.Translate("确认公开分享范围"), MessageBoxButton.YesNo, MessageBoxImage.Warning,
             MessageBoxResult.No);
         if (confirmation != MessageBoxResult.Yes)
         {
@@ -4942,8 +4944,8 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         var review = _viewModel.ReviewWorkspace;
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
-            Title = "选择 TradePet 完整备份",
-            Filter = "TradePet 备份|TradePet-backup-*.zip|ZIP 文件|*.zip",
+            Title = TradePet.Core.Localization.UiText.Translate("选择 TradePet 完整备份"),
+            Filter = TradePet.Core.Localization.UiText.Translate("TradePet 备份|TradePet-backup-*.zip|ZIP 文件|*.zip"),
             Multiselect = false,
             CheckFileExists = true,
         };
@@ -4957,8 +4959,8 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
             review.ExportStatus = "正在验证备份路径、哈希、数据库和账户身份…";
             var manifest = await _reviewBackupService.ValidateAsync(dialog.FileName, _cancellation.Token);
             var answer = System.Windows.MessageBox.Show(
-                $"备份已通过校验，包含 {manifest.AccountKeys.Count} 个账户。\n\n恢复会替换当前本地数据，并先自动创建一份当前数据的完整备份。是否继续？",
-                "恢复 TradePet 备份",
+                TradePet.Core.Localization.UiText.Translate($"备份已通过校验，包含 {manifest.AccountKeys.Count} 个账户。\n\n恢复会替换当前本地数据，并先自动创建一份当前数据的完整备份。是否继续？"),
+                TradePet.Core.Localization.UiText.Translate("恢复 TradePet 备份"),
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Warning,
                 MessageBoxResult.No);
@@ -6241,57 +6243,57 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         data.DailyStates?.TryGetValue(date, out dailyState);
 
         var builder = new StringBuilder();
-        builder.AppendLine($"# {date:yyyy-MM-dd} 交易日报");
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"# {date:yyyy-MM-dd} 交易日报"));
         builder.AppendLine();
-        builder.AppendLine($"> 账户：{report.AccountKey}  ");
-        builder.AppendLine($"> 币种：{report.Currency}  ");
-        builder.AppendLine($"> 状态：{(report.IsLive ? "当日实时快照" : "交易日已结束")}  ");
-        builder.AppendLine($"> 生成时间（服务器）：{FormatServerTime(_timeProvider.GetUtcNow(), offset)}  ");
-        builder.AppendLine($"> 数据版本：{facts.SourceVersion}");
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"> 账户：{report.AccountKey}  "));
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"> 币种：{report.Currency}  "));
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"> 状态：{(report.IsLive ? "当日实时快照" : "交易日已结束")}  "));
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"> 生成时间（服务器）：{FormatServerTime(_timeProvider.GetUtcNow(), offset)}  "));
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"> 数据版本：{facts.SourceVersion}"));
         builder.AppendLine();
         if (report.Analysis is not null) builder.Append(report.Analysis.Markdown);
-        builder.AppendLine("## 一、核心结果");
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate("## 一、核心结果"));
         builder.AppendLine();
-        builder.AppendLine("| 指标 | 数值 |");
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate("| 指标 | 数值 |"));
         builder.AppendLine("|---|---:|");
-        builder.AppendLine($"| 已实现现金盈亏（含费用） | {FormatReportMoney(facts.RealizedCashPnl, report.Currency)} |");
-        builder.AppendLine($"| 完整交易净盈亏 | {FormatReportMoney(facts.CompleteTradeNetPnl, report.Currency)} |");
-        builder.AppendLine($"| 费用（佣金 + 隔夜费 + 其他费） | {FormatReportMoney(facts.Fees, report.Currency)} |");
-        builder.AppendLine($"| 开仓交易数 | {facts.OpeningTradeCount} |");
-        builder.AppendLine($"| 完整平仓交易数 | {report.TradeCount} |");
-        builder.AppendLine($"| 胜 / 负 / 平 | {report.WinCount} / {report.LossCount} / {report.BreakevenCount} |");
-        builder.AppendLine($"| 胜率 | {(report.WinRate is null ? "—" : $"{report.WinRate:0.##}%")} |");
-        builder.AppendLine($"| 复盘完成率 | {facts.ReviewCompletionPercentage:0.##}% |");
-        builder.AppendLine($"| 连续亏损 | {facts.ConsecutiveLosses} |");
-        builder.AppendLine($"| 冷静期违规提醒（仅注意 / 严重） | {facts.CooldownViolationCount} |");
-        builder.AppendLine($"| 行为风险提醒 | {report.BehaviorAlertCount} |");
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"| 已实现现金盈亏（含费用） | {FormatReportMoney(facts.RealizedCashPnl, report.Currency)} |"));
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"| 完整交易净盈亏 | {FormatReportMoney(facts.CompleteTradeNetPnl, report.Currency)} |"));
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"| 费用（佣金 + 隔夜费 + 其他费） | {FormatReportMoney(facts.Fees, report.Currency)} |"));
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"| 开仓交易数 | {facts.OpeningTradeCount} |"));
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"| 完整平仓交易数 | {report.TradeCount} |"));
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"| 胜 / 负 / 平 | {report.WinCount} / {report.LossCount} / {report.BreakevenCount} |"));
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"| 胜率 | {(report.WinRate is null ? "—" : $"{report.WinRate:0.##}%")} |"));
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"| 复盘完成率 | {facts.ReviewCompletionPercentage:0.##}% |"));
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"| 连续亏损 | {facts.ConsecutiveLosses} |"));
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"| 冷静期违规提醒（仅注意 / 严重） | {facts.CooldownViolationCount} |"));
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"| 行为风险提醒 | {report.BehaviorAlertCount} |"));
         builder.AppendLine();
 
-        builder.AppendLine("## 二、持仓采样与风险状态");
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate("## 二、持仓采样与风险状态"));
         builder.AppendLine();
-        builder.AppendLine($"- 有持仓采样：{report.SampledTradeCount}/{report.TradeCount} 笔；全程采样可靠：{report.ReliableSampleCount}/{report.TradeCount} 笔");
-        builder.AppendLine($"- 已复盘：{report.ReviewedCount} 笔；待复盘：{report.PendingReviewCount} 笔");
-        builder.AppendLine($"- 达标时刻：{(facts.TargetReachedAtUtc is null ? "未记录" : FormatServerTime(facts.TargetReachedAtUtc.Value, offset))}");
-        builder.AppendLine($"- 达标金额：{(facts.TargetAmount is null ? "未记录" : FormatReportMoney(facts.TargetAmount.Value, report.Currency))}");
-        builder.AppendLine($"- 达标后新交易净盈亏：{(facts.AfterTargetNewTradeNetPnl is null ? "未记录" : FormatReportMoney(facts.AfterTargetNewTradeNetPnl.Value, report.Currency))}");
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"- 有持仓采样：{report.SampledTradeCount}/{report.TradeCount} 笔；全程采样可靠：{report.ReliableSampleCount}/{report.TradeCount} 笔"));
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"- 已复盘：{report.ReviewedCount} 笔；待复盘：{report.PendingReviewCount} 笔"));
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"- 达标时刻：{(facts.TargetReachedAtUtc is null ? "未记录" : FormatServerTime(facts.TargetReachedAtUtc.Value, offset))}"));
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"- 达标金额：{(facts.TargetAmount is null ? "未记录" : FormatReportMoney(facts.TargetAmount.Value, report.Currency))}"));
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"- 达标后新交易净盈亏：{(facts.AfterTargetNewTradeNetPnl is null ? "未记录" : FormatReportMoney(facts.AfterTargetNewTradeNetPnl.Value, report.Currency))}"));
         if (dailyState is not null)
         {
-            builder.AppendLine($"- 日内浮动盈亏快照：{FormatReportMoney(dailyState.FloatingPnl, report.Currency)}");
-            builder.AppendLine($"- 日内高水位：{FormatReportMoney(dailyState.HighWaterPnl, report.Currency)}；回吐：{FormatReportMoney(dailyState.Giveback, report.Currency)}");
-            builder.AppendLine($"- 最大敞口：{dailyState.MaximumExposure:0.####}");
-            builder.AppendLine($"- 提醒状态：目标={YesNo(dailyState.TargetAlerted)}，亏损线={YesNo(dailyState.LossAlerted)}，回吐={YesNo(dailyState.GivebackAlerted)}，交易数上限={YesNo(dailyState.TradeLimitAlerted)}，手数上限={YesNo(dailyState.LotLimitAlerted)}");
+            builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"- 日内浮动盈亏快照：{FormatReportMoney(dailyState.FloatingPnl, report.Currency)}"));
+            builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"- 日内高水位：{FormatReportMoney(dailyState.HighWaterPnl, report.Currency)}；回吐：{FormatReportMoney(dailyState.Giveback, report.Currency)}"));
+            builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"- 最大敞口：{dailyState.MaximumExposure:0.####}"));
+            builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"- 提醒状态：目标={YesNo(dailyState.TargetAlerted)}，亏损线={YesNo(dailyState.LossAlerted)}，回吐={YesNo(dailyState.GivebackAlerted)}，交易数上限={YesNo(dailyState.TradeLimitAlerted)}，手数上限={YesNo(dailyState.LotLimitAlerted)}"));
         }
         builder.AppendLine();
 
-        builder.AppendLine("## 三、完整平仓交易");
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate("## 三、完整平仓交易"));
         builder.AppendLine();
         if (completed.Length == 0)
         {
-            builder.AppendLine("_无完整平仓交易。_");
+            builder.AppendLine(TradePet.Core.Localization.UiText.Translate("_无完整平仓交易。_"));
         }
         else
         {
-            builder.AppendLine("| Position | 品种 | 方向 | 开仓（服务器） | 平仓（服务器） | 入场 | 出场 | 最大手数 | 净盈亏 | 复盘状态 |");
+            builder.AppendLine(TradePet.Core.Localization.UiText.Translate("| Position | 品种 | 方向 | 开仓（服务器） | 平仓（服务器） | 入场 | 出场 | 最大手数 | 净盈亏 | 复盘状态 |"));
             builder.AppendLine("|---:|---|---|---|---|---:|---:|---:|---:|---|");
             foreach (var trade in completed)
             {
@@ -6302,7 +6304,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         }
         builder.AppendLine();
 
-        builder.AppendLine("## 四、逐笔复盘内容");
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate("## 四、逐笔复盘内容"));
         builder.AppendLine();
         foreach (var trade in completed)
         {
@@ -6311,7 +6313,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
             builder.AppendLine();
             if (document is null)
             {
-                builder.AppendLine("_尚未填写复盘。_");
+                builder.AppendLine(TradePet.Core.Localization.UiText.Translate("_尚未填写复盘。_"));
             }
             else
             {
@@ -6327,15 +6329,15 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
             builder.AppendLine();
         }
 
-        builder.AppendLine("## 五、当日全部成交明细");
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate("## 五、当日全部成交明细"));
         builder.AppendLine();
         if (deals.Length == 0)
         {
-            builder.AppendLine("_无成交记录。_");
+            builder.AppendLine(TradePet.Core.Localization.UiText.Translate("_无成交记录。_"));
         }
         else
         {
-            builder.AppendLine("| 时间（服务器） | Deal | Order | Position | 品种 | 方向 | 类型 | 手数 | 价格 | 毛盈亏 | 佣金 | 隔夜费 | 其他费 | 净额 |");
+            builder.AppendLine(TradePet.Core.Localization.UiText.Translate("| 时间（服务器） | Deal | Order | Position | 品种 | 方向 | 类型 | 手数 | 价格 | 毛盈亏 | 佣金 | 隔夜费 | 其他费 | 净额 |"));
             builder.AppendLine("|---|---:|---:|---:|---|---|---|---:|---:|---:|---:|---:|---:|---:|");
             foreach (var deal in deals)
             {
@@ -6344,15 +6346,15 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         }
         builder.AppendLine();
 
-        builder.AppendLine("## 六、当日开仓清单");
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate("## 六、当日开仓清单"));
         builder.AppendLine();
         if (opened.Length == 0)
         {
-            builder.AppendLine("_无新开仓交易。_");
+            builder.AppendLine(TradePet.Core.Localization.UiText.Translate("_无新开仓交易。_"));
         }
         else
         {
-            builder.AppendLine("| Position | 品种 | 方向 | 时间（服务器） | 入场价 | 开仓手数 | 最大手数 | 当日是否已平仓 |");
+            builder.AppendLine(TradePet.Core.Localization.UiText.Translate("| Position | 品种 | 方向 | 时间（服务器） | 入场价 | 开仓手数 | 最大手数 | 当日是否已平仓 |"));
             builder.AppendLine("|---:|---|---|---|---:|---:|---:|---|");
             foreach (var trade in opened)
             {
@@ -6361,15 +6363,15 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         }
         builder.AppendLine();
 
-        builder.AppendLine("## 七、行为提醒与证据");
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate("## 七、行为提醒与证据"));
         builder.AppendLine();
         if (behaviors.Length == 0)
         {
-            builder.AppendLine("_无行为规则记录。_");
+            builder.AppendLine(TradePet.Core.Localization.UiText.Translate("_无行为规则记录。_"));
         }
         else
         {
-            builder.AppendLine("| 时间（服务器） | 风险 | 规则 | 摘要 | 数值 / 阈值 | 说明 | 关联 Position |");
+            builder.AppendLine(TradePet.Core.Localization.UiText.Translate("| 时间（服务器） | 风险 | 规则 | 摘要 | 数值 / 阈值 | 说明 | 关联 Position |"));
             builder.AppendLine("|---|---|---|---|---|---|---|");
             foreach (var behavior in behaviors)
             {
@@ -6381,7 +6383,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         }
         builder.AppendLine();
 
-        builder.AppendLine("## 八、规则评估");
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate("## 八、规则评估"));
         builder.AppendLine();
         var assessments = data.Assessments
             .Where(item => item.TradeKey.AccountKey == report.AccountKey && completed.Any(trade => trade.PositionId == item.TradeKey.PositionId))
@@ -6390,11 +6392,11 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
             .ToArray();
         if (assessments.Length == 0)
         {
-            builder.AppendLine("_无规则评估。_");
+            builder.AppendLine(TradePet.Core.Localization.UiText.Translate("_无规则评估。_"));
         }
         else
         {
-            builder.AppendLine("| Position | 规则 | 结果 | 证据 | 备注 |");
+            builder.AppendLine(TradePet.Core.Localization.UiText.Translate("| Position | 规则 | 结果 | 证据 | 备注 |"));
             builder.AppendLine("|---:|---|---|---|---|");
             foreach (var assessment in assessments)
             {
@@ -6403,11 +6405,11 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         }
         builder.AppendLine();
 
-        builder.AppendLine("## 九、日记");
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate("## 九、日记"));
         builder.AppendLine();
         if (journal is null)
         {
-            builder.AppendLine("_当日尚未建立日记。_");
+            builder.AppendLine(TradePet.Core.Localization.UiText.Translate("_当日尚未建立日记。_"));
         }
         else
         {
@@ -6417,15 +6419,15 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
             AppendMarkdownField(builder, "做得好", journal.DidWell);
             AppendMarkdownField(builder, "待改进", journal.ToImprove);
             AppendMarkdownField(builder, "下一步行动", journal.NextAction);
-            builder.AppendLine($"- 日记状态：{FormatReviewStatus(journal.Status)}");
+            builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"- 日记状态：{FormatReviewStatus(journal.Status)}"));
         }
         builder.AppendLine();
 
-        builder.AppendLine("## 十、资金、权益与改进观察");
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate("## 十、资金、权益与改进观察"));
         builder.AppendLine();
         if (cashFlows.Length == 0)
         {
-            builder.AppendLine("- 非交易资金变动：无");
+            builder.AppendLine(TradePet.Core.Localization.UiText.Translate("- 非交易资金变动：无"));
         }
         else
         {
@@ -6436,28 +6438,28 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         }
         if (equity.Length == 0)
         {
-            builder.AppendLine("- 权益采样：无");
+            builder.AppendLine(TradePet.Core.Localization.UiText.Translate("- 权益采样：无"));
         }
         else
         {
-            builder.AppendLine($"- 权益采样：{equity.Length} 个；起始权益 {equity[0].Equity:0.##}，结束权益 {equity[^1].Equity:0.##}，最高 {equity.Max(item => item.Equity):0.##}，最低 {equity.Min(item => item.Equity):0.##}");
+            builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"- 权益采样：{equity.Length} 个；起始权益 {equity[0].Equity:0.##}，结束权益 {equity[^1].Equity:0.##}，最高 {equity.Max(item => item.Equity):0.##}，最低 {equity.Min(item => item.Equity):0.##}"));
         }
         foreach (var observation in data.GoalObservations.Where(item => item.ServerDate == date))
         {
             var goalName = data.Goals.FirstOrDefault(item => item.Id == observation.GoalId)?.Name ?? observation.GoalId;
-            builder.AppendLine($"- 改进目标「{goalName}」：{observation.Status}；机会 {observation.OpportunityCount}，通过 {observation.PassCount}，失败 {observation.FailCount}；证据：{MdCell(observation.Evidence)}");
+            builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"- 改进目标「{goalName}」：{observation.Status}；机会 {observation.OpportunityCount}，通过 {observation.PassCount}，失败 {observation.FailCount}；证据：{MdCell(observation.Evidence)}"));
         }
         foreach (var opportunity in data.Opportunities.Where(item => item.ServerDate == date))
         {
-            builder.AppendLine($"- 机会记录：{opportunity.Symbol} · {opportunity.Kind} · {MdCell(opportunity.Reason)} · {MdCell(opportunity.Notes)}");
+            builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"- 机会记录：{opportunity.Symbol} · {opportunity.Kind} · {MdCell(opportunity.Reason)} · {MdCell(opportunity.Notes)}"));
         }
         builder.AppendLine();
 
-        builder.AppendLine("## 十一、当日事实时间线");
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate("## 十一、当日事实时间线"));
         builder.AppendLine();
         if (facts.Timeline.Count == 0)
         {
-            builder.AppendLine("_无时间线事件。_");
+            builder.AppendLine(TradePet.Core.Localization.UiText.Translate("_无时间线事件。_"));
         }
         else
         {
@@ -6468,15 +6470,15 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         }
         builder.AppendLine();
 
-        builder.AppendLine("## 十二、当日宏观事件");
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate("## 十二、当日宏观事件"));
         builder.AppendLine();
         if (macroEvents.Length == 0)
         {
-            builder.AppendLine("_当前未收到该日的宏观事件数据。MT4 公开周历不回补历史公布值。_");
+            builder.AppendLine(TradePet.Core.Localization.UiText.Translate("_当前未收到该日的宏观事件数据。MT4 公开周历不回补历史公布值。_"));
         }
         else
         {
-            builder.AppendLine("| 时间（服务器） | 重要度 | 国家 / 货币 | 事件 | 前值 | 预期 | 公布 | 影响 |");
+            builder.AppendLine(TradePet.Core.Localization.UiText.Translate("| 时间（服务器） | 重要度 | 国家 / 货币 | 事件 | 前值 | 预期 | 公布 | 影响 |"));
             builder.AppendLine("|---|---|---|---|---:|---:|---:|---|");
             foreach (var item in macroEvents)
             {
@@ -6485,31 +6487,31 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         }
         builder.AppendLine();
 
-        builder.AppendLine("## 十三、数据完整性说明");
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate("## 十三、数据完整性说明"));
         builder.AppendLine();
-        builder.AppendLine($"- 服务器 UTC 偏移：{facts.ServerUtcOffsetSeconds} 秒");
-        builder.AppendLine($"- 当日是否标记数据缺口：{YesNo(data.DataGapDates.Contains(date))}");
-        builder.AppendLine($"- 工作区版本：来源 {data.Version.SourceVersion}，元数据 {data.Version.MetadataVersion}，观察 {data.Version.ObservationVersion}，规则 {data.Version.RuleVersion}，时间 {data.Version.TimeVersion}");
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"- 服务器 UTC 偏移：{facts.ServerUtcOffsetSeconds} 秒"));
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"- 当日是否标记数据缺口：{YesNo(data.DataGapDates.Contains(date))}"));
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"- 工作区版本：来源 {data.Version.SourceVersion}，元数据 {data.Version.MetadataVersion}，观察 {data.Version.ObservationVersion}，规则 {data.Version.RuleVersion}，时间 {data.Version.TimeVersion}"));
         builder.AppendLine(report.AccountKey.StartsWith("MT4:", StringComparison.Ordinal)
             ? "- MT4 金额以已存档订单的利润、佣金、隔夜费为准；有 broker 关联证据的部分平仓合为同一持仓。Deal 为内部记账编号，Order 保留原票号，Position 为最初票号；缺少关联证据的订单保持独立。未读取过的历史覆盖仍需确认。\n"
             : "- 金额以 MT5 成交和费用记录为准；胜率只统计当日完整平仓的 position；尚未平仓的持仓不会计入胜率。\n");
 
-        builder.AppendLine("## 给 AI 的分析任务");
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate("## 给 AI 的分析任务"));
         builder.AppendLine();
-        builder.AppendLine("请只依据本报告中的事实进行分析，不要补造行情或交易数据。请输出：");
-        builder.AppendLine("1. 当日表现结论与最主要的盈利/亏损来源；");
-        builder.AppendLine("2. 计划执行、仓位、费用、退出和行为纪律中的关键问题；");
-        builder.AppendLine("3. 做得最好的 3 点、最需要改进的 3 点；");
-        builder.AppendLine("4. 明日可执行的 3 条具体动作，并说明每条动作对应的报告证据；");
-        builder.AppendLine("5. 明确区分“数据已证明”“合理推测”“数据不足”。");
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate("请只依据本报告中的事实进行分析，不要补造行情或交易数据。请输出："));
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate("1. 当日表现结论与最主要的盈利/亏损来源；"));
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate("2. 计划执行、仓位、费用、退出和行为纪律中的关键问题；"));
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate("3. 做得最好的 3 点、最需要改进的 3 点；"));
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate("4. 明日可执行的 3 条具体动作，并说明每条动作对应的报告证据；"));
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate("5. 明确区分“数据已证明”“合理推测”“数据不足”。"));
         return builder.ToString();
     }
 
     private static void AppendMarkdownField(StringBuilder builder, string label, string? value)
     {
-        builder.AppendLine($"**{label}**");
+        builder.AppendLine($"**{TradePet.Core.Localization.UiText.Translate(label)}**");
         builder.AppendLine();
-        builder.AppendLine(string.IsNullOrWhiteSpace(value) ? "_未记录_" : value.Trim());
+        builder.AppendLine(string.IsNullOrWhiteSpace(value) ? TradePet.Core.Localization.UiText.Translate("_未记录_") : value.Trim());
         builder.AppendLine();
     }
 
@@ -6758,6 +6760,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
             _viewModel.QuickReviewPromptEnabled = settings.QuickReviewPromptEnabled;
             _viewModel.EntryReasonPromptEnabled = settings.EntryReasonPromptEnabled;
             _viewModel.UpdateNotificationsEnabled = settings.UpdateNotificationsEnabled;
+            _viewModel.UiLanguage = settings.UiLanguage;
             _viewModel.DailyReportTimeText = NormalizeDailyReportTime(settings.DailyReportTime);
             _viewModel.StartWithWindows = StartupRegistration.IsEnabled();
         });
@@ -7090,7 +7093,8 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         int SetupVersion = 0,
         bool QuickReviewPromptEnabled = true,
         bool EntryReasonPromptEnabled = true,
-        bool UpdateNotificationsEnabled = true);
+        bool UpdateNotificationsEnabled = true,
+        string UiLanguage = "zh-CN");
 
     private sealed record BehaviorReviewEditCommand(
         string AccountKey,

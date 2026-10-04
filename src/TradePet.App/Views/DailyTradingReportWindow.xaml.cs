@@ -44,33 +44,33 @@ public partial class DailyTradingReportWindow : Window
     {
         InitializeComponent();
         _report = report;
-        TitleText.Text = $"{report.ServerDate:yyyy-MM-dd} 交易日报";
-        AccountText.Text = $"{report.AccountKey} · {report.Currency}";
-        StatusText.Text = report.IsLive ? "今日实时" : "已结束";
-        NetPnlText.Text = FormatMoney(report.RealizedCashPnl, report.Currency);
+        TitleText.Text = TradePet.Core.Localization.UiText.Translate($"{report.ServerDate:yyyy-MM-dd} 交易日报");
+        AccountText.Text = TradePet.Core.Localization.UiText.Translate($"{report.AccountKey} · {report.Currency}");
+        StatusText.Text = TradePet.Core.Localization.UiText.Translate(report.IsLive ? "今日实时" : "已结束");
+        NetPnlText.Text = TradePet.Core.Localization.UiText.Translate(FormatMoney(report.RealizedCashPnl, report.Currency));
         NetPnlText.Foreground = PnlBrush(report.RealizedCashPnl);
-        SummaryText.Text = BuildSummary(report);
-        TradeCountText.Text = $"{report.TradeCount} 笔";
-        WinRateText.Text = report.WinRate is null ? "—" : $"{report.WinRate:0.#}%";
-        WinLossText.Text = $"{report.WinCount} / {report.LossCount}";
-        FeesText.Text = FormatMoney(report.Fees, report.Currency);
-        BestTradeText.Text = FormatTrade(report.BestTrade, report.Currency);
-        WorstTradeText.Text = FormatTrade(report.WorstTrade, report.Currency);
-        ProcessText.Text = $"有持仓采样 {report.SampledTradeCount}/{report.TradeCount} 笔 · 全程采样可靠 {report.ReliableSampleCount}/{report.TradeCount} 笔";
-        ReviewText.Text = $"已完成 {report.ReviewedCount} · 待复盘 {report.PendingReviewCount}";
-        BehaviorText.Text = report.BehaviorAlertCount == 0
+        SummaryText.Text = TradePet.Core.Localization.UiText.Translate(BuildSummary(report));
+        TradeCountText.Text = TradePet.Core.Localization.UiText.Translate($"{report.TradeCount} 笔");
+        WinRateText.Text = TradePet.Core.Localization.UiText.Translate(report.WinRate is null ? "—" : $"{report.WinRate:0.#}%");
+        WinLossText.Text = TradePet.Core.Localization.UiText.Translate($"{report.WinCount} / {report.LossCount}");
+        FeesText.Text = TradePet.Core.Localization.UiText.Translate(FormatMoney(report.Fees, report.Currency));
+        BestTradeText.Text = TradePet.Core.Localization.UiText.Translate(FormatTrade(report.BestTrade, report.Currency));
+        WorstTradeText.Text = TradePet.Core.Localization.UiText.Translate(FormatTrade(report.WorstTrade, report.Currency));
+        ProcessText.Text = TradePet.Core.Localization.UiText.Translate($"有持仓采样 {report.SampledTradeCount}/{report.TradeCount} 笔 · 全程采样可靠 {report.ReliableSampleCount}/{report.TradeCount} 笔");
+        ReviewText.Text = TradePet.Core.Localization.UiText.Translate($"已完成 {report.ReviewedCount} · 待复盘 {report.PendingReviewCount}");
+        BehaviorText.Text = TradePet.Core.Localization.UiText.Translate(report.BehaviorAlertCount == 0
             ? "没有记录到风险提醒；不代表全天没有风险"
-            : $"{report.BehaviorAlertCount} 条风险提醒，其中冷静期触发 {report.CooldownViolationCount} 条（不含正常检查）";
-        ArchivePathText.Text = string.IsNullOrWhiteSpace(report.ArchivePath)
+            : $"{report.BehaviorAlertCount} 条风险提醒，其中冷静期触发 {report.CooldownViolationCount} 条（不含正常检查）");
+        ArchivePathText.Text = TradePet.Core.Localization.UiText.Translate(string.IsNullOrWhiteSpace(report.ArchivePath)
             ? "Markdown 尚未归档。"
-            : $"已归档：{report.ArchivePath}";
+            : $"已归档：{report.ArchivePath}");
         ArchivePathText.ToolTip = report.ArchivePath;
         AnalysisSections.ItemsSource = report.Analysis?.Sections;
         TradeDetailsGrid.ItemsSource = report.Analysis?.Trades;
         FullReportText.Text = report.Markdown;
-        TradeDetailHint.Text = report.Analysis?.Trades.Count > 0
+        TradeDetailHint.Text = TradePet.Core.Localization.UiText.Translate(report.Analysis?.Trades.Count > 0
             ? $"共 {report.Analysis.Trades.Count} 笔完整平仓交易；横向滚动可查看费用、风险和退出原因。金额单位：{report.Currency}。"
-            : "没有完整平仓交易；当日成交和未结交易请查看完整日报。";
+            : "没有完整平仓交易；当日成交和未结交易请查看完整日报。");
     }
 
     public DateOnly ServerDate => _report.ServerDate;
@@ -112,11 +112,11 @@ public partial class DailyTradingReportWindow : Window
         try
         {
             System.Windows.Clipboard.SetText(_report.Markdown);
-            ArchivePathText.Text = "完整 Markdown 已复制，可直接粘贴给 AI。";
+            ArchivePathText.Text = TradePet.Core.Localization.UiText.Translate("完整 Markdown 已复制，可直接粘贴给 AI。");
         }
         catch (Exception exception)
         {
-            System.Windows.MessageBox.Show(exception.Message, "复制 Markdown 失败", MessageBoxButton.OK, MessageBoxImage.Warning);
+            System.Windows.MessageBox.Show(TradePet.Core.Localization.UiText.Translate(exception.Message), TradePet.Core.Localization.UiText.Translate("复制 Markdown 失败"), MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
@@ -124,8 +124,8 @@ public partial class DailyTradingReportWindow : Window
     {
         var dialog = new WpfSaveFileDialog
         {
-            Title = "保存交易日报",
-            Filter = "Markdown 文件 (*.md)|*.md|所有文件 (*.*)|*.*",
+            Title = TradePet.Core.Localization.UiText.Translate("保存交易日报"),
+            Filter = TradePet.Core.Localization.UiText.Translate("Markdown 文件 (*.md)|*.md|所有文件 (*.*)|*.*"),
             DefaultExt = ".md",
             AddExtension = true,
             FileName = $"{_report.ServerDate:yyyy-MM-dd}-交易日报.md",
@@ -141,12 +141,12 @@ public partial class DailyTradingReportWindow : Window
         try
         {
             File.WriteAllText(dialog.FileName, _report.Markdown);
-            ArchivePathText.Text = $"已保存：{dialog.FileName}";
+            ArchivePathText.Text = TradePet.Core.Localization.UiText.Translate($"已保存：{dialog.FileName}");
             ArchivePathText.ToolTip = dialog.FileName;
         }
         catch (Exception exception)
         {
-            System.Windows.MessageBox.Show(exception.Message, "保存 Markdown 失败", MessageBoxButton.OK, MessageBoxImage.Warning);
+            System.Windows.MessageBox.Show(TradePet.Core.Localization.UiText.Translate(exception.Message), TradePet.Core.Localization.UiText.Translate("保存 Markdown 失败"), MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 

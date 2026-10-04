@@ -105,9 +105,9 @@ public partial class MainWindow : Window
         var step = _activeGuideSteps[_guideIndex];
         ShowPage(step.PageIndex);
         if (step.WorkspaceTabIndex is { } tabIndex) ReviewWorkspace.SelectGuideTab(tabIndex);
-        GuideProgress.Text = $"{_guideIndex + 1} / {_activeGuideSteps.Length}";
-        GuideTitle.Text = step.Title;
-        GuideDescription.Text = step.Description;
+        GuideProgress.Text = TradePet.Core.Localization.UiText.Translate($"{_guideIndex + 1} / {_activeGuideSteps.Length}");
+        GuideTitle.Text = TradePet.Core.Localization.UiText.Translate(step.Title);
+        GuideDescription.Text = TradePet.Core.Localization.UiText.Translate(step.Description);
         GuidePrevious.IsEnabled = _guideIndex > 0;
         GuideNext.Content = _guideIndex == _activeGuideSteps.Length - 1 ? "完成" : "下一步";
         MainRoot.UpdateLayout();
@@ -238,7 +238,7 @@ public partial class MainWindow : Window
                 error = "请检查数字格式：金额和手数填数字，交易次数与等待秒数填整数。";
         }
 
-        PlanValidationText.Text = error ?? string.Empty;
+        PlanValidationText.Text = TradePet.Core.Localization.UiText.Translate(error ?? string.Empty);
         PlanValidationText.Visibility = error is null ? Visibility.Collapsed : Visibility.Visible;
         if (error is null && _viewModel.SaveDailyPlanCommand.CanExecute(null))
             _viewModel.SaveDailyPlanCommand.Execute(null);
@@ -300,7 +300,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            System.Windows.MessageBox.Show(this, $"无法打开导出目录：{ex.Message}", "报告与数据");
+            System.Windows.MessageBox.Show(this, TradePet.Core.Localization.UiText.Translate($"无法打开导出目录：{ex.Message}"), TradePet.Core.Localization.UiText.Translate("报告与数据"));
         }
     }
 

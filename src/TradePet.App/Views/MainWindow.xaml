@@ -1,9 +1,10 @@
-<Window x:Class="TradePet.App.Views.MainWindow"
+<Window Language="{l:Language}" x:Class="TradePet.App.Views.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="clr-namespace:TradePet.App.Localization"
         xmlns:controls="clr-namespace:TradePet.App.Controls"
         xmlns:views="clr-namespace:TradePet.App.Views"
-        Title="天禄交易助手" Icon="/TradePet;component/Assets/tradepet-icon.ico"
+        Title="{l:Text Key=S350ce565e947d392}" Icon="/TradePet;component/Assets/tradepet-icon.ico"
         Width="1040" Height="696" MinWidth="920" MinHeight="640"
         WindowStartupLocation="CenterScreen" Background="{StaticResource AppBackgroundBrush}"
         UseLayoutRounding="True">
@@ -37,14 +38,14 @@
                                 </Grid.ColumnDefinitions>
                                 <Border Width="25" Height="25" CornerRadius="7" Background="#20342F"
                                         BorderBrush="#31574D" BorderThickness="1" VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding Icon}" Foreground="{StaticResource AccentBrush}"
+                                    <TextBlock Text="{Binding Icon, Converter={StaticResource UiTranslation}}" Foreground="{StaticResource AccentBrush}"
                                                FontSize="13" FontWeight="SemiBold"
                                                HorizontalAlignment="Center" VerticalAlignment="Center" />
                                 </Border>
-                                <TextBlock Grid.Column="1" Text="{Binding Label}" Margin="7,0,0,0"
+                                <TextBlock Grid.Column="1" Text="{Binding Label, Converter={StaticResource UiTranslation}}" Margin="7,0,0,0"
                                            Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"
                                            FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                <TextBlock Grid.Column="2" Text="{Binding CountText}" Foreground="#718091"
+                                <TextBlock Grid.Column="2" Text="{Binding CountText, Converter={StaticResource UiTranslation}}" Foreground="#718091"
                                            FontSize="9" VerticalAlignment="Center" Margin="5,0,0,0" />
                             </Grid>
                         </DataTemplate>
@@ -61,21 +62,21 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="{Binding SelectedReviewCategory.Icon}" Foreground="{StaticResource AccentBrush}"
+                                <TextBlock Text="{Binding SelectedReviewCategory.Icon, Converter={StaticResource UiTranslation}}" Foreground="{StaticResource AccentBrush}"
                                            FontSize="18" FontWeight="Bold" VerticalAlignment="Center" />
-                                <TextBlock Text="{Binding SelectedReviewCategory.Label, StringFormat={}{0}表现}"
+                                <TextBlock Text="{Binding SelectedReviewCategory.Label, StringFormat={l:Text Key=Sc04166e303b2e25b}, Converter={StaticResource UiTranslation}}"
                                            FontSize="15" FontWeight="SemiBold" Margin="8,0,0,0" VerticalAlignment="Center" />
                             </StackPanel>
-                            <TextBlock Text="{Binding SelectedReviewCategory.Hint}" Style="{StaticResource MutedTextStyle}"
+                            <TextBlock Text="{Binding SelectedReviewCategory.Hint, Converter={StaticResource UiTranslation}}" Style="{StaticResource MutedTextStyle}"
                                        FontSize="10" Margin="0,4,10,0" TextTrimming="CharacterEllipsis" />
                         </StackPanel>
                         <Border Grid.Column="1" BorderBrush="#263142" BorderThickness="1,0,0,0" Padding="13,0,8,0">
                             <StackPanel VerticalAlignment="Center">
-                                <TextBlock Text="最佳净盈亏" Style="{StaticResource MutedTextStyle}" FontSize="9" />
+                                <TextBlock Text="{l:Text Key=S90edc19eafc3bcb4}" Style="{StaticResource MutedTextStyle}" FontSize="9" />
                                 <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                                    <TextBlock Text="{Binding SelectedReviewCategory.BestGroup}" FontWeight="SemiBold"
+                                    <TextBlock Text="{Binding SelectedReviewCategory.BestGroup, Converter={StaticResource UiTranslation}}" FontWeight="SemiBold"
                                                TextTrimming="CharacterEllipsis" MaxWidth="110" />
-                                    <TextBlock Text="{Binding SelectedReviewCategory.BestNetPnl}"
+                                    <TextBlock Text="{Binding SelectedReviewCategory.BestNetPnl, Converter={StaticResource UiTranslation}}"
                                                Foreground="{Binding SelectedReviewCategory.BestNetPnlColor}"
                                                FontWeight="SemiBold" Margin="7,0,0,0" />
                                 </StackPanel>
@@ -83,11 +84,11 @@
                         </Border>
                         <Border Grid.Column="2" BorderBrush="#263142" BorderThickness="1,0,0,0" Padding="13,0,0,0">
                             <StackPanel VerticalAlignment="Center">
-                                <TextBlock Text="交易最多" Style="{StaticResource MutedTextStyle}" FontSize="9" />
+                                <TextBlock Text="{l:Text Key=S307305e37397de72}" Style="{StaticResource MutedTextStyle}" FontSize="9" />
                                 <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                                    <TextBlock Text="{Binding SelectedReviewCategory.MostActiveGroup}" FontWeight="SemiBold"
+                                    <TextBlock Text="{Binding SelectedReviewCategory.MostActiveGroup, Converter={StaticResource UiTranslation}}" FontWeight="SemiBold"
                                                TextTrimming="CharacterEllipsis" MaxWidth="110" />
-                                    <TextBlock Text="{Binding SelectedReviewCategory.MostActiveTrades}" Foreground="#AAB7C4"
+                                    <TextBlock Text="{Binding SelectedReviewCategory.MostActiveTrades, Converter={StaticResource UiTranslation}}" Foreground="#AAB7C4"
                                                FontSize="10" Margin="7,2,0,0" />
                                 </StackPanel>
                             </StackPanel>
@@ -111,12 +112,12 @@
                                 <ColumnDefinition Width="90" />
                                 <ColumnDefinition Width="100" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="分组" Style="{StaticResource MutedTextStyle}" Margin="12,0" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="1" Text="交易数" Style="{StaticResource MutedTextStyle}" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="2" Text="胜率" Style="{StaticResource MutedTextStyle}" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="3" Text="净盈亏" Style="{StaticResource MutedTextStyle}" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="4" Text="盈亏因子" Style="{StaticResource MutedTextStyle}" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="5" Text="期望值" Style="{StaticResource MutedTextStyle}" VerticalAlignment="Center" />
+                            <TextBlock Text="{l:Text Key=S5cf917fa38c3343e}" Style="{StaticResource MutedTextStyle}" Margin="12,0" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="{l:Text Key=Sbc39a72a6d8c5fe2}" Style="{StaticResource MutedTextStyle}" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="2" Text="{l:Text Key=S84ca5c99f5ae546c}" Style="{StaticResource MutedTextStyle}" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="3" Text="{l:Text Key=S66973c7ea00e9a13}" Style="{StaticResource MutedTextStyle}" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="4" Text="{l:Text Key=S2cf789917bfbd4d8}" Style="{StaticResource MutedTextStyle}" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="5" Text="{l:Text Key=S1b956e8c9d9b25da}" Style="{StaticResource MutedTextStyle}" VerticalAlignment="Center" />
                         </Grid>
                         <ListView Grid.Row="1" ItemsSource="{Binding VisibleReviewGroups}"
                                   ScrollViewer.VerticalScrollBarVisibility="Hidden"
@@ -143,19 +144,19 @@
                                                 <ColumnDefinition Width="90" />
                                                 <ColumnDefinition Width="100" />
                                             </Grid.ColumnDefinitions>
-                                            <TextBlock Text="{Binding Group}" Margin="12,0" FontWeight="SemiBold"
-                                                       TextTrimming="CharacterEllipsis" ToolTip="{Binding Group}" />
-                                            <TextBlock Grid.Column="1" Text="{Binding Trades}" />
-                                            <TextBlock Grid.Column="2" Text="{Binding WinRate}" />
-                                            <TextBlock Grid.Column="3" Text="{Binding NetPnl}" Foreground="{Binding NetPnlColor}" FontWeight="SemiBold" />
-                                            <TextBlock Grid.Column="4" Text="{Binding ProfitFactor}" />
-                                            <TextBlock Grid.Column="5" Text="{Binding Expectancy}" Foreground="{Binding ExpectancyColor}" />
+                                            <TextBlock Text="{Binding Group, Converter={StaticResource UiTranslation}}" Margin="12,0" FontWeight="SemiBold"
+                                                       TextTrimming="CharacterEllipsis" ToolTip="{Binding Group, Converter={StaticResource UiTranslation}}" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Trades, Converter={StaticResource UiTranslation}}" />
+                                            <TextBlock Grid.Column="2" Text="{Binding WinRate, Converter={StaticResource UiTranslation}}" />
+                                            <TextBlock Grid.Column="3" Text="{Binding NetPnl, Converter={StaticResource UiTranslation}}" Foreground="{Binding NetPnlColor}" FontWeight="SemiBold" />
+                                            <TextBlock Grid.Column="4" Text="{Binding ProfitFactor, Converter={StaticResource UiTranslation}}" />
+                                            <TextBlock Grid.Column="5" Text="{Binding Expectancy, Converter={StaticResource UiTranslation}}" Foreground="{Binding ExpectancyColor}" />
                                         </Grid>
                                     </Border>
                                 </DataTemplate>
                             </ListView.ItemTemplate>
                         </ListView>
-                        <TextBlock Grid.Row="1" Text="这个分类还没有可用数据。"
+                        <TextBlock Grid.Row="1" Text="{l:Text Key=S4676a6011a04d50e}"
                                    Style="{StaticResource MutedTextStyle}" FontSize="12"
                                    HorizontalAlignment="Center" VerticalAlignment="Center"
                                    Visibility="{Binding SelectedReviewCategory.HasNoGroups, Converter={StaticResource BoolToVisibility}}" />
@@ -184,12 +185,12 @@
                     <StackPanel Orientation="Horizontal">
                         <Border Width="34" Height="34" CornerRadius="9" Background="#19241F"
                                 BorderBrush="#3B4A3F" BorderThickness="1">
-                            <TextBlock Text="禄" Foreground="{StaticResource GoldBrush}" FontSize="17"
+                            <TextBlock Text="{l:Text Key=Sebf93e00b644f759}" Foreground="{StaticResource GoldBrush}" FontSize="17"
                                        FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
-                            <TextBlock Text="天禄" FontSize="17" FontWeight="Bold" />
-                            <TextBlock Text="交易守护助手" Style="{StaticResource MutedTextStyle}" FontSize="10" />
+                            <TextBlock Text="{l:Text Key=S5c9484c45f7e3920}" FontSize="17" FontWeight="Bold" />
+                            <TextBlock Text="{l:Text Key=Sdea3b260dd0bd28a}" Style="{StaticResource MutedTextStyle}" FontSize="10" />
                         </StackPanel>
                     </StackPanel>
                 </StackPanel>
@@ -204,26 +205,26 @@
                          Background="Transparent" BorderThickness="0"
                          ItemContainerStyle="{StaticResource SideNavItemStyle}"
                          SelectedIndex="{Binding ElementName=MainTabs, Path=SelectedIndex, Mode=TwoWay}">
-                    <ListBoxItem Content="今日概览" />
-                    <ListBoxItem Content="日目标与风险" />
-                    <ListBoxItem Content="亏损区域" />
-                    <ListBoxItem Content="复盘分析" />
-                    <ListBoxItem Content="时间线" />
-                    <ListBoxItem Content="设置中心" />
-                    <ListBoxItem Content="报告与数据" />
+                    <ListBoxItem Content="{l:Text Key=S9dd8a635443930be}" />
+                    <ListBoxItem Content="{l:Text Key=S57375aa8783db9b0}" />
+                    <ListBoxItem Content="{l:Text Key=S39f12fd8d6936711}" />
+                    <ListBoxItem Content="{l:Text Key=S2b9f7901b72f0549}" />
+                    <ListBoxItem Content="{l:Text Key=S67819401c5dcb20e}" />
+                    <ListBoxItem Content="{l:Text Key=Secaf64d1186a8269}" />
+                    <ListBoxItem Content="{l:Text Key=S22d7af3b431e1994}" />
                 </ListBox>
 
                 <Border x:Name="GuideConnectionStatus" Grid.Row="3" Style="{StaticResource PageCardStyle}" Padding="12" Background="#101821">
                     <StackPanel>
-                        <TextBlock Text="连接状态" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock Text="{l:Text Key=S60810f961fdc4b1a}" FontWeight="SemiBold" FontSize="12" />
                         <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                             <Ellipse Width="7" Height="7" Fill="{StaticResource AccentBrush}" Margin="0,0,7,0" />
-                            <TextBlock Text="{Binding ConnectionText}" Style="{StaticResource MutedTextStyle}"
+                            <TextBlock Text="{Binding ConnectionText, Converter={StaticResource UiTranslation}}" Style="{StaticResource MutedTextStyle}"
                                        TextTrimming="CharacterEllipsis" Width="126" />
                         </StackPanel>
-                        <TextBlock Text="{Binding BridgeText}" Style="{StaticResource MutedTextStyle}"
+                        <TextBlock Text="{Binding BridgeText, Converter={StaticResource UiTranslation}}" Style="{StaticResource MutedTextStyle}"
                                    Margin="14,4,0,0" TextTrimming="CharacterEllipsis" />
-                        <TextBlock Text="{Binding AccountLabel}" Foreground="#C7D1CD" FontSize="11"
+                        <TextBlock Text="{Binding AccountLabel, Converter={StaticResource UiTranslation}}" Foreground="#C7D1CD" FontSize="11"
                                    Margin="0,9,0,0" TextTrimming="CharacterEllipsis" />
                     </StackPanel>
                 </Border>
@@ -243,17 +244,17 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel>
-                    <TextBlock Text="{Binding GreetingText}" FontSize="22" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding GreetingText, Converter={StaticResource UiTranslation}}" FontSize="22" FontWeight="SemiBold" />
                     <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                        <TextBlock Text="守住边界，尊重市场，等待属于你的机会" Style="{StaticResource MutedTextStyle}" />
-                        <TextBlock Text="  ·  服务器交易日 " Foreground="#546170" FontSize="11" />
-                        <TextBlock Text="{Binding ServerDateText}" Foreground="#AEBBB5" FontSize="11" />
+                        <TextBlock Text="{l:Text Key=Sa19e2b2857f341a3}" Style="{StaticResource MutedTextStyle}" />
+                        <TextBlock Text="{l:Text Key=S1c669c747bc4052e}" Foreground="#546170" FontSize="11" />
+                        <TextBlock Text="{Binding ServerDateText, Converter={StaticResource UiTranslation}}" Foreground="#AEBBB5" FontSize="11" />
                     </StackPanel>
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button x:Name="GuideReplayButton" Content="使用引导" Click="StartGuide_Click" Style="{StaticResource QuietButtonStyle}" />
-                    <Button x:Name="GuideFocusButton" Content="专注模式" Command="{Binding ToggleFocusCommand}" Style="{StaticResource QuietButtonStyle}" />
-                    <Button Content="收起控制台" Click="HideWindow_Click" Style="{StaticResource PrimaryButtonStyle}" Margin="0" />
+                    <Button x:Name="GuideReplayButton" Content="{l:Text Key=S1d36f11481771ca2}" Click="StartGuide_Click" Style="{StaticResource QuietButtonStyle}" />
+                    <Button x:Name="GuideFocusButton" Content="{l:Text Key=S9517a69c74e322c2}" Command="{Binding ToggleFocusCommand}" Style="{StaticResource QuietButtonStyle}" />
+                    <Button Content="{l:Text Key=S1f0a04e1b6ca5d8b}" Click="HideWindow_Click" Style="{StaticResource PrimaryButtonStyle}" Margin="0" />
                 </StackPanel>
             </Grid>
 
@@ -265,19 +266,19 @@
                     </ControlTemplate>
                 </TabControl.Template>
 
-                <TabItem Header="今日概览">
+                <TabItem Header="{l:Text Key=S9dd8a635443930be}">
                     <ScrollViewer VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
                         <StackPanel>
-                            <TextBlock Text="正在等待订单历史和服务器时间。请更新桥接插件；MT4 账户历史请选择全部历史。数据就绪前依赖历史的指标显示为 —。"
+                            <TextBlock Text="{l:Text Key=Sd4ba8744c0c35757}"
                                        TextWrapping="Wrap" Foreground="{StaticResource AccentBrush}" Margin="0,0,0,12"
                                        Visibility="{Binding MonitoringOnly, Converter={StaticResource BoolToVisibility}}" />
-                            <TextBlock Text="MT4 · 时间及交易日以 broker 服务器为准。订单历史、复盘、日报、图表标记和 M5 回放已接入；历史范围取决于终端已加载记录。部分平仓按票据统计；原生历史 Tick 不可回补；公开周历不含实时公布值。"
+                            <TextBlock Text="{l:Text Key=Se44e647e4fadd563}"
                                        TextWrapping="Wrap" Style="{StaticResource MutedTextStyle}" Margin="0,0,0,12"
                                        Visibility="{Binding IsMt4, Converter={StaticResource BoolToVisibility}}" />
                             <UniformGrid x:Name="GuideOverviewMetrics" Columns="4" Margin="0,0,0,12">
                                 <Border Style="{StaticResource MetricCardStyle}" Background="{Binding TotalPnlBackground}">
                                     <StackPanel>
-                                        <TextBlock Text="今日合计" Style="{StaticResource MutedTextStyle}" />
+                                        <TextBlock Text="{l:Text Key=Sf7e6146c1c2156c5}" Style="{StaticResource MutedTextStyle}" />
                                         <TextBlock
                                         Foreground="{Binding TotalPnlColor}" FontSize="25" FontWeight="SemiBold" Margin="0,8,0,0">
                                             <TextBlock.Text>
@@ -287,12 +288,12 @@
                                                 </MultiBinding>
                                             </TextBlock.Text>
                                         </TextBlock>
-                                        <TextBlock Text="含浮动盈亏" Foreground="#608E81" FontSize="10" Margin="0,7,0,0" />
+                                        <TextBlock Text="{l:Text Key=S3e5980c636a0e92b}" Foreground="#608E81" FontSize="10" Margin="0,7,0,0" />
                                     </StackPanel>
                                 </Border>
                                 <Border Style="{StaticResource MetricCardStyle}">
                                     <StackPanel>
-                                        <TextBlock Text="已实现盈亏" Style="{StaticResource MutedTextStyle}" />
+                                        <TextBlock Text="{l:Text Key=S862f4c5ec0813af2}" Style="{StaticResource MutedTextStyle}" />
                                         <TextBlock
                                         Foreground="{Binding RealizedPnlColor}" FontSize="25" FontWeight="SemiBold" Margin="0,8,0,0">
                                             <TextBlock.Text>
@@ -302,12 +303,12 @@
                                                 </MultiBinding>
                                             </TextBlock.Text>
                                         </TextBlock>
-                                        <TextBlock Text="已平仓交易" Foreground="#65719C" FontSize="10" Margin="0,7,0,0" />
+                                        <TextBlock Text="{l:Text Key=S4fe6cbcdf3c5656f}" Foreground="#65719C" FontSize="10" Margin="0,7,0,0" />
                                     </StackPanel>
                                 </Border>
                                 <Border Style="{StaticResource MetricCardStyle}">
                                     <StackPanel>
-                                        <TextBlock Text="交易次数" Style="{StaticResource MutedTextStyle}" />
+                                        <TextBlock Text="{l:Text Key=S27dadce3ee3bca2a}" Style="{StaticResource MutedTextStyle}" />
                                         <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                                             <TextBlock  Foreground="{StaticResource GoldBrush}"
                                             FontSize="25" FontWeight="SemiBold">
@@ -318,14 +319,14 @@
                                                     </MultiBinding>
                                                 </TextBlock.Text>
                                             </TextBlock>
-                                            <TextBlock Text=" 次" Foreground="#8B826C" FontSize="11" VerticalAlignment="Bottom" Margin="2,0,0,4" />
+                                            <TextBlock Text="{l:Text Key=S189ba26c333f581f}" Foreground="#8B826C" FontSize="11" VerticalAlignment="Bottom" Margin="2,0,0,4" />
                                         </StackPanel>
-                                        <TextBlock Text="完整交易" Foreground="#8B826C" FontSize="10" Margin="0,7,0,0" />
+                                        <TextBlock Text="{l:Text Key=S6072c933ec67ae1f}" Foreground="#8B826C" FontSize="10" Margin="0,7,0,0" />
                                     </StackPanel>
                                 </Border>
                                 <Border Style="{StaticResource PageCardStyle}" Padding="15">
                                     <StackPanel>
-                                        <TextBlock Text="今日连亏" Style="{StaticResource MutedTextStyle}" />
+                                        <TextBlock Text="{l:Text Key=S3584ce01013d64cd}" Style="{StaticResource MutedTextStyle}" />
                                         <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                                             <TextBlock  Foreground="{Binding ConsecutiveLossesColor}"
                                             FontSize="25" FontWeight="SemiBold">
@@ -336,9 +337,9 @@
                                                     </MultiBinding>
                                                 </TextBlock.Text>
                                             </TextBlock>
-                                            <TextBlock Text=" 次" Foreground="#987272" FontSize="11" VerticalAlignment="Bottom" Margin="2,0,0,4" />
+                                            <TextBlock Text="{l:Text Key=S189ba26c333f581f}" Foreground="#987272" FontSize="11" VerticalAlignment="Bottom" Margin="2,0,0,4" />
                                         </StackPanel>
-                                        <TextBlock Text="保持交易节奏" Foreground="#987272" FontSize="10" Margin="0,7,0,0" />
+                                        <TextBlock Text="{l:Text Key=S119f958233394a47}" Foreground="#987272" FontSize="10" Margin="0,7,0,0" />
                                     </StackPanel>
                                 </Border>
                             </UniformGrid>
@@ -357,8 +358,8 @@
                                             <RowDefinition Height="*" />
                                         </Grid.RowDefinitions>
                                         <Grid>
-                                            <TextBlock Text="当前持仓" Style="{StaticResource SectionTitleStyle}" />
-                                            <TextBlock Text="实时同步，只读显示" Style="{StaticResource MutedTextStyle}"
+                                            <TextBlock Text="{l:Text Key=Sc04bdce4d8106dc7}" Style="{StaticResource SectionTitleStyle}" />
+                                            <TextBlock Text="{l:Text Key=Sf3cdfdee33506c7f}" Style="{StaticResource MutedTextStyle}"
                                                        HorizontalAlignment="Right" VerticalAlignment="Center" />
                                         </Grid>
                                         <Grid Grid.Row="1" Margin="0,15,0,8">
@@ -366,11 +367,11 @@
                                                 <ColumnDefinition Width="1.3*" /><ColumnDefinition /><ColumnDefinition />
                                                 <ColumnDefinition /><ColumnDefinition Width="1.1*" />
                                             </Grid.ColumnDefinitions>
-                                            <TextBlock Text="品种" Style="{StaticResource MutedTextStyle}" />
-                                            <TextBlock Grid.Column="1" Text="方向" Style="{StaticResource MutedTextStyle}" />
-                                            <TextBlock Grid.Column="2" Text="手数" Style="{StaticResource MutedTextStyle}" />
-                                            <TextBlock Grid.Column="3" Text="浮动盈亏" Style="{StaticResource MutedTextStyle}" />
-                                            <TextBlock Grid.Column="4" Text="持仓时长" Style="{StaticResource MutedTextStyle}" />
+                                            <TextBlock Text="{l:Text Key=S2b0abb7bb8ff7c99}" Style="{StaticResource MutedTextStyle}" />
+                                            <TextBlock Grid.Column="1" Text="{l:Text Key=S99a8b38806d6b5a5}" Style="{StaticResource MutedTextStyle}" />
+                                            <TextBlock Grid.Column="2" Text="{l:Text Key=S3a3c0f49569fc529}" Style="{StaticResource MutedTextStyle}" />
+                                            <TextBlock Grid.Column="3" Text="{l:Text Key=Se9155716d392fa18}" Style="{StaticResource MutedTextStyle}" />
+                                            <TextBlock Grid.Column="4" Text="{l:Text Key=Sa8c31c4d515f1591}" Style="{StaticResource MutedTextStyle}" />
                                         </Grid>
                                         <ItemsControl Grid.Row="2" ItemsSource="{Binding Positions}">
                                             <ItemsControl.ItemTemplate>
@@ -381,11 +382,11 @@
                                                                 <ColumnDefinition Width="1.3*" /><ColumnDefinition /><ColumnDefinition />
                                                                 <ColumnDefinition /><ColumnDefinition Width="1.1*" />
                                                             </Grid.ColumnDefinitions>
-                                                            <TextBlock Text="{Binding Symbol}" FontWeight="SemiBold" />
-                                                            <TextBlock Grid.Column="1" Text="{Binding Side}" Foreground="{StaticResource AccentBrush}" />
-                                                            <TextBlock Grid.Column="2" Text="{Binding Volume}" />
-                                                            <TextBlock Grid.Column="3" Text="{Binding Profit}" Foreground="{Binding ProfitColor}" />
-                                                            <TextBlock Grid.Column="4" Text="{Binding Duration}" Foreground="{StaticResource MutedBrush}" />
+                                                            <TextBlock Text="{Binding Symbol, Converter={StaticResource UiTranslation}}" FontWeight="SemiBold" />
+                                                            <TextBlock Grid.Column="1" Text="{Binding Side, Converter={StaticResource UiTranslation}}" Foreground="{StaticResource AccentBrush}" />
+                                                            <TextBlock Grid.Column="2" Text="{Binding Volume, Converter={StaticResource UiTranslation}}" />
+                                                            <TextBlock Grid.Column="3" Text="{Binding Profit, Converter={StaticResource UiTranslation}}" Foreground="{Binding ProfitColor}" />
+                                                            <TextBlock Grid.Column="4" Text="{Binding Duration, Converter={StaticResource UiTranslation}}" Foreground="{StaticResource MutedBrush}" />
                                                         </Grid>
                                                     </Border>
                                                 </DataTemplate>
@@ -393,8 +394,8 @@
                                         </ItemsControl>
                                         <StackPanel Grid.Row="2" HorizontalAlignment="Center" VerticalAlignment="Center"
                                                     Visibility="{Binding HasNoPositions, Converter={StaticResource BoolToVisibility}}">
-                                            <TextBlock Text="当前没有持仓" Foreground="#718078" FontSize="13" HorizontalAlignment="Center" />
-                                            <TextBlock Text="开仓后会在这里实时显示，只读同步。" Style="{StaticResource MutedTextStyle}"
+                                            <TextBlock Text="{l:Text Key=Sd2211fb82f4f5698}" Foreground="#718078" FontSize="13" HorizontalAlignment="Center" />
+                                            <TextBlock Text="{l:Text Key=S51f1bb678067d026}" Style="{StaticResource MutedTextStyle}"
                                                        FontSize="10" Margin="0,6,0,0" HorizontalAlignment="Center" />
                                         </StackPanel>
                                     </Grid>
@@ -405,13 +406,13 @@
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" />
                                         </Grid.RowDefinitions>
-                                        <TextBlock Text="当前风险" Style="{StaticResource SectionTitleStyle}" />
+                                        <TextBlock Text="{l:Text Key=S06e4388483b2341f}" Style="{StaticResource SectionTitleStyle}" />
                                         <StackPanel Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center">
                                             <Border Width="92" Height="92" CornerRadius="46" BorderBrush="#295D54" BorderThickness="9"
                                                     Background="#0E171A">
                                                 <StackPanel VerticalAlignment="Center">
-                                                    <TextBlock Text="风险" Foreground="{StaticResource MutedBrush}" FontSize="11" HorizontalAlignment="Center" />
-                                                    <TextBlock Text="{Binding RiskText}" Foreground="{StaticResource AccentBrush}" FontSize="13"
+                                                    <TextBlock Text="{l:Text Key=S1dbec8e3ac292955}" Foreground="{StaticResource MutedBrush}" FontSize="11" HorizontalAlignment="Center" />
+                                                    <TextBlock Text="{Binding RiskText, Converter={StaticResource UiTranslation}}" Foreground="{StaticResource AccentBrush}" FontSize="13"
                                                                FontWeight="SemiBold" HorizontalAlignment="Center" TextAlignment="Center"
                                                                TextWrapping="Wrap" MaxWidth="70" />
                                                 </StackPanel>
@@ -420,7 +421,7 @@
                                         <Grid Grid.Row="2">
                                             <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
                                             <StackPanel>
-                                                <TextBlock Text="盈利次数" Style="{StaticResource MutedTextStyle}" />
+                                                <TextBlock Text="{l:Text Key=S79a5381eb88b6e43}" Style="{StaticResource MutedTextStyle}" />
                                                 <TextBlock Foreground="{Binding WinCountColor}" FontSize="17" Margin="0,4,0,0">
                                                     <TextBlock.Text>
                                                         <MultiBinding Converter="{StaticResource HistoryMetric}" ConverterParameter="0.##">
@@ -431,7 +432,7 @@
                                                 </TextBlock>
                                             </StackPanel>
                                             <StackPanel Grid.Column="1">
-                                                <TextBlock Text="亏损次数" Style="{StaticResource MutedTextStyle}" />
+                                                <TextBlock Text="{l:Text Key=S03a197b2184eeed2}" Style="{StaticResource MutedTextStyle}" />
                                                 <TextBlock Foreground="{Binding LossCountColor}" FontSize="17" Margin="0,4,0,0">
                                                     <TextBlock.Text>
                                                         <MultiBinding Converter="{StaticResource HistoryMetric}" ConverterParameter="0.##">
@@ -449,7 +450,7 @@
                             <Border Style="{StaticResource PageCardStyle}" Padding="15">
                                 <UniformGrid Columns="4">
                                     <StackPanel>
-                                        <TextBlock Text="今日最高盈亏" Style="{StaticResource MutedTextStyle}" />
+                                        <TextBlock Text="{l:Text Key=S663a93763dc1f6de}" Style="{StaticResource MutedTextStyle}" />
                                         <TextBlock Foreground="{Binding HighWaterPnlColor}" FontSize="17" Margin="0,5,0,0">
                                             <TextBlock.Text>
                                                 <MultiBinding Converter="{StaticResource HistoryMetric}" ConverterParameter="+0.##;-0.##;0">
@@ -460,11 +461,11 @@
                                         </TextBlock>
                                     </StackPanel>
                                     <StackPanel>
-                                        <TextBlock Text="当前浮动盈亏" Style="{StaticResource MutedTextStyle}" />
-                                        <TextBlock Text="{Binding FloatingPnl, StringFormat={}{0:+0.##;-0.##;0}}" Foreground="{Binding FloatingPnlColor}" FontSize="17" Margin="0,5,0,0" />
+                                        <TextBlock Text="{l:Text Key=S421b0fdd3847e85a}" Style="{StaticResource MutedTextStyle}" />
+                                        <TextBlock Text="{Binding FloatingPnl, StringFormat={}{0:+0.##;-0.##;0}, Converter={StaticResource UiTranslation}}" Foreground="{Binding FloatingPnlColor}" FontSize="17" Margin="0,5,0,0" />
                                     </StackPanel>
                                     <StackPanel>
-                                        <TextBlock Text="当前盈利回吐" Style="{StaticResource MutedTextStyle}" />
+                                        <TextBlock Text="{l:Text Key=S9193400fc57ca032}" Style="{StaticResource MutedTextStyle}" />
                                         <TextBlock Foreground="{Binding GivebackColor}" FontSize="17" Margin="0,5,0,0">
                                             <TextBlock.Text>
                                                 <MultiBinding Converter="{StaticResource HistoryMetric}" ConverterParameter="0.##">
@@ -475,8 +476,8 @@
                                         </TextBlock>
                                     </StackPanel>
                                     <StackPanel>
-                                        <TextBlock Text="最大总仓位" Style="{StaticResource MutedTextStyle}" />
-                                        <TextBlock Text="{Binding MaximumExposure, StringFormat={}{0:0.##} 手}" FontSize="17" Margin="0,5,0,0" />
+                                        <TextBlock Text="{l:Text Key=S3225c079cb1148ac}" Style="{StaticResource MutedTextStyle}" />
+                                        <TextBlock Text="{Binding MaximumExposure, StringFormat={l:Text Key=Sff9f6b4647e75586}, Converter={StaticResource UiTranslation}}" FontSize="17" Margin="0,5,0,0" />
                                     </StackPanel>
                                 </UniformGrid>
                             </Border>
@@ -492,23 +493,23 @@
                                 <Border Grid.Column="0" Style="{StaticResource PageCardStyle}" Margin="0,0,10,0" Padding="14">
                                     <Grid>
                                         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-                                        <TextBlock Text="今日目标与限额" Style="{StaticResource SectionTitleStyle}" FontSize="14" />
+                                        <TextBlock Text="{l:Text Key=S060ba5d329350409}" Style="{StaticResource SectionTitleStyle}" FontSize="14" />
                                         <UniformGrid Grid.Row="1" Columns="2" Rows="2" Margin="0,10,0,0">
                                             <StackPanel>
-                                                <TextBlock Text="盈利目标" Style="{StaticResource MutedTextStyle}" FontSize="10" />
-                                                <TextBlock Text="{Binding DailyTargetDisplay}" Margin="0,3,0,0" />
+                                                <TextBlock Text="{l:Text Key=Sa133ec440c0cc718}" Style="{StaticResource MutedTextStyle}" FontSize="10" />
+                                                <TextBlock Text="{Binding DailyTargetDisplay, Converter={StaticResource UiTranslation}}" Margin="0,3,0,0" />
                                             </StackPanel>
                                             <StackPanel>
-                                                <TextBlock Text="亏损上限" Style="{StaticResource MutedTextStyle}" FontSize="10" />
-                                                <TextBlock Text="{Binding DailyLoss, TargetNullValue=未设置}" Margin="0,3,0,0" />
+                                                <TextBlock Text="{l:Text Key=S4f4590fdd2c7fe19}" Style="{StaticResource MutedTextStyle}" FontSize="10" />
+                                                <TextBlock Text="{Binding DailyLoss, TargetNullValue={l:Text Key=S9513012fa9cd216a}, Converter={StaticResource UiTranslation}}" Margin="0,3,0,0" />
                                             </StackPanel>
                                             <StackPanel>
-                                                <TextBlock Text="最多交易" Style="{StaticResource MutedTextStyle}" FontSize="10" />
-                                                <TextBlock Text="{Binding MaximumTrades, TargetNullValue=未设置}" Margin="0,3,0,0" />
+                                                <TextBlock Text="{l:Text Key=Sf9d7fbf84c775331}" Style="{StaticResource MutedTextStyle}" FontSize="10" />
+                                                <TextBlock Text="{Binding MaximumTrades, TargetNullValue={l:Text Key=S9513012fa9cd216a}, Converter={StaticResource UiTranslation}}" Margin="0,3,0,0" />
                                             </StackPanel>
                                             <StackPanel>
-                                                <TextBlock Text="最大手数" Style="{StaticResource MutedTextStyle}" FontSize="10" />
-                                                <TextBlock Text="{Binding MaximumLot, TargetNullValue=未设置}" Margin="0,3,0,0" />
+                                                <TextBlock Text="{l:Text Key=Sff03b07b66e943c8}" Style="{StaticResource MutedTextStyle}" FontSize="10" />
+                                                <TextBlock Text="{Binding MaximumLot, TargetNullValue={l:Text Key=S9513012fa9cd216a}, Converter={StaticResource UiTranslation}}" Margin="0,3,0,0" />
                                             </StackPanel>
                                         </UniformGrid>
                                     </Grid>
@@ -517,14 +518,14 @@
                                 <Border Grid.Column="1" Style="{StaticResource PageCardStyle}" Margin="0,0,10,0" Padding="14">
                                     <Grid>
                                         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                                        <TextBlock Text="行为管理" Style="{StaticResource SectionTitleStyle}" FontSize="14" />
+                                        <TextBlock Text="{l:Text Key=Sc17954512053a545}" Style="{StaticResource SectionTitleStyle}" FontSize="14" />
                                         <StackPanel Grid.Row="1" VerticalAlignment="Center">
-                                            <TextBlock Text="当前状态" Style="{StaticResource MutedTextStyle}" FontSize="10" />
-                                            <TextBlock Text="{Binding TodayBehaviorRiskText}" Foreground="{StaticResource AccentBrush}" FontSize="17" FontWeight="SemiBold" Margin="0,3,0,0" />
-                                            <TextBlock Text="{Binding BehaviorPresetText, StringFormat=预设：{0}}" Style="{StaticResource MutedTextStyle}" FontSize="10" Margin="0,2,0,0" />
-                                            <TextBlock Text="{Binding TodayBehaviorTriggeredText}" Foreground="#C1CEC8" FontSize="10" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{l:Text Key=S18fdc6d95e07a037}" Style="{StaticResource MutedTextStyle}" FontSize="10" />
+                                            <TextBlock Text="{Binding TodayBehaviorRiskText, Converter={StaticResource UiTranslation}}" Foreground="{StaticResource AccentBrush}" FontSize="17" FontWeight="SemiBold" Margin="0,3,0,0" />
+                                            <TextBlock Text="{Binding BehaviorPresetText, StringFormat={l:Text Key=S90f26f937b54d9cf}, Converter={StaticResource UiTranslation}}" Style="{StaticResource MutedTextStyle}" FontSize="10" Margin="0,2,0,0" />
+                                            <TextBlock Text="{Binding TodayBehaviorTriggeredText, Converter={StaticResource UiTranslation}}" Foreground="#C1CEC8" FontSize="10" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
                                         </StackPanel>
-                                        <TextBlock Grid.Row="2" Text="打开复盘分析管理规则" Style="{StaticResource MutedTextStyle}" FontSize="10" />
+                                        <TextBlock Grid.Row="2" Text="{l:Text Key=S0ec539cfe08e4c6b}" Style="{StaticResource MutedTextStyle}" FontSize="10" />
                                     </Grid>
                                 </Border>
 
@@ -532,8 +533,8 @@
                                     <Grid>
                                         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
                                         <Grid>
-                                            <TextBlock Text="亏损预警" Style="{StaticResource SectionTitleStyle}" FontSize="14" />
-                                            <TextBlock Text="按最近触发排序" Style="{StaticResource MutedTextStyle}" FontSize="10"
+                                            <TextBlock Text="{l:Text Key=S0157bf817c077c10}" Style="{StaticResource SectionTitleStyle}" FontSize="14" />
+                                            <TextBlock Text="{l:Text Key=S43aad08ebd2dc47b}" Style="{StaticResource MutedTextStyle}" FontSize="10"
                                                        HorizontalAlignment="Right" VerticalAlignment="Center" />
                                         </Grid>
                                         <ScrollViewer Grid.Row="1" Margin="0,9,0,0" VerticalScrollBarVisibility="Hidden">
@@ -544,11 +545,11 @@
                                                                 CornerRadius="7" Padding="8,6" Margin="0,0,0,5">
                                                             <Grid>
                                                                 <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                                                                <TextBlock Text="{Binding Symbol}" FontSize="11" FontWeight="SemiBold" />
-                                                                <TextBlock Text="{Binding Loss}" Foreground="{Binding LossColor}" FontSize="10"
+                                                                <TextBlock Text="{Binding Symbol, Converter={StaticResource UiTranslation}}" FontSize="11" FontWeight="SemiBold" />
+                                                                <TextBlock Text="{Binding Loss, Converter={StaticResource UiTranslation}}" Foreground="{Binding LossColor}" FontSize="10"
                                                                            HorizontalAlignment="Right" />
-                                                                <TextBlock Grid.Row="1" Text="{Binding Range}" Foreground="#DFA1A8" FontSize="9" Margin="0,3,0,0" />
-                                                                <TextBlock Grid.Row="1" Text="{Binding Attempts}" Foreground="#7F8C89" FontSize="8"
+                                                                <TextBlock Grid.Row="1" Text="{Binding Range, Converter={StaticResource UiTranslation}}" Foreground="#DFA1A8" FontSize="9" Margin="0,3,0,0" />
+                                                                <TextBlock Grid.Row="1" Text="{Binding Attempts, Converter={StaticResource UiTranslation}}" Foreground="#7F8C89" FontSize="8"
                                                                            HorizontalAlignment="Right" Margin="8,3,0,0" />
                                                             </Grid>
                                                         </Border>
@@ -563,8 +564,8 @@
                                     <Grid>
                                         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
                                         <Grid>
-                                            <TextBlock Text="最近记录" Style="{StaticResource SectionTitleStyle}" FontSize="14" />
-                                            <TextBlock Text="全部事实都可追溯" Style="{StaticResource MutedTextStyle}" FontSize="10"
+                                            <TextBlock Text="{l:Text Key=S20bd27ca4e513c92}" Style="{StaticResource SectionTitleStyle}" FontSize="14" />
+                                            <TextBlock Text="{l:Text Key=Scb965bac0b81cee0}" Style="{StaticResource MutedTextStyle}" FontSize="10"
                                                        HorizontalAlignment="Right" VerticalAlignment="Center" />
                                         </Grid>
                                         <ScrollViewer Grid.Row="1" Margin="0,9,0,0" VerticalScrollBarVisibility="Hidden">
@@ -573,9 +574,9 @@
                                                     <DataTemplate>
                                                         <Grid Margin="0,0,0,6">
                                                             <Grid.ColumnDefinitions><ColumnDefinition Width="48"/><ColumnDefinition Width="75"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                                                            <TextBlock Text="{Binding Time}" Foreground="#65717F" FontSize="10" />
-                                                            <TextBlock Grid.Column="1" Text="{Binding Kind}" Foreground="{StaticResource AccentBrush}" FontSize="10" />
-                                                            <TextBlock Grid.Column="2" Text="{Binding Summary}" Foreground="#AFB9B5" FontSize="10" TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Text="{Binding Time, Converter={StaticResource UiTranslation}}" Foreground="#65717F" FontSize="10" />
+                                                            <TextBlock Grid.Column="1" Text="{Binding Kind, Converter={StaticResource UiTranslation}}" Foreground="{StaticResource AccentBrush}" FontSize="10" />
+                                                            <TextBlock Grid.Column="2" Text="{Binding Summary, Converter={StaticResource UiTranslation}}" Foreground="#AFB9B5" FontSize="10" TextTrimming="CharacterEllipsis" />
                                                         </Grid>
                                                     </DataTemplate>
                                                 </ItemsControl.ItemTemplate>
@@ -588,7 +589,7 @@
                     </ScrollViewer>
                 </TabItem>
 
-                <TabItem Header="日目标与风险">
+                <TabItem Header="{l:Text Key=S57375aa8783db9b0}">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <Grid>
                         <Grid.RowDefinitions>
@@ -596,12 +597,12 @@
                         </Grid.RowDefinitions>
                         <Grid x:Name="GuidePlanHeader" Margin="0,0,0,12">
                             <StackPanel>
-                                <TextBlock Text="日目标与风险" FontSize="20" FontWeight="SemiBold" />
-                                <TextBlock Text="提前写下边界，交易时只负责执行。" Style="{StaticResource MutedTextStyle}" Margin="0,5,0,0" />
+                                <TextBlock Text="{l:Text Key=S57375aa8783db9b0}" FontSize="20" FontWeight="SemiBold" />
+                                <TextBlock Text="{l:Text Key=S5838237574b46e41}" Style="{StaticResource MutedTextStyle}" Margin="0,5,0,0" />
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                <Button x:Name="GuidePlanRecordingButton" Content="{Binding PlanRecordingText}" Command="{Binding TogglePlanRecordingCommand}" Style="{StaticResource PrimaryButtonStyle}" ToolTip="先开始记录，再到已连接的终端图表画线、矩形或文字；新对象会进入下方列表，移动同步，删除留历史。" />
-                                <Button x:Name="GuideImportChartButton" Content="从当前图表导入" Command="{Binding ImportPlanCommand}" Style="{StaticResource QuietButtonStyle}" Margin="0" ToolTip="导入当前桥接图表上已经画好的对象。需要先连接终端并等待图表同步；导入后在下方列表选择用途。" />
+                                <Button x:Name="GuidePlanRecordingButton" Content="{Binding PlanRecordingText, Converter={StaticResource UiTranslation}}" Command="{Binding TogglePlanRecordingCommand}" Style="{StaticResource PrimaryButtonStyle}" ToolTip="{l:Text Key=S89fb7795dc47dbf1}" />
+                                <Button x:Name="GuideImportChartButton" Content="{l:Text Key=S1e0a0a8d028fd223}" Command="{Binding ImportPlanCommand}" Style="{StaticResource QuietButtonStyle}" Margin="0" ToolTip="{l:Text Key=S479f7048e0dcef94}" />
                             </StackPanel>
                         </Grid>
 
@@ -609,8 +610,8 @@
                             <Grid>
                                 <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                                 <Grid>
-                                    <TextBlock Text="今日交易边界" Style="{StaticResource SectionTitleStyle}" />
-                                    <Button x:Name="GuideSavePlan" Content="保存目标与限额" Click="SavePlan_Click" Style="{StaticResource PrimaryButtonStyle}"
+                                    <TextBlock Text="{l:Text Key=S1150a3848bbe51ca}" Style="{StaticResource SectionTitleStyle}" />
+                                    <Button x:Name="GuideSavePlan" Content="{l:Text Key=Sce061d921f543509}" Click="SavePlan_Click" Style="{StaticResource PrimaryButtonStyle}"
                                             HorizontalAlignment="Right" Padding="13,7" Margin="0" />
                                 </Grid>
                                 <Grid Grid.Row="1" Margin="0,15,0,0">
@@ -629,8 +630,8 @@
                                         <ColumnDefinition Width="*"/><ColumnDefinition Width="9"/>
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
-                                    <StackPanel x:Name="GuideDailyTarget" ToolTip="金额使用账户货币；百分比按当日初始余额换算。今日已实现盈亏加持仓浮盈亏达到目标时提醒一次；留空关闭。">
-                                        <TextBlock Text="每日盈利目标" Style="{StaticResource FieldLabelStyle}" />
+                                    <StackPanel x:Name="GuideDailyTarget" ToolTip="{l:Text Key=Sbf4a26ac137797f2}">
+                                        <TextBlock Text="{l:Text Key=S89c999a5c5816ca1}" Style="{StaticResource FieldLabelStyle}" />
                                         <Border x:Name="DailyTargetField" Height="40" Background="#0C121B" BorderThickness="1" CornerRadius="8">
                                             <Border.Style>
                                                 <Style TargetType="Border">
@@ -649,35 +650,35 @@
                                                 <Border Grid.Column="1" Background="{StaticResource BorderBrush}" Margin="0,7" />
                                                 <ComboBox x:Name="DailyTargetUnitInput" Grid.Column="2" SelectedIndex="{Binding DailyTargetUnitIndex, Mode=TwoWay}"
                                                           Height="38" MinHeight="38" Background="Transparent" BorderThickness="0" Padding="8,0,25,0"
-                                                          ToolTip="金额：账户货币；%：当日初始余额的百分比。">
-                                                    <ComboBoxItem Content="金额"/><ComboBoxItem Content="%"/>
+                                                          ToolTip="{l:Text Key=S81af7dbdd86fd9f2}">
+                                                    <ComboBoxItem Content="{l:Text Key=S30e9fc44836a3e2a}"/><ComboBoxItem Content="%"/>
                                                 </ComboBox>
                                             </Grid>
                                         </Border>
                                     </StackPanel>
-                                    <StackPanel x:Name="GuideDailyLoss" Grid.Column="2" ToolTip="填亏损金额的正数，单位为账户货币。例如填 100，今日合计盈亏到 -100 时提醒一次；留空关闭。">
-                                        <TextBlock Text="每日亏损上限" Style="{StaticResource FieldLabelStyle}" />
+                                    <StackPanel x:Name="GuideDailyLoss" Grid.Column="2" ToolTip="{l:Text Key=Sf408a990688314d9}">
+                                        <TextBlock Text="{l:Text Key=S15b4b71fa709259d}" Style="{StaticResource FieldLabelStyle}" />
                                         <TextBox x:Name="DailyLossInput" Text="{Binding DailyLoss, UpdateSourceTrigger=LostFocus, TargetNullValue=''}" />
                                     </StackPanel>
-                                    <StackPanel x:Name="GuideMaximumTrades" Grid.Column="4" ToolTip="填正整数；按交易服务器日期统计当日开仓笔数，达到该数时提醒一次，不会拦截下单；留空关闭。">
-                                        <TextBlock Text="最多交易次数" Style="{StaticResource FieldLabelStyle}" />
+                                    <StackPanel x:Name="GuideMaximumTrades" Grid.Column="4" ToolTip="{l:Text Key=S8a14fe709ea5545c}">
+                                        <TextBlock Text="{l:Text Key=Se656f4485b3d2260}" Style="{StaticResource FieldLabelStyle}" />
                                         <TextBox x:Name="MaximumTradesInput" Text="{Binding MaximumTrades, UpdateSourceTrigger=LostFocus, TargetNullValue=''}" />
                                     </StackPanel>
-                                    <StackPanel x:Name="GuideMaximumLot" Grid.Column="6" ToolTip="填正数，单位为手。同品种同方向的当前持仓手数合计达到该值时提醒一次；留空关闭。">
-                                        <TextBlock Text="同向持仓上限（手）" Style="{StaticResource FieldLabelStyle}" />
+                                    <StackPanel x:Name="GuideMaximumLot" Grid.Column="6" ToolTip="{l:Text Key=S6af0645acb9abd11}">
+                                        <TextBlock Text="{l:Text Key=Sdca64dd1957e3125}" Style="{StaticResource FieldLabelStyle}" />
                                         <TextBox x:Name="MaximumLotInput" Text="{Binding MaximumLot, UpdateSourceTrigger=LostFocus, TargetNullValue=''}" />
                                     </StackPanel>
-                                    <StackPanel x:Name="GuideLossZoneTolerance" Grid.Column="8" ToolTip="填正数，按品种最小可交易跳动换算为价格距离。例如最小跳动 0.01、填 200，半径就是 2.00；已有亏损区保留原半径。">
-                                        <TextBlock Text="亏损区半径（跳动数）" Style="{StaticResource FieldLabelStyle}" />
+                                    <StackPanel x:Name="GuideLossZoneTolerance" Grid.Column="8" ToolTip="{l:Text Key=S5ec2344981ea1683}">
+                                        <TextBlock Text="{l:Text Key=Sd9a5b7a7d076a437}" Style="{StaticResource FieldLabelStyle}" />
                                         <TextBox x:Name="LossZoneToleranceInput" Text="{Binding LossZoneTolerance, UpdateSourceTrigger=LostFocus}" />
                                     </StackPanel>
                                 </Grid>
                                 <StackPanel x:Name="GuideStopLossReminder" Grid.Row="2" Orientation="Horizontal" Margin="0,12,0,0"
-                                            ToolTip="勾选后，实时持仓持续未设置止损达到等待秒数时，每笔持仓提醒一次；不会代设止损。">
-                                    <CheckBox Content="持仓持续无止损时提醒" IsChecked="{Binding StopLossReminderEnabled}" VerticalAlignment="Center" />
-                                    <TextBlock Text="等待" Style="{StaticResource MutedTextStyle}" Margin="16,0,6,0" VerticalAlignment="Center" />
+                                            ToolTip="{l:Text Key=S3e2b45b74e7e62af}">
+                                    <CheckBox Content="{l:Text Key=S5e6cd76edb9128d4}" IsChecked="{Binding StopLossReminderEnabled}" VerticalAlignment="Center" />
+                                    <TextBlock Text="{l:Text Key=S7a2972ebcf244cf8}" Style="{StaticResource MutedTextStyle}" Margin="16,0,6,0" VerticalAlignment="Center" />
                                     <TextBox x:Name="StopLossReminderSecondsInput" Text="{Binding StopLossReminderSeconds, UpdateSourceTrigger=LostFocus}" Width="72" />
-                                    <TextBlock Text="秒（仅提醒，不会修改持仓）" Style="{StaticResource MutedTextStyle}" Margin="6,0,0,0" VerticalAlignment="Center" />
+                                    <TextBlock Text="{l:Text Key=S69c1eafcfccf492c}" Style="{StaticResource MutedTextStyle}" Margin="6,0,0,0" VerticalAlignment="Center" />
                                 </StackPanel>
                                 <TextBlock x:Name="PlanValidationText" Grid.Row="3" Margin="0,8,0,0" Foreground="#F3A4A0"
                                            FontSize="11" Visibility="Collapsed" TextWrapping="Wrap" />
@@ -689,8 +690,8 @@
                                 <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                                 <Grid x:Name="GuidePlanObjectsHeader" Margin="16,13">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                                    <TextBlock Text="图表标记" Style="{StaticResource SectionTitleStyle}" />
-                                    <TextBlock Grid.Column="1" Text="{Binding PlanChartStatusText}" Style="{StaticResource MutedTextStyle}"
+                                    <TextBlock Text="{l:Text Key=Scff7ff938d13fae5}" Style="{StaticResource SectionTitleStyle}" />
+                                    <TextBlock Grid.Column="1" Text="{Binding PlanChartStatusText, Converter={StaticResource UiTranslation}}" Style="{StaticResource MutedTextStyle}"
                                                Margin="14,0,0,0" TextAlignment="Right" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                                 </Grid>
                                 <ListView x:Name="GuideChartObjectList" Grid.Row="3" ItemsSource="{Binding PlanItems}"
@@ -699,20 +700,19 @@
                                           ScrollViewer.HorizontalScrollBarVisibility="Auto">
                                     <ListView.View>
                                         <GridView>
-                                            <GridViewColumn Header="品种" Width="100" DisplayMemberBinding="{Binding Symbol}" />
-                                            <GridViewColumn Header="对象范围" Width="190" DisplayMemberBinding="{Binding KindText}" />
-                                            <GridViewColumn Header="图表文字" Width="150" DisplayMemberBinding="{Binding Text}" />
-                                            <GridViewColumn Header="标记用途" Width="170">
+                                            <GridViewColumn Header="{l:Text Key=S2b0abb7bb8ff7c99}" Width="100" DisplayMemberBinding="{Binding Symbol}" />
+                                            <GridViewColumn Header="{l:Text Key=S6572e7c3756797d5}" Width="190" DisplayMemberBinding="{Binding KindText}" />
+                                            <GridViewColumn Header="{l:Text Key=Sedef1c8fefa208f9}" Width="150" DisplayMemberBinding="{Binding Text}" />
+                                            <GridViewColumn Header="{l:Text Key=S9ffd70620fff2ec1}" Width="170">
                                                 <GridViewColumn.CellTemplate>
                                                     <DataTemplate>
                                                         <ComboBox Width="155"
-                                                                  ItemsSource="{Binding DataContext.PlanCategoryOptions, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                                  DisplayMemberPath="Label" SelectedValuePath="Value"
-                                                                  SelectedValue="{Binding Category, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                                                  ItemsSource="{Binding DataContext.PlanCategoryOptions, RelativeSource={RelativeSource AncestorType=Window}}" SelectedValuePath="Value"
+                                                                  SelectedValue="{Binding Category, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" ><ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Label, Converter={StaticResource UiTranslation}}" /></DataTemplate></ComboBox.ItemTemplate></ComboBox>
                                                     </DataTemplate>
                                                 </GridViewColumn.CellTemplate>
                                             </GridViewColumn>
-                                            <GridViewColumn Header="状态" Width="78" DisplayMemberBinding="{Binding ActiveText}" />
+                                            <GridViewColumn Header="{l:Text Key=Sb4bd20378aeea93c}" Width="78" DisplayMemberBinding="{Binding ActiveText}" />
                                         </GridView>
                                     </ListView.View>
                                 </ListView>
@@ -722,12 +722,12 @@
                     </ScrollViewer>
                 </TabItem>
 
-                <TabItem Header="亏损区域">
+                <TabItem Header="{l:Text Key=S39f12fd8d6936711}">
                     <Grid>
                         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
                         <StackPanel x:Name="GuideLossHeader" Margin="0,0,0,14">
-                            <TextBlock Text="亏损区域" FontSize="20" FontWeight="SemiBold" />
-                            <TextBlock Text="只由完整亏损交易生成，用来识别重复犯错的位置。" Style="{StaticResource MutedTextStyle}" Margin="0,5,0,0" />
+                            <TextBlock Text="{l:Text Key=S39f12fd8d6936711}" FontSize="20" FontWeight="SemiBold" />
+                            <TextBlock Text="{l:Text Key=S7bc00607261e5573}" Style="{StaticResource MutedTextStyle}" Margin="0,5,0,0" />
                         </StackPanel>
                         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Hidden">
                             <ItemsControl ItemsSource="{Binding LossZones}">
@@ -740,25 +740,25 @@
                                                     <ColumnDefinition Width="1.4*"/><ColumnDefinition/><ColumnDefinition/>
                                                 </Grid.ColumnDefinitions>
                                                 <StackPanel>
-                                                    <TextBlock Text="品种" Style="{StaticResource MutedTextStyle}" />
-                                                    <TextBlock Text="{Binding Symbol}" FontSize="17" FontWeight="SemiBold" Margin="0,6,0,0" />
+                                                    <TextBlock Text="{l:Text Key=S2b0abb7bb8ff7c99}" Style="{StaticResource MutedTextStyle}" />
+                                                    <TextBlock Text="{Binding Symbol, Converter={StaticResource UiTranslation}}" FontSize="17" FontWeight="SemiBold" Margin="0,6,0,0" />
                                                 </StackPanel>
                                                 <StackPanel Grid.Column="1">
-                                                    <TextBlock Text="价格区间" Style="{StaticResource MutedTextStyle}" />
-                                                    <TextBlock Text="{Binding Range}" Foreground="{StaticResource DangerBrush}" FontWeight="SemiBold" Margin="0,6,0,0" />
-                                                    <TextBlock Text="{Binding Center}" Style="{StaticResource MutedTextStyle}" FontSize="10" Margin="0,3,0,0" />
+                                                    <TextBlock Text="{l:Text Key=See9e27da8f139cbe}" Style="{StaticResource MutedTextStyle}" />
+                                                    <TextBlock Text="{Binding Range, Converter={StaticResource UiTranslation}}" Foreground="{StaticResource DangerBrush}" FontWeight="SemiBold" Margin="0,6,0,0" />
+                                                    <TextBlock Text="{Binding Center, Converter={StaticResource UiTranslation}}" Style="{StaticResource MutedTextStyle}" FontSize="10" Margin="0,3,0,0" />
                                                 </StackPanel>
                                                 <StackPanel Grid.Column="2">
-                                                    <TextBlock Text="尝试记录" Style="{StaticResource MutedTextStyle}" />
-                                                    <TextBlock Text="{Binding Attempts}" Margin="0,8,0,0" />
+                                                    <TextBlock Text="{l:Text Key=S9b4a685390d291ac}" Style="{StaticResource MutedTextStyle}" />
+                                                    <TextBlock Text="{Binding Attempts, Converter={StaticResource UiTranslation}}" Margin="0,8,0,0" />
                                                 </StackPanel>
                                                 <StackPanel Grid.Column="3">
-                                                    <TextBlock Text="累计亏损" Style="{StaticResource MutedTextStyle}" />
-                                                    <TextBlock Text="{Binding Loss}" Foreground="{Binding LossColor}" Margin="0,8,0,0" />
+                                                    <TextBlock Text="{l:Text Key=Sb2e3d54bd323282a}" Style="{StaticResource MutedTextStyle}" />
+                                                    <TextBlock Text="{Binding Loss, Converter={StaticResource UiTranslation}}" Foreground="{Binding LossColor}" Margin="0,8,0,0" />
                                                 </StackPanel>
                                                 <StackPanel Grid.Column="4">
-                                                    <TextBlock Text="最近触发" Style="{StaticResource MutedTextStyle}" />
-                                                    <TextBlock Text="{Binding LastTime}" Margin="0,8,0,0" />
+                                                    <TextBlock Text="{l:Text Key=S4de3e5431ffcc749}" Style="{StaticResource MutedTextStyle}" />
+                                                    <TextBlock Text="{Binding LastTime, Converter={StaticResource UiTranslation}}" Margin="0,8,0,0" />
                                                 </StackPanel>
                                             </Grid>
                                         </Border>
@@ -769,7 +769,7 @@
                     </Grid>
                 </TabItem>
 
-                <TabItem Header="复盘分析">
+                <TabItem Header="{l:Text Key=S2b9f7901b72f0549}">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
@@ -780,38 +780,38 @@
                         <Grid x:Name="GuideReviewHeader" Margin="0,0,0,10">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                             <StackPanel>
-                                <TextBlock Text="复盘分析" FontSize="20" FontWeight="SemiBold" />
-                                <TextBlock Text="用完整交易看清自己的优势与习惯。" Style="{StaticResource MutedTextStyle}" Margin="0,5,0,0" />
+                                <TextBlock Text="{l:Text Key=S2b9f7901b72f0549}" FontSize="20" FontWeight="SemiBold" />
+                                <TextBlock Text="{l:Text Key=Sd5f77eeda30ad524}" Style="{StaticResource MutedTextStyle}" Margin="0,5,0,0" />
                             </StackPanel>
-                            <Button x:Name="ReviewGuideButton" Grid.Column="1" Content="复盘使用引导" Click="StartReviewGuide_Click"
-                                    VerticalAlignment="Center" Margin="12,0,0,0" ToolTip="逐步了解筛选、日记、交易档案、分析和导出" />
+                            <Button x:Name="ReviewGuideButton" Grid.Column="1" Content="{l:Text Key=S0f74dc8b1450ae43}" Click="StartReviewGuide_Click"
+                                    VerticalAlignment="Center" Margin="12,0,0,0" ToolTip="{l:Text Key=Sc66bfd39165bf39a}" />
                         </Grid>
                         <Border x:Name="GuideReviewRange" Grid.Row="1" Style="{StaticResource PageCardStyle}" Padding="10" Margin="0,0,0,8">
                             <WrapPanel VerticalAlignment="Center">
-                                <TextBlock Text="周期" Style="{StaticResource MutedTextStyle}" VerticalAlignment="Center" Margin="0,0,5,0" />
+                                <TextBlock Text="{l:Text Key=Sc7861000b30a5cb8}" Style="{StaticResource MutedTextStyle}" VerticalAlignment="Center" Margin="0,0,5,0" />
                                 <ComboBox Width="105" ItemsSource="{Binding ReviewPeriodOptions}" SelectedItem="{Binding SelectedReviewPeriod}" />
-                                <TextBlock Text="从" Style="{StaticResource MutedTextStyle}" VerticalAlignment="Center" Margin="10,0,5,0" />
-                                <TextBox Width="120" Padding="6,8" Text="{Binding ReviewFromDateText, UpdateSourceTrigger=LostFocus}" ToolTip="格式：2026-08-01；选择自定义周期后生效" />
-                                <TextBlock Text="到" Style="{StaticResource MutedTextStyle}" VerticalAlignment="Center" Margin="8,0,5,0" />
-                                <TextBox Width="120" Padding="6,8" Text="{Binding ReviewToDateText, UpdateSourceTrigger=LostFocus}" ToolTip="格式：2026-09-01；选择自定义周期后生效" />
-                                <TextBlock Text="品种" Style="{StaticResource MutedTextStyle}" VerticalAlignment="Center" Margin="10,0,5,0" />
-                                <TextBox Width="100" Text="{Binding ReviewSymbolFilter, UpdateSourceTrigger=LostFocus}" ToolTip="留空为全部；例如 XAUUSD.s" />
-                                <TextBlock Text="方向" Style="{StaticResource MutedTextStyle}" VerticalAlignment="Center" Margin="10,0,5,0" />
+                                <TextBlock Text="{l:Text Key=S2fc2c4e117f3aba7}" Style="{StaticResource MutedTextStyle}" VerticalAlignment="Center" Margin="10,0,5,0" />
+                                <TextBox Width="120" Padding="6,8" Text="{Binding ReviewFromDateText, UpdateSourceTrigger=LostFocus}" ToolTip="{l:Text Key=S4bee9c5ae02cdb9a}" />
+                                <TextBlock Text="{l:Text Key=S3f052ceda45614ca}" Style="{StaticResource MutedTextStyle}" VerticalAlignment="Center" Margin="8,0,5,0" />
+                                <TextBox Width="120" Padding="6,8" Text="{Binding ReviewToDateText, UpdateSourceTrigger=LostFocus}" ToolTip="{l:Text Key=S2b1c47261f379110}" />
+                                <TextBlock Text="{l:Text Key=S2b0abb7bb8ff7c99}" Style="{StaticResource MutedTextStyle}" VerticalAlignment="Center" Margin="10,0,5,0" />
+                                <TextBox Width="100" Text="{Binding ReviewSymbolFilter, UpdateSourceTrigger=LostFocus}" ToolTip="{l:Text Key=Sa5956f930d821b43}" />
+                                <TextBlock Text="{l:Text Key=S99a8b38806d6b5a5}" Style="{StaticResource MutedTextStyle}" VerticalAlignment="Center" Margin="10,0,5,0" />
                                 <ComboBox Width="76" ItemsSource="{Binding ReviewSideFilterOptions}" SelectedItem="{Binding SelectedReviewSideFilter}" />
-                                <Button Content="查询" Command="{Binding RefreshReviewCommand}" Style="{StaticResource PrimaryButtonStyle}" Margin="8,0,0,0" Padding="11,5" />
+                                <Button Content="{l:Text Key=S36c7542828d50215}" Command="{Binding RefreshReviewCommand}" Style="{StaticResource PrimaryButtonStyle}" Margin="8,0,0,0" Padding="11,5" />
                             </WrapPanel>
                         </Border>
                         <Grid Grid.Row="2" Margin="3,0,3,8">
-                            <TextBlock Text="{Binding ReviewRangeText}" FontWeight="SemiBold" />
-                            <TextBlock Text="{Binding ReviewSyncText}" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Right" />
+                            <TextBlock Text="{Binding ReviewRangeText, Converter={StaticResource UiTranslation}}" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding ReviewSyncText, Converter={StaticResource UiTranslation}}" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Right" />
                         </Grid>
                         <TabControl Grid.Row="3" Background="Transparent" BorderThickness="0" Padding="0" Visibility="Collapsed">
-                            <TabItem Header="绩效统计">
+                            <TabItem Header="{l:Text Key=S591267eaae0b084b}">
                                 <ScrollViewer VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
                                     <StackPanel>
                                         <Border Style="{StaticResource PageCardStyle}" Margin="0,0,0,8" Padding="12"
                                                 Visibility="{Binding HasNoReviewTrades, Converter={StaticResource BoolToVisibility}}">
-                                            <TextBlock Text="这个范围没有完整交易。换一个周期，或等待上方历史同步完成。" Style="{StaticResource MutedTextStyle}" />
+                                            <TextBlock Text="{l:Text Key=S1f8fc58aa29f65a2}" Style="{StaticResource MutedTextStyle}" />
                                         </Border>
                                         <ItemsControl ItemsSource="{Binding ReviewMetrics}">
                                             <ItemsControl.ItemsPanel>
@@ -821,13 +821,13 @@
                                                 <DataTemplate>
                                                     <Border Style="{StaticResource MetricCardStyle}" Margin="0,0,8,8" Padding="12" MinHeight="88">
                                                         <StackPanel>
-                                                            <TextBlock Text="{Binding Label}" Style="{StaticResource MutedTextStyle}" FontSize="11" />
+                                                            <TextBlock Text="{Binding Label, Converter={StaticResource UiTranslation}}" Style="{StaticResource MutedTextStyle}" FontSize="11" />
                                                             <Viewbox Height="27" Stretch="Uniform" StretchDirection="DownOnly"
                                                                      HorizontalAlignment="Left" Margin="0,6,0,3">
-                                                                <TextBlock Text="{Binding Value}" ToolTip="{Binding Value}" Foreground="{Binding ValueColor}"
+                                                                <TextBlock Text="{Binding Value, Converter={StaticResource UiTranslation}}" ToolTip="{Binding Value, Converter={StaticResource UiTranslation}}" Foreground="{Binding ValueColor}"
                                                                            FontSize="19" FontWeight="SemiBold" />
                                                             </Viewbox>
-                                                            <TextBlock Text="{Binding Hint}" ToolTip="{Binding Hint}"
+                                                            <TextBlock Text="{Binding Hint, Converter={StaticResource UiTranslation}}" ToolTip="{Binding Hint, Converter={StaticResource UiTranslation}}"
                                                                        Style="{StaticResource MutedTextStyle}" FontSize="10"
                                                                        TextWrapping="Wrap" MaxHeight="30" />
                                                         </StackPanel>
@@ -838,32 +838,32 @@
                                         <Border Style="{StaticResource PageCardStyle}" Padding="14" Margin="0,4,0,0">
                                             <StackPanel>
                                                 <Grid Margin="0,0,0,11">
-                                                    <TextBlock Text="分类速览" Style="{StaticResource SectionTitleStyle}" />
-                                                    <TextBlock Text="选择一个维度，只看这一类" Style="{StaticResource MutedTextStyle}"
+                                                    <TextBlock Text="{l:Text Key=S4670e938221f6480}" Style="{StaticResource SectionTitleStyle}" />
+                                                    <TextBlock Text="{l:Text Key=S56188a3ed7582bf8}" Style="{StaticResource MutedTextStyle}"
                                                                HorizontalAlignment="Right" VerticalAlignment="Center" />
                                                 </Grid>
-                                                <ContentControl Content="{Binding}" ContentTemplate="{StaticResource ReviewCategoryPanelTemplate}"
+                                                <ContentControl Content="{Binding Converter={StaticResource UiTranslation}}" ContentTemplate="{StaticResource ReviewCategoryPanelTemplate}"
                                                                 Height="350" />
                                             </StackPanel>
                                         </Border>
                                     </StackPanel>
                                 </ScrollViewer>
                             </TabItem>
-                            <TabItem Header="行为分析">
+                            <TabItem Header="{l:Text Key=Sc5515c49518e1aa2}">
                                 <ScrollViewer VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
                                     <StackPanel>
                                         <Border Style="{StaticResource PageCardStyle}" Margin="0,0,0,10">
                                             <Grid>
                                                 <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                                 <StackPanel>
-                                                    <TextBlock Text="当前行为状态" Style="{StaticResource SectionTitleStyle}" />
-                                                    <TextBlock Text="{Binding BehaviorRiskText}" Foreground="{StaticResource AccentBrush}" FontSize="23" FontWeight="SemiBold" Margin="0,5,0,0" />
+                                                    <TextBlock Text="{l:Text Key=Sa867b4f05f99783c}" Style="{StaticResource SectionTitleStyle}" />
+                                                    <TextBlock Text="{Binding BehaviorRiskText, Converter={StaticResource UiTranslation}}" Foreground="{StaticResource AccentBrush}" FontSize="23" FontWeight="SemiBold" Margin="0,5,0,0" />
                                                 </StackPanel>
                                                 <StackPanel Grid.Column="1" HorizontalAlignment="Right">
-                                                    <TextBlock Text="行为预设" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Right" />
+                                                    <TextBlock Text="{l:Text Key=S5ac350e423bce08c}" Style="{StaticResource MutedTextStyle}" HorizontalAlignment="Right" />
                                                     <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
                                                         <ComboBox Width="72" ItemsSource="{Binding BehaviorPresetOptions}" SelectedItem="{Binding SelectedBehaviorPreset}" />
-                                                        <Button Content="应用" Command="{Binding ApplyBehaviorPresetCommand}" Style="{StaticResource PrimaryButtonStyle}" Padding="8,5" Margin="6,0,0,0" />
+                                                        <Button Content="{l:Text Key=S1ca4c92bcb97e67e}" Command="{Binding ApplyBehaviorPresetCommand}" Style="{StaticResource PrimaryButtonStyle}" Padding="8,5" Margin="6,0,0,0" />
                                                     </StackPanel>
                                                 </StackPanel>
                                             </Grid>
@@ -875,12 +875,12 @@
                                                         <Grid>
                                                             <Grid.ColumnDefinitions><ColumnDefinition Width="1.5*"/><ColumnDefinition Width="0.6*"/><ColumnDefinition Width="0.6*"/><ColumnDefinition Width="0.8*"/></Grid.ColumnDefinitions>
                                                             <StackPanel>
-                                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
-                                                                <TextBlock Text="{Binding Detail}" Style="{StaticResource MutedTextStyle}" FontSize="10" Margin="0,4,0,0" />
+                                                                <TextBlock Text="{Binding Name, Converter={StaticResource UiTranslation}}" FontWeight="SemiBold" />
+                                                                <TextBlock Text="{Binding Detail, Converter={StaticResource UiTranslation}}" Style="{StaticResource MutedTextStyle}" FontSize="10" Margin="0,4,0,0" />
                                                             </StackPanel>
-                                                            <TextBlock Grid.Column="1" Text="{Binding Value}" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                                            <TextBlock Grid.Column="2" Text="{Binding Threshold, StringFormat=阈值 {0}}" Style="{StaticResource MutedTextStyle}" VerticalAlignment="Center" />
-                                                            <TextBlock Grid.Column="3" Text="{Binding Status}" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                                            <TextBlock Grid.Column="1" Text="{Binding Value, Converter={StaticResource UiTranslation}}" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                            <TextBlock Grid.Column="2" Text="{Binding Threshold, StringFormat={l:Text Key=S6fdf32cf4b70c5d1}, Converter={StaticResource UiTranslation}}" Style="{StaticResource MutedTextStyle}" VerticalAlignment="Center" />
+                                                            <TextBlock Grid.Column="3" Text="{Binding Status, Converter={StaticResource UiTranslation}}" Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" />
                                                         </Grid>
                                                     </Border>
                                                 </DataTemplate>
@@ -889,8 +889,8 @@
                                         <Border Style="{StaticResource PageCardStyle}" Margin="0,3,0,0" Padding="12">
                                             <StackPanel>
                                                 <Grid>
-                                                    <TextBlock Text="规则开关与阈值" Style="{StaticResource SectionTitleStyle}" />
-                                                    <Button Content="保存行为设置" Command="{Binding SaveBehaviorSettingsCommand}" Style="{StaticResource PrimaryButtonStyle}"
+                                                    <TextBlock Text="{l:Text Key=Sf5752eac65327632}" Style="{StaticResource SectionTitleStyle}" />
+                                                    <Button Content="{l:Text Key=S1676324a1ad5dd15}" Command="{Binding SaveBehaviorSettingsCommand}" Style="{StaticResource PrimaryButtonStyle}"
                                                             HorizontalAlignment="Right" Padding="10,6" />
                                                 </Grid>
                                                 <ItemsControl ItemsSource="{Binding BehaviorSettings}" Margin="0,10,0,0">
@@ -902,7 +902,7 @@
                                                             <Grid Margin="0,0,8,8">
                                                                 <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition/><ColumnDefinition Width="68"/></Grid.ColumnDefinitions>
                                                                 <CheckBox IsChecked="{Binding Enabled, Mode=TwoWay}" VerticalAlignment="Center" Margin="0,0,6,0" />
-                                                                <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                                                <TextBlock Grid.Column="1" Text="{Binding Name, Converter={StaticResource UiTranslation}}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                                                                 <TextBox Grid.Column="2" Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" Padding="5,3" />
                                                             </Grid>
                                                         </DataTemplate>
@@ -913,34 +913,34 @@
                                     </StackPanel>
                                 </ScrollViewer>
                             </TabItem>
-                            <TabItem Header="分类表现">
+                            <TabItem Header="{l:Text Key=S3a85de2886b9d26f}">
                                 <Border Style="{StaticResource PageCardStyle}" Padding="14">
-                                    <ContentControl Content="{Binding}"
+                                    <ContentControl Content="{Binding Converter={StaticResource UiTranslation}}"
                                                     ContentTemplate="{StaticResource ReviewCategoryPanelTemplate}" />
                                 </Border>
                             </TabItem>
-                            <TabItem Header="逐笔归类">
+                            <TabItem Header="{l:Text Key=Sb1a266db01c03f13}">
                                 <Border Style="{StaticResource PageCardStyle}" Padding="8">
                                     <ListView ItemsSource="{Binding ReviewTrades}"
                                               ScrollViewer.VerticalScrollBarVisibility="Hidden"
                                               ScrollViewer.HorizontalScrollBarVisibility="Auto">
                                         <ListView.View>
                                             <GridView>
-                                                <GridViewColumn Header="开仓" Width="90" DisplayMemberBinding="{Binding Time}" />
-                                                <GridViewColumn Header="品种" Width="88" DisplayMemberBinding="{Binding Symbol}" />
-                                                <GridViewColumn Header="方向" Width="48" DisplayMemberBinding="{Binding Side}" />
-                                                <GridViewColumn Header="净盈亏" Width="72" DisplayMemberBinding="{Binding Pnl}" />
-                                                <GridViewColumn Header="策略" Width="100">
+                                                <GridViewColumn Header="{l:Text Key=S6d40ed7e82fcc5ed}" Width="90" DisplayMemberBinding="{Binding Time}" />
+                                                <GridViewColumn Header="{l:Text Key=S2b0abb7bb8ff7c99}" Width="88" DisplayMemberBinding="{Binding Symbol}" />
+                                                <GridViewColumn Header="{l:Text Key=S99a8b38806d6b5a5}" Width="48" DisplayMemberBinding="{Binding Side}" />
+                                                <GridViewColumn Header="{l:Text Key=S66973c7ea00e9a13}" Width="72" DisplayMemberBinding="{Binding Pnl}" />
+                                                <GridViewColumn Header="{l:Text Key=S55c280bf46551444}" Width="100">
                                                     <GridViewColumn.CellTemplate><DataTemplate><TextBox Width="92" Text="{Binding Strategy, UpdateSourceTrigger=LostFocus}" /></DataTemplate></GridViewColumn.CellTemplate>
                                                 </GridViewColumn>
-                                                <GridViewColumn Header="形态" Width="100">
+                                                <GridViewColumn Header="{l:Text Key=S7b1013af7eae0c91}" Width="100">
                                                     <GridViewColumn.CellTemplate><DataTemplate><TextBox Width="92" Text="{Binding Setup, UpdateSourceTrigger=LostFocus}" /></DataTemplate></GridViewColumn.CellTemplate>
                                                 </GridViewColumn>
-                                                <GridViewColumn Header="标签" Width="115">
+                                                <GridViewColumn Header="{l:Text Key=Se84ebe9cb656cdbc}" Width="115">
                                                     <GridViewColumn.CellTemplate><DataTemplate><TextBox Width="107" Text="{Binding Tags, UpdateSourceTrigger=LostFocus}" /></DataTemplate></GridViewColumn.CellTemplate>
                                                 </GridViewColumn>
-                                                <GridViewColumn Header="操作" Width="72">
-                                                    <GridViewColumn.CellTemplate><DataTemplate><Button Content="保存" Command="{Binding SaveCommand}" Style="{StaticResource PrimaryButtonStyle}" Padding="7,3" Margin="0" /></DataTemplate></GridViewColumn.CellTemplate>
+                                                <GridViewColumn Header="{l:Text Key=S94993e4f719f1291}" Width="72">
+                                                    <GridViewColumn.CellTemplate><DataTemplate><Button Content="{l:Text Key=S6b755a1d299361bf}" Command="{Binding SaveCommand}" Style="{StaticResource PrimaryButtonStyle}" Padding="7,3" Margin="0" /></DataTemplate></GridViewColumn.CellTemplate>
                                                 </GridViewColumn>
                                             </GridView>
                                         </ListView.View>
@@ -952,12 +952,12 @@
                     </Grid>
                 </TabItem>
 
-                <TabItem Header="时间线">
+                <TabItem Header="{l:Text Key=S67819401c5dcb20e}">
                     <Grid>
                         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
                         <StackPanel x:Name="GuideTimelineHeader" Margin="0,0,0,14">
-                            <TextBlock Text="交易时间线" FontSize="20" FontWeight="SemiBold" />
-                            <TextBlock Text="每个事实都会记录，历史恢复不会重复弹出提醒。" Style="{StaticResource MutedTextStyle}" Margin="0,5,0,0" />
+                            <TextBlock Text="{l:Text Key=Sb011bdcee151e00d}" FontSize="20" FontWeight="SemiBold" />
+                            <TextBlock Text="{l:Text Key=S1748cbde59992384}" Style="{StaticResource MutedTextStyle}" Margin="0,5,0,0" />
                         </StackPanel>
                         <Border Grid.Row="1" Style="{StaticResource PageCardStyle}" Padding="0">
                             <ListView ItemsSource="{Binding Timeline}"
@@ -965,9 +965,9 @@
                                       ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                                 <ListView.View>
                                     <GridView>
-                                        <GridViewColumn Header="时间" Width="105" DisplayMemberBinding="{Binding Time}" />
-                                        <GridViewColumn Header="事件" Width="155" DisplayMemberBinding="{Binding Kind}" />
-                                        <GridViewColumn Header="记录事实" Width="455" DisplayMemberBinding="{Binding Summary}" />
+                                        <GridViewColumn Header="{l:Text Key=S2994c5e8e479d067}" Width="105" DisplayMemberBinding="{Binding Time}" />
+                                        <GridViewColumn Header="{l:Text Key=S1a4745475bfcec82}" Width="155" DisplayMemberBinding="{Binding Kind}" />
+                                        <GridViewColumn Header="{l:Text Key=S6cad1fd45bd645fb}" Width="455" DisplayMemberBinding="{Binding Summary}" />
                                     </GridView>
                                 </ListView.View>
                             </ListView>
@@ -975,30 +975,33 @@
                     </Grid>
                 </TabItem>
 
-                <TabItem Header="设置中心">
+                <TabItem Header="{l:Text Key=Secaf64d1186a8269}">
                     <ScrollViewer VerticalScrollBarVisibility="Hidden">
                         <StackPanel>
                             <StackPanel x:Name="GuideSettingsHeader" Margin="0,0,0,14">
-                                <TextBlock Text="设置中心" FontSize="20" FontWeight="SemiBold" />
-                                <TextBlock Text="调整桌宠行为、交易提醒和终端连接。" Style="{StaticResource MutedTextStyle}" Margin="0,5,0,0" />
-                                <Button Content="打开设置向导 / 切换 MT4、MT5" Command="{Binding ShowSetupCommand}" HorizontalAlignment="Left" Margin="0,12,0,0" />
+                                <TextBlock Text="{l:Text Key=Secaf64d1186a8269}" FontSize="20" FontWeight="SemiBold" />
+                                <TextBlock Text="{l:Text Key=S710a34bef297e132}" Style="{StaticResource MutedTextStyle}" Margin="0,5,0,0" />
+                                <TextBlock Text="{l:Text Key=Sfc18f936c8bab1d5}" Style="{StaticResource FieldLabelStyle}" Margin="0,12,0,5" />
+                                <ComboBox x:Name="UiLanguagePicker" ItemsSource="{Binding UiLanguageOptions}"
+                                          SelectedValuePath="Code" SelectedValue="{Binding UiLanguage}" Width="220" HorizontalAlignment="Left" ><ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Label, Converter={StaticResource UiTranslation}}" /></DataTemplate></ComboBox.ItemTemplate></ComboBox>
+                                <Button Content="{l:Text Key=Sd644a42d124b5e76}" Command="{Binding ShowSetupCommand}" HorizontalAlignment="Left" Margin="0,12,0,0" />
                             </StackPanel>
                             <Border Style="{StaticResource PageCardStyle}" Margin="0,0,0,12">
                                 <Grid>
                                     <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
                                     <StackPanel Margin="0,0,18,0">
-                                        <TextBlock Text="快速记录提示" Style="{StaticResource SectionTitleStyle}" Margin="0,0,0,8" />
-                                        <CheckBox Content="平仓后自动提示快速复盘" IsChecked="{Binding QuickReviewPromptEnabled}" />
-                                        <CheckBox Content="入场后自动提示下单原因" IsChecked="{Binding EntryReasonPromptEnabled}" />
-                                        <TextBlock Text="两个提示默认开启，可分别关闭。显示在宠物旁，不抢焦点；也可从宠物菜单手动打开。" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,4,0,9" />
-                                        <Button Content="保存设置" Command="{Binding SaveSettingsCommand}" Style="{StaticResource PrimaryButtonStyle}" HorizontalAlignment="Left" Margin="0" />
+                                        <TextBlock Text="{l:Text Key=S09c93f402bc69600}" Style="{StaticResource SectionTitleStyle}" Margin="0,0,0,8" />
+                                        <CheckBox Content="{l:Text Key=Sb79fd5d3e6f4996d}" IsChecked="{Binding QuickReviewPromptEnabled}" />
+                                        <CheckBox Content="{l:Text Key=S65afa6b967db9d49}" IsChecked="{Binding EntryReasonPromptEnabled}" />
+                                        <TextBlock Text="{l:Text Key=Sd72d478f9cbaa78f}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,4,0,9" />
+                                        <Button Content="{l:Text Key=Se80ec7afbc69b76f}" Command="{Binding SaveSettingsCommand}" Style="{StaticResource PrimaryButtonStyle}" HorizontalAlignment="Left" Margin="0" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="1">
-                                        <TextBlock Text="版本更新" Style="{StaticResource SectionTitleStyle}" Margin="0,0,0,8" />
-                                        <CheckBox Content="自动检查并提醒 GitHub 新版本" IsChecked="{Binding UpdateNotificationsEnabled}" />
-                                        <TextBlock Text="{Binding AppVersionText}" Style="{StaticResource MutedTextStyle}" />
-                                        <TextBlock Text="{Binding UpdateStatus}" Foreground="{StaticResource AccentBrush}" TextWrapping="Wrap" Margin="0,5,0,7" />
-                                        <WrapPanel><Button Content="检查更新" Command="{Binding CheckUpdatesCommand}" Padding="9,5"/><Button Content="打开发布页" Command="{Binding OpenReleasePageCommand}" Padding="9,5"/></WrapPanel>
+                                        <TextBlock Text="{l:Text Key=Sf9e30b75f34c8667}" Style="{StaticResource SectionTitleStyle}" Margin="0,0,0,8" />
+                                        <CheckBox Content="{l:Text Key=Sb26d9b72d321fbad}" IsChecked="{Binding UpdateNotificationsEnabled}" />
+                                        <TextBlock Text="{Binding AppVersionText, Converter={StaticResource UiTranslation}}" Style="{StaticResource MutedTextStyle}" />
+                                        <TextBlock Text="{Binding UpdateStatus, Converter={StaticResource UiTranslation}}" Foreground="{StaticResource AccentBrush}" TextWrapping="Wrap" Margin="0,5,0,7" />
+                                        <WrapPanel><Button Content="{l:Text Key=S1b021801bdd4caca}" Command="{Binding CheckUpdatesCommand}" Padding="9,5"/><Button Content="{l:Text Key=Sbc9234b659a5463e}" Command="{Binding OpenReleasePageCommand}" Padding="9,5"/></WrapPanel>
                                     </StackPanel>
                                 </Grid>
                             </Border>
@@ -1006,40 +1009,40 @@
                                 <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
                                 <Border Grid.Column="0" Style="{StaticResource PageCardStyle}" Margin="0,0,10,0">
                                     <StackPanel>
-                                        <TextBlock Text="桌宠行为" Style="{StaticResource SectionTitleStyle}" Margin="0,0,0,8" />
-                                        <CheckBox Content="始终置顶" IsChecked="{Binding IsTopmost}" />
-                                        <CheckBox Content="锁定桌宠位置" IsChecked="{Binding IsPositionLocked}" />
-                                        <CheckBox Content="鼠标穿透（通过托盘恢复）" IsChecked="{Binding IsMouseThrough}" />
-                                        <CheckBox Content="开启专注模式" IsChecked="{Binding IsFocusMode}" />
-                                        <CheckBox Content="悬停展开速览（关闭时点击展开）" IsChecked="{Binding ExpandCardOnHover}" />
-                                        <CheckBox Content="显示迷你持仓条" IsChecked="{Binding MiniPositionVisible}" />
-                                        <CheckBox Content="开机自动启动" IsChecked="{Binding StartWithWindows}" />
-                                        <TextBlock Text="桌宠大小" Style="{StaticResource FieldLabelStyle}" Margin="0,14,0,5" />
+                                        <TextBlock Text="{l:Text Key=S8ceec647e26b0a0b}" Style="{StaticResource SectionTitleStyle}" Margin="0,0,0,8" />
+                                        <CheckBox Content="{l:Text Key=Sf2254661aefee231}" IsChecked="{Binding IsTopmost}" />
+                                        <CheckBox Content="{l:Text Key=S551d10238c4eb7cf}" IsChecked="{Binding IsPositionLocked}" />
+                                        <CheckBox Content="{l:Text Key=Sbd558debb4fadb58}" IsChecked="{Binding IsMouseThrough}" />
+                                        <CheckBox Content="{l:Text Key=S3594a85d4434a5bb}" IsChecked="{Binding IsFocusMode}" />
+                                        <CheckBox Content="{l:Text Key=Sc8b2dc8747fd40ea}" IsChecked="{Binding ExpandCardOnHover}" />
+                                        <CheckBox Content="{l:Text Key=S7f86eaa5db5a5f74}" IsChecked="{Binding MiniPositionVisible}" />
+                                        <CheckBox Content="{l:Text Key=S602304d530b7044b}" IsChecked="{Binding StartWithWindows}" />
+                                        <TextBlock Text="{l:Text Key=Sda7d82318eca3713}" Style="{StaticResource FieldLabelStyle}" Margin="0,14,0,5" />
                                         <Slider Minimum="0.4" Maximum="1.5" Value="{Binding PetScale}" TickFrequency="0.1" IsSnapToTickEnabled="True" />
-                                        <TextBlock Text="桌宠透明度" Style="{StaticResource FieldLabelStyle}" Margin="0,14,0,5" />
+                                        <TextBlock Text="{l:Text Key=Sa34944c307ec3566}" Style="{StaticResource FieldLabelStyle}" Margin="0,14,0,5" />
                                         <Slider Minimum="0.25" Maximum="1" Value="{Binding PetOpacity}" TickFrequency="0.05" />
                                     </StackPanel>
                                 </Border>
                                 <Border Grid.Column="1" Style="{StaticResource PageCardStyle}">
                                     <StackPanel>
-                                        <TextBlock Text="交易与连接" Style="{StaticResource SectionTitleStyle}" Margin="0,0,0,14" />
-                                        <TextBlock Text="交易终端（保存后下次启动生效）" Style="{StaticResource FieldLabelStyle}" />
-                                        <ComboBox ItemsSource="{Binding TerminalOptions}" DisplayMemberPath="Label"
+                                        <TextBlock Text="{l:Text Key=S084723f164dbf6a5}" Style="{StaticResource SectionTitleStyle}" Margin="0,0,0,14" />
+                                        <TextBlock Text="{l:Text Key=S57b6561e1969ef18}" Style="{StaticResource FieldLabelStyle}" />
+                                        <ComboBox ItemsSource="{Binding TerminalOptions}"
                                                   TextSearch.TextPath="Label" IsEditable="False"
                                                   SelectedValuePath="Path" SelectedValue="{Binding SelectedTerminalPath, Mode=TwoWay}"
-                                                  ToolTip="选择要读取的交易终端" />
-                                        <TextBlock Text="达到目标后的盈利回吐比例" Style="{StaticResource FieldLabelStyle}" Margin="0,18,0,7" />
+                                                  ToolTip="{l:Text Key=S64e813cf907ff105}" ><ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Label, Converter={StaticResource UiTranslation}}" /></DataTemplate></ComboBox.ItemTemplate></ComboBox>
+                                        <TextBlock Text="{l:Text Key=S11f3a940bba1cd6b}" Style="{StaticResource FieldLabelStyle}" Margin="0,18,0,7" />
                                         <TextBox Width="150" HorizontalAlignment="Left"
                                                  Text="{Binding GivebackValue, UpdateSourceTrigger=LostFocus}" />
-                                        <TextBlock Text="填写 1–100，例如 50 表示回吐一半时提醒。" Style="{StaticResource MutedTextStyle}" Margin="0,7,0,16" />
-                                        <CheckBox Content="每天自动弹出并归档交易日报" IsChecked="{Binding DailyReportEnabled}" />
-                                        <TextBlock Text="日报时间（MT5 服务器时间，24 小时制）" Style="{StaticResource FieldLabelStyle}" Margin="0,14,0,7" />
+                                        <TextBlock Text="{l:Text Key=Sf090a0242ad9c32b}" Style="{StaticResource MutedTextStyle}" Margin="0,7,0,16" />
+                                        <CheckBox Content="{l:Text Key=S4e5643a88bb27f34}" IsChecked="{Binding DailyReportEnabled}" />
+                                        <TextBlock Text="{l:Text Key=S46bfbf8de97260cc}" Style="{StaticResource FieldLabelStyle}" Margin="0,14,0,7" />
                                         <TextBox Width="100" MaxLength="5" HorizontalAlignment="Left"
                                                  Text="{Binding DailyReportTimeText, UpdateSourceTrigger=LostFocus}" />
-                                        <TextBlock Text="直接输入 HH:mm，例如 23:55；不使用下拉菜单。" Style="{StaticResource MutedTextStyle}" Margin="0,7,0,16" />
-                                        <Button Content="保存全部设置" Command="{Binding SaveSettingsCommand}" Style="{StaticResource PrimaryButtonStyle}" Margin="0,0,0,9" />
-                                        <Button Content="安装或更新桥接插件" Command="{Binding InstallBridgeCommand}" Margin="0,0,0,9" />
-                                        <Button Content="回放核心交易场景" Command="{Binding ReplayScenarioCommand}" Style="{StaticResource QuietButtonStyle}" Margin="0" />
+                                        <TextBlock Text="{l:Text Key=S6a7370d30fe5c048}" Style="{StaticResource MutedTextStyle}" Margin="0,7,0,16" />
+                                        <Button Content="{l:Text Key=S13a6adea20ae1eef}" Command="{Binding SaveSettingsCommand}" Style="{StaticResource PrimaryButtonStyle}" Margin="0,0,0,9" />
+                                        <Button Content="{l:Text Key=S50b98131a47c06db}" Command="{Binding InstallBridgeCommand}" Margin="0,0,0,9" />
+                                        <Button Content="{l:Text Key=S5a25c20761544571}" Command="{Binding ReplayScenarioCommand}" Style="{StaticResource QuietButtonStyle}" Margin="0" />
                                     </StackPanel>
                                 </Border>
                             </Grid>
@@ -1051,13 +1054,13 @@
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <StackPanel>
-                                            <TextBlock Text="多段浮亏提醒" Style="{StaticResource SectionTitleStyle}" />
-                                            <TextBlock Text="按当前总浮亏占账户余额的比例触发；回落到阈值下方后才会重新提醒。"
+                                            <TextBlock Text="{l:Text Key=Seec08949cfe7397d}" Style="{StaticResource SectionTitleStyle}" />
+                                            <TextBlock Text="{l:Text Key=S595fbd385a7d834e}"
                                                        Style="{StaticResource MutedTextStyle}" Margin="0,5,0,0" />
                                         </StackPanel>
                                         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                            <TextBlock Text="当前浮亏比例" Style="{StaticResource FieldLabelStyle}" VerticalAlignment="Center" Margin="0,0,8,0" />
-                                            <TextBlock Text="{Binding CurrentFloatingLossPercentage, StringFormat={}{0:0.##}%}"
+                                            <TextBlock Text="{l:Text Key=S68871e2cddca5201}" Style="{StaticResource FieldLabelStyle}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                            <TextBlock Text="{Binding CurrentFloatingLossPercentage, StringFormat={}{0:0.##}%, Converter={StaticResource UiTranslation}}"
                                                        Foreground="{Binding CurrentFloatingLossPercentageColor}"
                                                        FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
                                         </StackPanel>
@@ -1078,13 +1081,13 @@
                                                             <RowDefinition Height="Auto" />
                                                             <RowDefinition Height="Auto" />
                                                         </Grid.RowDefinitions>
-                                                        <CheckBox Content="{Binding Name}" IsChecked="{Binding Enabled}"
+                                                        <CheckBox Content="{Binding Name, Converter={StaticResource UiTranslation}}" IsChecked="{Binding Enabled}"
                                                                   FontSize="14" FontWeight="SemiBold" />
-                                                        <TextBlock Grid.Row="1" Text="{Binding Hint}" Style="{StaticResource MutedTextStyle}"
+                                                        <TextBlock Grid.Row="1" Text="{Binding Hint, Converter={StaticResource UiTranslation}}" Style="{StaticResource MutedTextStyle}"
                                                                    Margin="0,7,0,12" />
                                                         <StackPanel Grid.Row="2" Orientation="Horizontal">
                                                             <TextBox Width="110" Text="{Binding LossPercentage, UpdateSourceTrigger=LostFocus}"
-                                                                     ToolTip="请输入 0.01 到 100 之间的比例" />
+                                                                     ToolTip="{l:Text Key=Sdd1d20270326ca35}" />
                                                             <TextBlock Text="%" FontSize="15" VerticalAlignment="Center" Margin="8,0,0,0" />
                                                         </StackPanel>
                                                     </Grid>
@@ -1093,9 +1096,9 @@
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
                                     <Grid Margin="0,14,0,0">
-                                        <TextBlock Text="默认三段为 1%、2%、3%；每段都能单独关闭或修改。一次跨过多段时只弹最高一段。"
+                                        <TextBlock Text="{l:Text Key=S8ce520e7dbe7f24c}"
                                                    Style="{StaticResource MutedTextStyle}" VerticalAlignment="Center" />
-                                        <Button Content="保存设置" Command="{Binding SaveSettingsCommand}"
+                                        <Button Content="{l:Text Key=Se80ec7afbc69b76f}" Command="{Binding SaveSettingsCommand}"
                                                 Style="{StaticResource PrimaryButtonStyle}" HorizontalAlignment="Right" />
                                     </Grid>
                                 </StackPanel>
@@ -1103,61 +1106,61 @@
                         </StackPanel>
                     </ScrollViewer>
                 </TabItem>
-                <TabItem Header="报告与数据">
+                <TabItem Header="{l:Text Key=S22d7af3b431e1994}">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                         <StackPanel>
                             <StackPanel x:Name="GuideReportData" Margin="0,0,0,14">
-                                <TextBlock Text="报告与数据" FontSize="20" FontWeight="SemiBold" />
-                                <TextBlock Text="导出交易报告、分享复盘结果，或备份与恢复本地记录。" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,5,0,0" />
+                                <TextBlock Text="{l:Text Key=S22d7af3b431e1994}" FontSize="20" FontWeight="SemiBold" />
+                                <TextBlock Text="{l:Text Key=S52796244c36e44e5}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,5,0,0" />
                             </StackPanel>
                             <Border Style="{StaticResource PageCardStyle}" Margin="0,0,0,10">
                                 <StackPanel>
-                                    <TextBlock Text="今日交易日报" Style="{StaticResource SectionTitleStyle}" />
-                                    <TextBlock Text="按当前账户的服务器交易日生成。打开日报后查看交易与费用明细，点击“导出 MD”选择保存位置，也可复制完整报告给 AI。终端与服务器时间需先就绪。" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,7,0,10" />
-                                    <Button x:Name="ReportDailyButton" Content="打开今日交易日报" Command="{Binding ShowDailyTradingReportCommand}" HorizontalAlignment="Left" Style="{StaticResource PrimaryButtonStyle}" />
+                                    <TextBlock Text="{l:Text Key=S362b575f2ec36f61}" Style="{StaticResource SectionTitleStyle}" />
+                                    <TextBlock Text="{l:Text Key=Saba25d51e3440a39}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,7,0,10" />
+                                    <Button x:Name="ReportDailyButton" Content="{l:Text Key=Sc10d1207661dfdc1}" Command="{Binding ShowDailyTradingReportCommand}" HorizontalAlignment="Left" Style="{StaticResource PrimaryButtonStyle}" />
                                 </StackPanel>
                             </Border>
                             <StackPanel DataContext="{Binding ReviewWorkspace}">
                                 <Border Style="{StaticResource PageCardStyle}" Margin="0,0,0,10">
                                     <StackPanel>
-                                        <TextBlock Text="周期复盘报告" Style="{StaticResource SectionTitleStyle}" />
-                                        <TextBlock Text="按“复盘分析”中已查询的日期和筛选条件，导出全部交易及复盘内容。无需逐笔勾选。" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,7,0,7" />
-                                        <TextBlock Text="{Binding ExportRangeText}" Foreground="{StaticResource AccentBrush}" TextWrapping="Wrap" Margin="0,0,0,10" />
+                                        <TextBlock Text="{l:Text Key=Scc7d811352cc07fd}" Style="{StaticResource SectionTitleStyle}" />
+                                        <TextBlock Text="{l:Text Key=Sc98a152d5d81155a}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,7,0,7" />
+                                        <TextBlock Text="{Binding ExportRangeText, Converter={StaticResource UiTranslation}}" Foreground="{StaticResource AccentBrush}" TextWrapping="Wrap" Margin="0,0,0,10" />
                                         <WrapPanel>
-                                            <Button x:Name="ReportMarkdownButton" Content="导出复盘报告（MD）" Command="{Binding ExportMarkdownCommand}" Style="{StaticResource PrimaryButtonStyle}" Margin="0,0,8,7" />
-                                            <Button Content="打开导出目录" Click="OpenExportDirectory_Click" Margin="0,0,0,7" />
+                                            <Button x:Name="ReportMarkdownButton" Content="{l:Text Key=S0080ca436906e4a3}" Command="{Binding ExportMarkdownCommand}" Style="{StaticResource PrimaryButtonStyle}" Margin="0,0,8,7" />
+                                            <Button Content="{l:Text Key=S8bdec351750beecc}" Click="OpenExportDirectory_Click" Margin="0,0,0,7" />
                                         </WrapPanel>
-                                        <TextBlock Text="报告包含交易、原始成交与费用明细、复盘笔记、日记和周期总结。文件保存到本地导出目录，保留账户信息，不包含截图原文件。" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,0,0,10" />
-                                        <Expander Header="公开分享 ZIP（含 MD / CSV / HTML）">
+                                        <TextBlock Text="{l:Text Key=Sae9e6d99bc6c6ef7}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,0,0,10" />
+                                        <Expander Header="{l:Text Key=Sc87eb0a79d0ca521}">
                                             <StackPanel Margin="0,8,0,0">
-                                                <TextBlock Text="分享包使用上方的同一导出范围。先生成预览，再确认写出；账户和已识别的本机路径会被遮盖。" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,0,0,7" />
-                                                <Button Content="生成公开导出预览" Command="{Binding ExportCommand}" HorizontalAlignment="Left" />
-                                                <TextBlock Text="{Binding ExportPreview}" TextWrapping="Wrap" Margin="0,7,0,5" />
-                                                <TextBlock Text="原始截图/附件默认不包含；仅勾选确实要公开的文件。图片内容无法自动保证匿名。" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" />
+                                                <TextBlock Text="{l:Text Key=S86bf148776cbe0e7}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,0,0,7" />
+                                                <Button Content="{l:Text Key=Sac0dc5a333cc0ebb}" Command="{Binding ExportCommand}" HorizontalAlignment="Left" />
+                                                <TextBlock Text="{Binding ExportPreview, Converter={StaticResource UiTranslation}}" TextWrapping="Wrap" Margin="0,7,0,5" />
+                                                <TextBlock Text="{l:Text Key=S597fc0a7f8aea8a6}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" />
                                                 <ItemsControl ItemsSource="{Binding ExportAttachmentOptions}" Margin="0,4,0,6">
                                                     <ItemsControl.ItemTemplate><DataTemplate>
                                                         <StackPanel Margin="0,3,0,3">
-                                                            <CheckBox IsChecked="{Binding IsIncluded}" Content="{Binding Display}" ToolTip="勾选后原始文件将进入公开分享包；请检查画面与文件内容" />
-                                                            <TextBox Text="{Binding PublicNote, UpdateSourceTrigger=PropertyChanged}" ToolTip="公开说明；原文件名不会进入分享包" Margin="0,4,0,0" />
+                                                            <CheckBox IsChecked="{Binding IsIncluded}" Content="{Binding Display, Converter={StaticResource UiTranslation}}" ToolTip="{l:Text Key=Sbde1d397c19b10c0}" />
+                                                            <TextBox Text="{Binding PublicNote, UpdateSourceTrigger=PropertyChanged}" ToolTip="{l:Text Key=S6c00503371aadc72}" Margin="0,4,0,0" />
                                                         </StackPanel>
                                                     </DataTemplate></ItemsControl.ItemTemplate>
                                                 </ItemsControl>
-                                                <Button Content="确认并写出公开分享 ZIP" Command="{Binding ConfirmExportCommand}" IsEnabled="{Binding CanConfirmExport}" HorizontalAlignment="Left" />
+                                                <Button Content="{l:Text Key=S3635e8c156edda27}" Command="{Binding ConfirmExportCommand}" IsEnabled="{Binding CanConfirmExport}" HorizontalAlignment="Left" />
                                             </StackPanel>
                                         </Expander>
                                     </StackPanel>
                                 </Border>
                                 <Border Style="{StaticResource PageCardStyle}" Margin="0,0,0,10">
                                     <StackPanel>
-                                        <TextBlock Text="本地备份与恢复" Style="{StaticResource SectionTitleStyle}" />
-                                        <TextBlock Text="备份用于迁移或恢复数据库、复盘记录和附件，报告文件不能替代备份。恢复会校验备份并替换当前本地数据，恢复前请先创建当前备份。" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,7,0,10" />
+                                        <TextBlock Text="{l:Text Key=See09a1fbeedf3a88}" Style="{StaticResource SectionTitleStyle}" />
+                                        <TextBlock Text="{l:Text Key=Sa967d96ff3a2a699}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,7,0,10" />
                                         <WrapPanel>
-                                            <Button Content="创建完整本地备份" Command="{Binding BackupCommand}" Margin="0,0,8,7" />
-                                            <Button Content="校验并恢复本地备份" Command="{Binding RestoreCommand}" Margin="0,0,0,7" />
+                                            <Button Content="{l:Text Key=Sa864363e9bf155a7}" Command="{Binding BackupCommand}" Margin="0,0,8,7" />
+                                            <Button Content="{l:Text Key=S9ee519a520ffce7c}" Command="{Binding RestoreCommand}" Margin="0,0,0,7" />
                                         </WrapPanel>
                                     </StackPanel>
                                 </Border>
-                                <TextBox Text="{Binding ExportStatus, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" BorderThickness="0" Background="Transparent" Margin="0,0,0,10" ToolTip="导出或备份结果，可选中复制文件路径" />
+                                <TextBox Text="{Binding ExportStatus, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" BorderThickness="0" Background="Transparent" Margin="0,0,0,10" ToolTip="{l:Text Key=Sf75e630ed743f7c9}" />
                             </StackPanel>
                         </StackPanel>
                     </ScrollViewer>
@@ -1167,7 +1170,7 @@
             <Border Grid.Row="2" Background="#0A1018" BorderBrush="#1D2734" BorderThickness="0,1,0,0" Padding="22,10">
                 <StackPanel Orientation="Horizontal">
                     <Ellipse Width="6" Height="6" Fill="{StaticResource AccentBrush}" Margin="0,0,8,0" />
-                    <TextBlock Text="{Binding DiagnosticText}" Foreground="#788594" FontSize="11"
+                    <TextBlock Text="{Binding DiagnosticText, Converter={StaticResource UiTranslation}}" Foreground="#788594" FontSize="11"
                                TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                 </StackPanel>
             </Border>
@@ -1186,10 +1189,10 @@
                     <TextBlock x:Name="GuideDescription" TextWrapping="Wrap" Foreground="#B7C5C7"
                                FontSize="12" LineHeight="20" Margin="0,8,0,16" />
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                        <Button x:Name="GuideSkip" Content="跳过" Click="SkipGuide_Click" Style="{StaticResource QuietButtonStyle}" />
-                        <Button x:Name="GuidePrevious" Content="上一步" Click="PreviousGuide_Click"
+                        <Button x:Name="GuideSkip" Content="{l:Text Key=S0d8ce6fef045f498}" Click="SkipGuide_Click" Style="{StaticResource QuietButtonStyle}" />
+                        <Button x:Name="GuidePrevious" Content="{l:Text Key=Sd57ced27d9d76ca3}" Click="PreviousGuide_Click"
                                 Style="{StaticResource QuietButtonStyle}" />
-                        <Button x:Name="GuideNext" Content="下一步" Click="NextGuide_Click"
+                        <Button x:Name="GuideNext" Content="{l:Text Key=S2b241ff3cb5afcc4}" Click="NextGuide_Click"
                                 Style="{StaticResource PrimaryButtonStyle}" Margin="0" />
                     </StackPanel>
                 </StackPanel>

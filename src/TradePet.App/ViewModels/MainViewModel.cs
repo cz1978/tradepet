@@ -43,6 +43,7 @@ public sealed class MainViewModel : ObservableObject
     private bool _quickReviewPromptEnabled = true;
     private bool _entryReasonPromptEnabled = true;
     private bool _updateNotificationsEnabled = true;
+    private string _uiLanguage = "zh-CN";
     private string _updateStatus = "尚未检查新版本。";
     private bool _updateAvailable;
     private string _dailyReportTimeText = "23:55";
@@ -326,6 +327,9 @@ public sealed class MainViewModel : ObservableObject
     public bool QuickReviewPromptEnabled { get => _quickReviewPromptEnabled; set => SetProperty(ref _quickReviewPromptEnabled, value); }
     public bool EntryReasonPromptEnabled { get => _entryReasonPromptEnabled; set => SetProperty(ref _entryReasonPromptEnabled, value); }
     public bool UpdateNotificationsEnabled { get => _updateNotificationsEnabled; set => SetProperty(ref _updateNotificationsEnabled, value); }
+    public string UiLanguage { get => _uiLanguage; set => SetProperty(ref _uiLanguage, TradePet.Core.Localization.UiText.NormalizeLanguage(value)); }
+    public IReadOnlyList<UiLanguageOption> UiLanguageOptions { get; } =
+        [new("zh-CN", "简体中文"), new("en-US", "English")];
     public string UpdateStatus { get => _updateStatus; set => SetProperty(ref _updateStatus, value); }
     public bool UpdateAvailable { get => _updateAvailable; set => SetProperty(ref _updateAvailable, value); }
     public string AppVersionText => "当前版本 " + Runtime.GitHubReleaseChecker.CurrentVersion;

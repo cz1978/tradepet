@@ -1598,7 +1598,7 @@ public sealed class ReviewExportService
         ReviewExportMode mode,
         IReadOnlyDictionary<long, string> publicIds)
     {
-        var builder = new StringBuilder($"""
+        var builder = new StringBuilder(TradePet.Core.Localization.UiText.Translate($"""
         # TradePet 复盘导出
 
         - 账户：{accountLabel}
@@ -1616,24 +1616,24 @@ public sealed class ReviewExportService
 
         - 日记数量：{(scope == ReviewExportScope.AllFiltered ? workspaceData?.DailyJournals.Count ?? 0 : 0)}
         - 周期总结数量：{(scope == ReviewExportScope.AllFiltered ? workspaceData?.PeriodReviews?.Count ?? 0 : 0)}
-        """);
+        """));
         builder.AppendLine().AppendLine();
         var wins = trades.Count(trade => trade.NetPnl > 0);
         var losses = trades.Count(trade => trade.NetPnl < 0);
-        builder.AppendLine($"- 盈利 / 亏损 / 持平：{wins} / {losses} / {trades.Count - wins - losses}");
-        builder.AppendLine($"- 胜率：{(trades.Count == 0 ? "未知" : Number(100m * wins / trades.Count) + "%")}");
-        builder.AppendLine().AppendLine("## 逐笔交易与复盘");
-        if (trades.Count == 0) builder.AppendLine("所选范围没有完整交易。");
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"- 盈利 / 亏损 / 持平：{wins} / {losses} / {trades.Count - wins - losses}"));
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"- 胜率：{(trades.Count == 0 ? "未知" : Number(100m * wins / trades.Count) + "%")}"));
+        builder.AppendLine().AppendLine(TradePet.Core.Localization.UiText.Translate("## 逐笔交易与复盘"));
+        if (trades.Count == 0) builder.AppendLine(TradePet.Core.Localization.UiText.Translate("所选范围没有完整交易。"));
         foreach (var trade in trades)
         {
             var detail = details[trade.PositionId];
             var id = mode == ReviewExportMode.PublicShare ? publicIds[trade.PositionId] : trade.PositionId.ToString(CultureInfo.InvariantCulture);
-            builder.AppendLine().AppendLine($"### 交易 {id}");
-            builder.AppendLine($"- 品种 / 方向：{Text(trade.Symbol)} / {trade.Side}");
-            builder.AppendLine($"- 开仓 / 平仓（服务器时间）：{Time(trade.OpenedAtUtc)} / {Time(trade.ClosedAtUtc)}");
-            builder.AppendLine($"- 入场 / 出场价格：{Number(trade.EntryPrice)} / {(trade.ExitPrice is { } exit ? Number(exit) : "未知")}");
-            builder.AppendLine($"- 开仓 / 最大手数：{Number(trade.OpeningVolume)} / {Number(trade.MaximumVolume)}");
-            builder.AppendLine($"- 净盈亏：{Number(trade.NetPnl)}");
+            builder.AppendLine().AppendLine(TradePet.Core.Localization.UiText.Translate($"### 交易 {id}"));
+            builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"- 品种 / 方向：{Text(trade.Symbol)} / {trade.Side}"));
+            builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"- 开仓 / 平仓（服务器时间）：{Time(trade.OpenedAtUtc)} / {Time(trade.ClosedAtUtc)}"));
+            builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"- 入场 / 出场价格：{Number(trade.EntryPrice)} / {(trade.ExitPrice is { } exit ? Number(exit) : "未知")}"));
+            builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"- 开仓 / 最大手数：{Number(trade.OpeningVolume)} / {Number(trade.MaximumVolume)}"));
+            builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"- 净盈亏：{Number(trade.NetPnl)}"));
             if (detail.Metadata is { } metadata)
             {
                 Field("策略", metadata.Strategy);
@@ -1642,7 +1642,7 @@ public sealed class ReviewExportService
             }
             if (detail.Document is { } document)
             {
-                builder.AppendLine($"- 复盘状态 / 修订：{document.Status} / {document.Revision}");
+                builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"- 复盘状态 / 修订：{document.Status} / {document.Revision}"));
                 Field("入场原因", string.IsNullOrWhiteSpace(document.EntryReason) ? detail.RecordedEntryReason : document.EntryReason); Field("退出原因", document.ExitReason);
                 Field("做得好", document.DidWell); Field("待改进", document.ToImprove);
                 Field("下次行动", document.NextAction); Field("总结", document.Summary);
@@ -1651,10 +1651,10 @@ public sealed class ReviewExportService
             if (detail.Document is null) Field("入场原因", detail.RecordedEntryReason);
             if (detail.Deals.Count == 0)
             {
-                builder.AppendLine("- 原始成交与费用明细：未提供。");
+                builder.AppendLine(TradePet.Core.Localization.UiText.Translate("- 原始成交与费用明细：未提供。"));
                 continue;
             }
-            builder.AppendLine().AppendLine("| 成交 | 服务器时间 | 出入场 | 手数 | 价格 | 盈利 | 佣金 | 隔夜费 | 其他费用 |");
+            builder.AppendLine().AppendLine(TradePet.Core.Localization.UiText.Translate("| 成交 | 服务器时间 | 出入场 | 手数 | 价格 | 盈利 | 佣金 | 隔夜费 | 其他费用 |"));
             builder.AppendLine("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |");
             var ordinal = 0;
             foreach (var deal in detail.Deals.OrderBy(deal => deal.OccurredAtUtc).ThenBy(deal => deal.Ticket))
@@ -1666,7 +1666,7 @@ public sealed class ReviewExportService
         }
         if (scope == ReviewExportScope.AllFiltered && workspaceData is not null)
         {
-            builder.AppendLine().AppendLine("## 日记内容");
+            builder.AppendLine().AppendLine(TradePet.Core.Localization.UiText.Translate("## 日记内容"));
             foreach (var journal in workspaceData.DailyJournals.Values.OrderBy(journal => journal.ServerDate))
             {
                 builder.AppendLine().AppendLine($"### {journal.ServerDate:yyyy-MM-dd}");
@@ -1674,10 +1674,10 @@ public sealed class ReviewExportService
                 Field("盘后总结", journal.PostMarketSummary); Field("做得好", journal.DidWell);
                 Field("待改进", journal.ToImprove); Field("下一步行动", journal.NextAction);
             }
-            builder.AppendLine().AppendLine("## 周期总结内容");
+            builder.AppendLine().AppendLine(TradePet.Core.Localization.UiText.Translate("## 周期总结内容"));
             foreach (var period in workspaceData.PeriodReviews ?? [])
             {
-                builder.AppendLine().AppendLine($"### {period.FromServerDate:yyyy-MM-dd} 至 {period.ToServerDate:yyyy-MM-dd}");
+                builder.AppendLine().AppendLine(TradePet.Core.Localization.UiText.Translate($"### {period.FromServerDate:yyyy-MM-dd} 至 {period.ToServerDate:yyyy-MM-dd}"));
                 Field("事实", period.Facts); Field("做得好", period.DidWell);
                 Field("待改进", period.ToImprove); Field("下一步行动", period.NextAction);
             }
@@ -1692,7 +1692,8 @@ public sealed class ReviewExportService
         void Field(string label, string? value)
         {
             if (string.IsNullOrWhiteSpace(value)) return;
-            builder.AppendLine($"- **{label}：**");
+            builder.AppendLine(TradePet.Core.Localization.UiText.Language == "en-US"
+                ? $"- **{TradePet.Core.Localization.UiText.Translate(label)}:**" : $"- **{label}：**");
             foreach (var line in Text(value).Replace("\r", string.Empty).Split('\n'))
                 builder.Append("> ").AppendLine(line);
         }
@@ -1743,7 +1744,7 @@ public sealed class ReviewExportService
             journals.Append("<article><h3>").Append(Html(journal.ServerDate.ToString("yyyy-MM-dd")))
                 .Append("</h3><p>").Append(Html(summary)).Append("</p></article>");
         }
-        return $$"""
+        return TradePet.Core.Localization.UiText.Translate($$"""
             <!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>TradePet 复盘导出</title>
             <style>body{font-family:system-ui,sans-serif;max-width:1100px;margin:32px auto;padding:0 20px;color:#18202a}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccd3dc;padding:8px;text-align:left;vertical-align:top}th{background:#f3f6f9}</style></head>
             <body><h1>TradePet 复盘导出</h1><ul>
@@ -1755,7 +1756,7 @@ public sealed class ReviewExportService
             <p>完整交易按最终平仓服务器日统计；日历现金账按成交发生日统计。</p>
             <h2>交易</h2><table><thead><tr><th>交易 ID</th><th>品种</th><th>方向</th><th>净盈亏</th><th>复盘修订</th><th>复盘结论</th></tr></thead><tbody>{{body}}</tbody></table>
             <h2>日记</h2>{{journals}}</body></html>
-            """;
+            """);
     }
 
     private static string Csv(string value)

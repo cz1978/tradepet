@@ -15,8 +15,8 @@ public partial class MacroCalendarWindow : Window
         _weeklyCalendar = weeklyCalendar;
         if (weeklyCalendar)
         {
-            SourceText.Text = "Forex Factory 公开周历 · 时间按当前服务器偏移显示 · 不提供实时公布值";
-            ReminderText.Text = "高重要度事件在 30 分钟和 5 分钟前提醒；数值缺失显示 —，周历约每 15 分钟更新。";
+            SourceText.Text = TradePet.Core.Localization.UiText.Translate("Forex Factory 公开周历 · 时间按当前服务器偏移显示 · 不提供实时公布值");
+            ReminderText.Text = TradePet.Core.Localization.UiText.Translate("高重要度事件在 30 分钟和 5 分钟前提醒；数值缺失显示 —，周历约每 15 分钟更新。");
         }
         EventList.ItemsSource = Rows;
         ApplyEvents(events, serverUtcOffsetSeconds);
@@ -24,7 +24,7 @@ public partial class MacroCalendarWindow : Window
 
     public ObservableCollection<MacroCalendarRow> Rows { get; } = [];
 
-    public void SetLoadStatus(string status) => SummaryText.Text = status;
+    public void SetLoadStatus(string status) => SummaryText.Text = TradePet.Core.Localization.UiText.Translate(status);
 
     public void ApplyEvents(IReadOnlyList<EconomicCalendarEvent> events, int serverUtcOffsetSeconds)
     {
@@ -35,7 +35,7 @@ public partial class MacroCalendarWindow : Window
             Rows.Add(ToRow(item));
         }
         var highCount = events.Count(item => item.Importance == EconomicEventImportance.High);
-        SummaryText.Text = events.Count == 0 ? "等待日历数据" : $"{events.Count} 项 · 高重要度 {highCount} 项";
+        SummaryText.Text = TradePet.Core.Localization.UiText.Translate(events.Count == 0 ? "等待日历数据" : $"{events.Count} 项 · 高重要度 {highCount} 项");
     }
 
     private MacroCalendarRow ToRow(EconomicCalendarEvent item)

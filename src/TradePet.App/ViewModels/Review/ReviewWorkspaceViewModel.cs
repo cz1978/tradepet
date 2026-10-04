@@ -68,7 +68,7 @@ public sealed partial class ReviewWorkspaceViewModel : ObservableObject
     private string _playbookSymbols = string.Empty;
     private string _playbookConditions = string.Empty;
     private string _playbookInvalidWhen = string.Empty;
-    private string _playbookRules = "入场|确认入场条件|写明事实依据|关键\r\n风险|开仓即有止损|检查首次风险证据|关键\r\n退出|按计划退出|记录退出依据|普通";
+    private string _playbookRules = DefaultPlaybookRules();
     private string _campaignName = string.Empty;
     private string _campaignThesis = string.Empty;
     private string _campaignMembers = string.Empty;
@@ -1186,7 +1186,7 @@ public sealed partial class ReviewWorkspaceViewModel : ObservableObject
             PlaybookSymbols = string.Empty;
             PlaybookConditions = string.Empty;
             PlaybookInvalidWhen = string.Empty;
-            PlaybookRules = "入场|确认入场条件|写明事实依据|关键\r\n风险|开仓即有止损|检查首次风险证据|关键\r\n退出|按计划退出|记录退出依据|普通";
+            PlaybookRules = DefaultPlaybookRules();
             CampaignName = string.Empty;
             CampaignThesis = string.Empty;
             CampaignMembers = string.Empty;

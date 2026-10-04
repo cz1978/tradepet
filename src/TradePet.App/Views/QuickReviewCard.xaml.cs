@@ -13,12 +13,12 @@ public partial class QuickReviewCard : System.Windows.Controls.UserControl
     {
         InitializeComponent();
         var trade = detail.Trade;
-        TradeText.Text = $"{trade.Symbol} · {trade.NetPnl:+0.##;-0.##;0} · {trade.ClosedAtUtc?.ToOffset(TimeSpan.FromSeconds(serverUtcOffsetSeconds)):yyyy-MM-dd HH:mm} 服务器";
+        TradeText.Text = TradePet.Core.Localization.UiText.Translate($"{trade.Symbol} · {trade.NetPnl:+0.##;-0.##;0} · {trade.ClosedAtUtc?.ToOffset(TimeSpan.FromSeconds(serverUtcOffsetSeconds)):yyyy-MM-dd HH:mm} 服务器");
         var analysis = QuickReviewAnalyzer.Analyze(detail);
         DocumentRevision = detail.Document?.Revision ?? 0;
-        ExitReasonBox.Text = detail.Document?.ExitReason ?? analysis.ExitReason;
-        AnalysisText.Text = detail.Document?.Summary ?? analysis.Explanation;
-        ImproveBox.Text = detail.Document?.ToImprove ?? analysis.Improvement;
+        ExitReasonBox.Text = detail.Document?.ExitReason ?? TradePet.Core.Localization.UiText.Translate(analysis.ExitReason);
+        AnalysisText.Text = detail.Document?.Summary ?? TradePet.Core.Localization.UiText.Translate(analysis.Explanation);
+        ImproveBox.Text = detail.Document?.ToImprove ?? TradePet.Core.Localization.UiText.Translate(analysis.Improvement);
     }
 
     public bool SaveRequested { get; private set; }
@@ -35,7 +35,7 @@ public partial class QuickReviewCard : System.Windows.Controls.UserControl
     private void ReasonPreset_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not System.Windows.Controls.Button { Tag: string reason }) return;
-        ExitReasonBox.Text = reason;
+        ExitReasonBox.Text = TradePet.Core.Localization.UiText.Translate(reason);
     }
 
     private async void Save_Click(object sender, RoutedEventArgs e)
@@ -43,7 +43,7 @@ public partial class QuickReviewCard : System.Windows.Controls.UserControl
         if (_saving) return;
         _saving = true;
         FooterButtons.IsEnabled = false;
-        SaveStatusText.Text = "正在保存…";
+        SaveStatusText.Text = TradePet.Core.Localization.UiText.Translate("正在保存…");
         string? error;
         try
         {
@@ -58,7 +58,7 @@ public partial class QuickReviewCard : System.Windows.Controls.UserControl
             _saving = false;
             FooterButtons.IsEnabled = true;
         }
-        if (error is not null) { SaveStatusText.Text = error; return; }
+        if (error is not null) { SaveStatusText.Text = TradePet.Core.Localization.UiText.Translate(error); return; }
         SaveRequested = true;
         Finish();
     }

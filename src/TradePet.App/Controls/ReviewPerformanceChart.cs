@@ -293,7 +293,7 @@ public sealed class ReviewPerformanceChart : FrameworkElement
 
     private void DrawText(DrawingContext context, string value, Point at, Brush brush, double size, double width, double height = 24)
     {
-        var text = new FormattedText(value, CultureInfo.CurrentCulture, System.Windows.FlowDirection.LeftToRight, Font, size, brush,
+        var text = new FormattedText(TradePet.Core.Localization.UiText.Translate(value), CultureInfo.CurrentCulture, System.Windows.FlowDirection.LeftToRight, Font, size, brush,
             VisualTreeHelper.GetDpi(this).PixelsPerDip) { MaxTextWidth = Math.Max(1d, width), MaxTextHeight = height, Trimming = TextTrimming.CharacterEllipsis };
         context.DrawText(text, at);
     }

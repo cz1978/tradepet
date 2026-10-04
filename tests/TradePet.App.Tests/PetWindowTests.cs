@@ -147,6 +147,7 @@ public sealed class PetWindowTests
                 // WPF permits one Application per test host; exercise the console on this STA thread.
                 VerifyMainWindowGuide();
                 ReviewDashboardTests.VerifyView();
+                VerifyEnglishMode();
             }
             catch (Exception exception)
             {
@@ -163,6 +164,105 @@ public sealed class PetWindowTests
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
         await completion.Task.WaitAsync(TimeSpan.FromSeconds(30));
+    }
+
+    private static void VerifyEnglishMode()
+    {
+        TradePet.Core.Localization.UiText.Configure("en-US");
+        MainWindow? console = null;
+        try
+        {
+            var vm = new MainViewModel();
+            Assert.All(vm.ReviewWorkspace.PlaybookRuleDrafts, rule => Assert.DoesNotContain(rule.Name, c => c is >= '\u3400' and <= '\u9fff'));
+            vm.ReviewWorkspace.PlaybookRules = "Entry|Check entry|Keep evidence|Critical";
+            Assert.True(Assert.Single(vm.ReviewWorkspace.PlaybookRuleDrafts).IsCritical);
+            Assert.True(vm.ReviewWorkspace.CanSavePlaybookRules);
+            var saved = 0;
+            vm.SaveSettingsAsync = () => { Assert.Equal("en-US", vm.UiLanguage); saved++; return Task.CompletedTask; };
+            console = new MainWindow(vm) { AllowClose = true, ShowActivated = false, Width = 1100, Height = 850 };
+            console.Show();
+            VerifyAllConsolePageBindings(console);
+            console.ShowPage(6);
+            console.UpdateLayout();
+            var picker = (ComboBox)console.FindName("UiLanguagePicker");
+            picker.SelectedValue = "en-US";
+            Assert.Equal("en-US", vm.UiLanguage);
+            var save = Descendants(console).OfType<Button>().First(button => ReferenceEquals(button.Command, vm.SaveSettingsCommand));
+            Assert.Equal("Save settings", save.Content);
+            save.Command.Execute(null);
+            Assert.Equal(1, saved);
+            Assert.Equal("en-us", console.Language.IetfLanguageTag);
+
+            // English labels must not become the stored filter values.
+            console.ShowPage(3);
+            console.UpdateLayout();
+            var sides = Descendants(console).OfType<ComboBox>().First(combo => ReferenceEquals(combo.ItemsSource, vm.ReviewSideFilterOptions));
+            sides.SelectedItem = "买入";
+            Assert.Equal("买入", vm.SelectedReviewSideFilter);
+            Assert.Equal("Buy", ((TradePet.App.Localization.UiTranslationConverter)App.Current.Resources["UiTranslation"]).Convert(
+                sides.SelectedItem, typeof(string), null!, System.Globalization.CultureInfo.InvariantCulture));
+
+            // Saved names and check instructions are user content, even when they match a UI label.
+            vm.ReviewWorkspace.Playbooks.Add(new TradePet.App.ViewModels.Review.PlaybookRow("保存设置", "v1", 1, "", ""));
+            vm.ReviewWorkspace.Goals.Add(new TradePet.App.ViewModels.Review.GoalRow("保存设置", "", "保存设置", "1", "", "", false,
+                vm.SaveSettingsCommand, vm.SaveSettingsCommand));
+            var workspace = (ReviewWorkspaceView)console.FindName("ReviewWorkspace");
+            workspace.SelectGuideTab(4);
+            console.UpdateLayout();
+            Assert.Equal(3, Descendants(workspace).OfType<TextBlock>().Count(block => block.Text == "保存设置"));
+
+            var now = DateTimeOffset.UtcNow;
+            var trade = new TradeRecord("Broker|1", 1, "TEST", TradeSide.Buy, now.AddMinutes(-10), now,
+                new(2026, 9, 24), new(2026, 9, 24), 100, 99, 1, 1, 0, -5, true);
+            var detail = new TradeDetailData(trade, [], null, null, null, [], null, null, [], [], [], null,
+                new ReviewDataVersion("Broker|1", 1, 1, 1, "rule-1", "time-1", now));
+            var quick = new QuickReviewCard(detail);
+            Assert.DoesNotContain("亏损", quick.ExitReason);
+            var original = new TradeReviewDocument(new("Broker|1", 1), ReviewCompletionStatus.Reviewed,
+                "入场原文", "保存设置", "", "我的改进原文", "下一步", "保存设置", "", "",
+                3, "source", "rule", "source", "rule", now, now, now, IsQuickReview: true);
+            var reopened = new QuickReviewCard(detail with { Document = original });
+            Assert.Equal(original.ExitReason, reopened.ExitReason);
+            Assert.Equal(original.ToImprove, reopened.Improvement);
+            Assert.Equal(original.Summary, reopened.AnalysisSummary);
+            var quickSaved = false;
+            reopened.SaveReviewAsync = card => { Assert.Equal(original.Summary, card.AnalysisSummary); quickSaved = true; return Task.FromResult<string?>(null); };
+            ((Button)reopened.FindName("QuickSaveButton")).RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            Assert.True(quickSaved);
+            Assert.True(reopened.SaveRequested);
+            ReviewDashboardTests.VerifyView();
+            var fixture = ReviewDashboardTests.Fixture([ReviewDashboardTests.Trade(1, -33.82m)]);
+            var date = fixture.Data.Trades[0].CloseServerDate!.Value;
+            var at = fixture.Data.Trades[0].ClosedAtUtc!.Value;
+            var note = new TradeReviewDocument(new("Broker|1", 1), ReviewCompletionStatus.Reviewed,
+                "", "保存设置", "", "", "保存设置", "我的原文", "", "", 1,
+                "source", "rule", "source", "rule", at, at, at, true);
+            var documents = new Dictionary<long, TradeReviewDocument> { [1] = note };
+            var fact = new TradePet.Core.Review.ReviewWorkspaceCalculator().BuildDailyFacts("Broker|1", date, date,
+                fixture.Data.Trades, fixture.Data.Deals, documents, [], new Dictionary<DateOnly, DailyState>(), 0)[date];
+            var report = DailyReportAnalyzer.Analyze(fixture.Data with { Documents = documents }, fact, false);
+            Assert.Contains("- Next action: 保存设置", report.Markdown);
+            Assert.DoesNotContain("## 逐笔风险", report.Markdown);
+            Assert.Contains("-33.82", report.Markdown);
+        }
+        finally { console?.Close(); TradePet.Core.Localization.UiText.Configure("zh-CN"); }
+
+        static IEnumerable<DependencyObject> Descendants(DependencyObject root)
+        {
+            var seen = new HashSet<DependencyObject>();
+            var pending = new Stack<DependencyObject>();
+            pending.Push(root);
+            while (pending.TryPop(out var current))
+            {
+                if (!seen.Add(current)) continue;
+                yield return current;
+                foreach (var child in LogicalTreeHelper.GetChildren(current))
+                    if (child is DependencyObject dependency) pending.Push(dependency);
+                if (current is not System.Windows.Media.Visual) continue;
+                for (var index = 0; index < System.Windows.Media.VisualTreeHelper.GetChildrenCount(current); index++)
+                    pending.Push(System.Windows.Media.VisualTreeHelper.GetChild(current, index));
+            }
+        }
     }
 
     private static void VerifyMainWindowGuide()

@@ -1,7 +1,8 @@
-<Window x:Class="TradePet.App.Views.MacroCalendarWindow"
+<Window Language="{l:Language}" x:Class="TradePet.App.Views.MacroCalendarWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="宏观日历"
+        xmlns:l="clr-namespace:TradePet.App.Localization"
+        Title="{l:Text Key=Sfd62c7a47ec1aa6a}"
         Width="760" Height="720" MinWidth="660" MinHeight="480"
         WindowStartupLocation="CenterScreen"
         Background="#101720" Topmost="True">
@@ -20,8 +21,8 @@
         <Grid>
             <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
             <StackPanel>
-                <TextBlock Text="宏观日历" Foreground="#F2F5F4" FontSize="24" FontWeight="Bold" />
-                <TextBlock x:Name="SourceText" Text="来自 MT5 内置经济日历 · 时间按当前交易服务器显示" Style="{StaticResource Muted}" Margin="0,5,0,0" />
+                <TextBlock Text="{l:Text Key=Sfd62c7a47ec1aa6a}" Foreground="#F2F5F4" FontSize="24" FontWeight="Bold" />
+                <TextBlock x:Name="SourceText" Text="{l:Text Key=Sc0dfb4a6df3154cb}" Style="{StaticResource Muted}" Margin="0,5,0,0" />
             </StackPanel>
             <Border Grid.Column="1" Background="#1A2A39" CornerRadius="12" Padding="11,6" VerticalAlignment="Top">
                 <TextBlock x:Name="SummaryText" Foreground="#65D9BE" FontWeight="SemiBold" />
@@ -41,19 +42,19 @@
                                         <ColumnDefinition Width="230" />
                                     </Grid.ColumnDefinitions>
                                     <StackPanel>
-                                        <TextBlock Text="{Binding TimeText}" Foreground="#F2F5F4" FontSize="15" FontWeight="SemiBold" />
-                                        <TextBlock Text="{Binding CountryText}" Style="{StaticResource Muted}" Margin="0,4,0,0" />
-                                        <TextBlock Text="{Binding ImportanceText}" Foreground="{Binding ImportanceColor}" FontSize="12" Margin="0,4,0,0" />
+                                        <TextBlock Text="{Binding TimeText, Converter={StaticResource UiTranslation}}" Foreground="#F2F5F4" FontSize="15" FontWeight="SemiBold" />
+                                        <TextBlock Text="{Binding CountryText, Converter={StaticResource UiTranslation}}" Style="{StaticResource Muted}" Margin="0,4,0,0" />
+                                        <TextBlock Text="{Binding ImportanceText, Converter={StaticResource UiTranslation}}" Foreground="{Binding ImportanceColor}" FontSize="12" Margin="0,4,0,0" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="1" Margin="6,0,16,0">
-                                        <TextBlock Text="{Binding Name}" Foreground="#F2F5F4" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" />
-                                        <TextBlock Text="{Binding StatusText}" Foreground="{Binding StatusColor}" FontSize="12" Margin="0,6,0,0" />
+                                        <TextBlock Text="{Binding Name, Converter={StaticResource UiTranslation}}" Foreground="#F2F5F4" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding StatusText, Converter={StaticResource UiTranslation}}" Foreground="{Binding StatusColor}" FontSize="12" Margin="0,6,0,0" />
                                     </StackPanel>
                                     <Grid Grid.Column="2">
                                         <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
-                                        <StackPanel><TextBlock Text="前值" Style="{StaticResource Muted}"/><TextBlock Text="{Binding PreviousText}" Foreground="#D9E2E8" Margin="0,5,0,0"/></StackPanel>
-                                        <StackPanel Grid.Column="1"><TextBlock Text="预期" Style="{StaticResource Muted}"/><TextBlock Text="{Binding ForecastText}" Foreground="#D9E2E8" Margin="0,5,0,0"/></StackPanel>
-                                        <StackPanel Grid.Column="2"><TextBlock Text="公布" Style="{StaticResource Muted}"/><TextBlock Text="{Binding ActualText}" Foreground="#65D9BE" FontWeight="SemiBold" Margin="0,5,0,0"/></StackPanel>
+                                        <StackPanel><TextBlock Text="{l:Text Key=S092b193501348716}" Style="{StaticResource Muted}"/><TextBlock Text="{Binding PreviousText, Converter={StaticResource UiTranslation}}" Foreground="#D9E2E8" Margin="0,5,0,0"/></StackPanel>
+                                        <StackPanel Grid.Column="1"><TextBlock Text="{l:Text Key=S89a4eeb08582790c}" Style="{StaticResource Muted}"/><TextBlock Text="{Binding ForecastText, Converter={StaticResource UiTranslation}}" Foreground="#D9E2E8" Margin="0,5,0,0"/></StackPanel>
+                                        <StackPanel Grid.Column="2"><TextBlock Text="{l:Text Key=S863730e2e0816b1b}" Style="{StaticResource Muted}"/><TextBlock Text="{Binding ActualText, Converter={StaticResource UiTranslation}}" Foreground="#65D9BE" FontWeight="SemiBold" Margin="0,5,0,0"/></StackPanel>
                                     </Grid>
                                 </Grid>
                             </Border>
@@ -64,8 +65,8 @@
         </Border>
 
         <Grid Grid.Row="2">
-            <TextBlock x:Name="ReminderText" Text="高重要度事件会在 30 分钟和 5 分钟前由宠物提醒；公布值更新后再提醒一次。" Style="{StaticResource Muted}" VerticalAlignment="Center" />
-            <Button Content="关闭" HorizontalAlignment="Right" Padding="18,7" Click="Close_Click" />
+            <TextBlock x:Name="ReminderText" Text="{l:Text Key=S084ed9c87d82dc9a}" Style="{StaticResource Muted}" VerticalAlignment="Center" />
+            <Button Content="{l:Text Key=Sa331f15358cb0cf7}" HorizontalAlignment="Right" Padding="18,7" Click="Close_Click" />
         </Grid>
     </Grid>
 </Window>

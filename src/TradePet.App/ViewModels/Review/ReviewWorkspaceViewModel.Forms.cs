@@ -8,6 +8,11 @@ namespace TradePet.App.ViewModels.Review;
 
 public sealed partial class ReviewWorkspaceViewModel
 {
+    private static string DefaultPlaybookRules()
+    {
+        Func<string?, string> t = TradePet.Core.Localization.UiText.Translate;
+        return $"入场|{t("确认入场条件")}|{t("写明事实依据")}|关键\r\n风险|{t("开仓即有止损")}|{t("检查首次风险证据")}|关键\r\n退出|{t("按计划退出")}|{t("记录退出依据")}|普通";
+    }
     private bool _updatingRuleDrafts;
     private string _ruleEditorError = "";
     private string? _loadedPlaybookVersionId;
@@ -91,7 +96,8 @@ public sealed partial class ReviewWorkspaceViewModel
         {
             var parts = line.Split('|', StringSplitOptions.TrimEntries);
             var section = parts[0] switch { "Entry" => "入场", "Risk" => "风险", "Management" => "管理", "Exit" => "退出", _ => parts[0] };
-            AddRuleDraft(section, parts.Length > 1 ? parts[1] : "", parts.Length > 2 ? parts[2] : "", parts.Length > 3 && parts[3] == "关键");
+            AddRuleDraft(section, parts.Length > 1 ? parts[1] : "", parts.Length > 2 ? parts[2] : "", parts.Length > 3 &&
+                (parts[3] == "关键" || parts[3].Equals("Critical", StringComparison.OrdinalIgnoreCase)));
         }
         ValidateRuleDrafts();
     }

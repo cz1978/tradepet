@@ -1,5 +1,7 @@
 # TradePet 1.0 baseline evidence
 
+English | [简体中文](README.zh-CN.md)
+
 This directory contains sanitized, reproducible WP01 evidence. Run
 `scripts/capture-baseline.ps1` after creating a private data baseline with
 `scripts/create-data-baseline.py`.

@@ -1,73 +1,78 @@
-<Window x:Class="TradePet.App.Views.SetupWindow"
+<Window Language="{l:Language}" x:Class="TradePet.App.Views.SetupWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="TradePet · 首次设置" Width="760" Height="670" MinWidth="620" MinHeight="560"
+        xmlns:l="clr-namespace:TradePet.App.Localization"
+        Title="{l:Text Key=Sb91e5f04e0ba6605}" Width="760" Height="670" MinWidth="620" MinHeight="560"
         WindowStartupLocation="CenterScreen" Background="{StaticResource AppBackgroundBrush}"
         Foreground="{StaticResource TextBrush}" FontFamily="Microsoft YaHei UI">
     <Grid Margin="28">
         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
         <StackPanel Margin="0,0,0,20">
-            <TextBlock Text="把天禄安顿好" FontSize="26" FontWeight="SemiBold"/>
-            <TextBlock Text="选平台 → 准备连接 → 检查状态 → 桌宠偏好" Foreground="{StaticResource AccentBrush}" Margin="0,10,0,0"/>
+            <TextBlock Text="{l:Text Key=Sbbf71e3b3a9bc735}" FontSize="26" FontWeight="SemiBold"/>
+            <TextBlock Text="{l:Text Key=Scfb4f5708ed0f228}" Foreground="{StaticResource AccentBrush}" Margin="0,10,0,0"/>
             <TextBlock x:Name="StepLabel" Margin="0,8,0,0" Style="{StaticResource MutedTextStyle}"/>
         </StackPanel>
         <ScrollViewer x:Name="StepScroll" Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <Grid>
                 <StackPanel x:Name="PlatformStep">
-                    <TextBlock Text="1 · 选择交易平台" Style="{StaticResource SectionTitleStyle}"/>
-                    <TextBlock Text="TradePet 只读账户数据，不下单、不平仓、不改单。请先在交易终端登录账户。" TextWrapping="Wrap" Margin="0,12,0,18"/>
-                    <ComboBox x:Name="PlatformPicker" ItemsSource="{Binding PlatformOptions}" DisplayMemberPath="Label"
-                              SelectedValuePath="Value" SelectedValue="{Binding SelectedPlatform, Mode=TwoWay}" SelectionChanged="Platform_Changed"/>
+                    <TextBlock Text="{l:Text Key=S1a3480dcb199ce75}" Style="{StaticResource SectionTitleStyle}"/>
+                    <TextBlock Text="{l:Text Key=Sb90f44048eaa2e2d}" TextWrapping="Wrap" Margin="0,12,0,18"/>
+                    <ComboBox x:Name="PlatformPicker" ItemsSource="{Binding PlatformOptions}"
+                              SelectedValuePath="Value" SelectedValue="{Binding SelectedPlatform, Mode=TwoWay}" SelectionChanged="Platform_Changed"><ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Label, Converter={StaticResource UiTranslation}}" /></DataTemplate></ComboBox.ItemTemplate></ComboBox>
                     <TextBlock x:Name="PlatformDescription" TextWrapping="Wrap" Style="{StaticResource MutedTextStyle}" Margin="0,10,0,20"/>
-                    <TextBlock Text="选择已安装的终端" Style="{StaticResource FieldLabelStyle}"/>
-                    <ComboBox ItemsSource="{Binding TerminalOptions}" DisplayMemberPath="Label" SelectedValuePath="Path"
-                              SelectedValue="{Binding SelectedTerminalPath, Mode=TwoWay}"/>
-                    <TextBlock Text="{Binding SelectedTerminalPath}" TextWrapping="Wrap" FontSize="11" Margin="0,8,0,12" Foreground="{StaticResource MutedBrush}"/>
-                    <WrapPanel><Button Content="重新检测" Click="Refresh_Click"/><Button Content="浏览终端…" Click="Browse_Click"/></WrapPanel>
-                    <TextBlock Text="每次连接一个终端。更换平台或终端后，保存设置并重新启动 TradePet。" TextWrapping="Wrap" Margin="0,18,0,0"/>
+                    <TextBlock Text="{l:Text Key=S598a992e48b8ddfb}" Style="{StaticResource FieldLabelStyle}"/>
+                    <ComboBox ItemsSource="{Binding TerminalOptions}" SelectedValuePath="Path"
+                              SelectedValue="{Binding SelectedTerminalPath, Mode=TwoWay}"><ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Label, Converter={StaticResource UiTranslation}}" /></DataTemplate></ComboBox.ItemTemplate></ComboBox>
+                    <TextBlock Text="{Binding SelectedTerminalPath, Converter={StaticResource UiTranslation}}" TextWrapping="Wrap" FontSize="11" Margin="0,8,0,12" Foreground="{StaticResource MutedBrush}"/>
+                    <WrapPanel><Button Content="{l:Text Key=S7ae881b7e14d8bc5}" Click="Refresh_Click"/><Button Content="{l:Text Key=S203c30780f65549c}" Click="Browse_Click"/></WrapPanel>
+                    <TextBlock Text="{l:Text Key=Sb3d23c313ef28434}" TextWrapping="Wrap" Margin="0,18,0,0"/>
                 </StackPanel>
                 <StackPanel x:Name="PrepareStep" Visibility="Collapsed">
-                    <TextBlock Text="2 · 准备连接" Style="{StaticResource SectionTitleStyle}"/>
+                    <TextBlock Text="{l:Text Key=Sb4c29378b43bbf93}" Style="{StaticResource SectionTitleStyle}"/>
                     <StackPanel x:Name="PythonPanel" Margin="0,14,0,18">
-                        <TextBlock x:Name="PythonDescription" Text="当前为开发环境，需要 64 位 Python 3.13。修复会从网络下载依赖，可能需要几分钟。" TextWrapping="Wrap"/>
-                        <WrapPanel Margin="0,12,0,0"><Button Content="检测 Python" Click="CheckPython_Click"/><WrapPanel x:Name="ExternalPythonActions"><Button Content="修复 Python 依赖" Click="RepairPython_Click"/><Button Content="选择 Python…" Click="BrowsePython_Click"/></WrapPanel></WrapPanel>
-                        <TextBlock x:Name="PythonStatus" Text="尚未检测；若未安装 Python，请先安装 64 位 Python 3.13。" TextWrapping="Wrap" Margin="0,10,0,0" Style="{StaticResource MutedTextStyle}"/>
+                        <TextBlock x:Name="PythonDescription" Text="{l:Text Key=Sce5791a103ac3551}" TextWrapping="Wrap"/>
+                        <WrapPanel Margin="0,12,0,0"><Button Content="{l:Text Key=Sf4b13a0922d919ec}" Click="CheckPython_Click"/><WrapPanel x:Name="ExternalPythonActions"><Button Content="{l:Text Key=S86268ad76ed59ffe}" Click="RepairPython_Click"/><Button Content="{l:Text Key=Sf7f8565c5b565fb2}" Click="BrowsePython_Click"/></WrapPanel></WrapPanel>
+                        <TextBlock x:Name="PythonStatus" Text="{l:Text Key=S20cf1302d542f312}" TextWrapping="Wrap" Margin="0,10,0,0" Style="{StaticResource MutedTextStyle}"/>
                     </StackPanel>
                     <TextBlock x:Name="BridgeInstructions" TextWrapping="Wrap" Margin="0,14,0,16"/>
-                    <WrapPanel><Button Content="安装 / 更新只读插件" Click="Install_Click" Style="{StaticResource PrimaryButtonStyle}"/><Button Content="打开终端数据目录" Click="OpenData_Click"/></WrapPanel>
+                    <WrapPanel><Button Content="{l:Text Key=S63c52bac9a0a4f37}" Click="Install_Click" Style="{StaticResource PrimaryButtonStyle}"/><Button Content="{l:Text Key=S8ba340cbcf111479}" Click="OpenData_Click"/></WrapPanel>
                     <TextBlock x:Name="InstallStatus" TextWrapping="Wrap" Margin="0,12,0,0" Style="{StaticResource MutedTextStyle}"/>
                 </StackPanel>
                 <StackPanel x:Name="VerifyStep" Visibility="Collapsed">
-                    <TextBlock Text="3 · 确认连接状态" Style="{StaticResource SectionTitleStyle}"/>
-                    <TextBlock Text="保存后重启才会切换采集来源。下方显示本次运行状态；选择新平台时，旧连接状态不代表新平台已连通。" TextWrapping="Wrap" Margin="0,14,0,20"/>
-                    <TextBlock Text="{Binding ConnectionText}" FontSize="17"/>
-                    <TextBlock Text="{Binding BridgeText}" Margin="0,10,0,0"/>
-                    <TextBlock Text="{Binding AccountLabel}" Margin="0,10,0,0"/>
-                    <TextBlock Text="{Binding DiagnosticText}" TextWrapping="Wrap" Margin="0,12,0,16" Style="{StaticResource MutedTextStyle}"/>
-                    <Button Content="检查所选终端" Click="CheckConnection_Click" HorizontalAlignment="Left"/>
+                    <TextBlock Text="{l:Text Key=Sc9f7a7fd62335f1d}" Style="{StaticResource SectionTitleStyle}"/>
+                    <TextBlock Text="{l:Text Key=S940c38ad8eb68961}" TextWrapping="Wrap" Margin="0,14,0,20"/>
+                    <TextBlock Text="{Binding ConnectionText, Converter={StaticResource UiTranslation}}" FontSize="17"/>
+                    <TextBlock Text="{Binding BridgeText, Converter={StaticResource UiTranslation}}" Margin="0,10,0,0"/>
+                    <TextBlock Text="{Binding AccountLabel, Converter={StaticResource UiTranslation}}" Margin="0,10,0,0"/>
+                    <TextBlock Text="{Binding DiagnosticText, Converter={StaticResource UiTranslation}}" TextWrapping="Wrap" Margin="0,12,0,16" Style="{StaticResource MutedTextStyle}"/>
+                    <Button Content="{l:Text Key=S5a168f1e12b3f5f4}" Click="CheckConnection_Click" HorizontalAlignment="Left"/>
                     <TextBlock x:Name="ConnectionCheck" TextWrapping="Wrap" Margin="0,12,0,0"/>
-                    <TextBlock Text="仍未连接：确认终端已登录、插件只挂在一个图表上、选中的终端与挂图终端一致。可以先保存，稍后从设置中心重新打开向导。" TextWrapping="Wrap" Margin="0,20,0,0" Style="{StaticResource MutedTextStyle}"/>
+                    <TextBlock Text="{l:Text Key=S45d49011c7f9e74c}" TextWrapping="Wrap" Margin="0,20,0,0" Style="{StaticResource MutedTextStyle}"/>
                 </StackPanel>
                 <StackPanel x:Name="PreferencesStep" Visibility="Collapsed">
-                    <TextBlock Text="4 · 让桌宠按你的习惯工作" Style="{StaticResource SectionTitleStyle}" Margin="0,0,0,16"/>
-                    <CheckBox Content="桌宠始终置顶" IsChecked="{Binding IsTopmost}"/>
-                    <CheckBox Content="显示迷你持仓条" IsChecked="{Binding MiniPositionVisible}"/>
-                    <CheckBox Content="专注模式，减少日常闲聊" IsChecked="{Binding IsFocusMode}"/>
-                    <CheckBox Content="悬停时展开持仓速览" IsChecked="{Binding ExpandCardOnHover}"/>
-                    <CheckBox Content="随 Windows 启动" IsChecked="{Binding StartWithWindows}"/>
-                    <TextBlock Text="桌宠大小" Style="{StaticResource FieldLabelStyle}" Margin="0,16,0,7"/>
+                    <TextBlock Text="{l:Text Key=Sb6c6a08a3ad51b35}" Style="{StaticResource SectionTitleStyle}" Margin="0,0,0,16"/>
+                    <TextBlock Text="{l:Text Key=Sfc18f936c8bab1d5}" Style="{StaticResource FieldLabelStyle}"/>
+                    <ComboBox ItemsSource="{Binding UiLanguageOptions}" SelectedValuePath="Code" SelectedValue="{Binding UiLanguage}" Width="220" HorizontalAlignment="Left" Margin="0,5,0,12">
+                        <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Label}"/></DataTemplate></ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <CheckBox Content="{l:Text Key=S9ab7648e208b0224}" IsChecked="{Binding IsTopmost}"/>
+                    <CheckBox Content="{l:Text Key=S7f86eaa5db5a5f74}" IsChecked="{Binding MiniPositionVisible}"/>
+                    <CheckBox Content="{l:Text Key=S3c75ec103e4868fb}" IsChecked="{Binding IsFocusMode}"/>
+                    <CheckBox Content="{l:Text Key=Sd3ddc5206b2af7cc}" IsChecked="{Binding ExpandCardOnHover}"/>
+                    <CheckBox Content="{l:Text Key=S36fa06144a4fc61d}" IsChecked="{Binding StartWithWindows}"/>
+                    <TextBlock Text="{l:Text Key=Sda7d82318eca3713}" Style="{StaticResource FieldLabelStyle}" Margin="0,16,0,7"/>
                     <Slider Minimum="0.4" Maximum="1.5" Value="{Binding PetScale}" TickFrequency="0.1" IsSnapToTickEnabled="True"/>
-                    <TextBlock Text="双击桌宠打开主面板；右键打开功能菜单。更多提醒阈值可在设置中心调整。" TextWrapping="Wrap" Margin="0,20,0,0"/>
-                    <TextBlock Text="保存仅表示设置已记住，不代表连接成功。切换平台、终端或修复 Python 后，请退出并重新启动 TradePet。" TextWrapping="Wrap" Margin="0,14,0,0" Foreground="{StaticResource AccentBrush}"/>
+                    <TextBlock Text="{l:Text Key=S0218dff10ed3dbff}" TextWrapping="Wrap" Margin="0,20,0,0"/>
+                    <TextBlock Text="{l:Text Key=S3aeeb58e5c2ff204}" TextWrapping="Wrap" Margin="0,14,0,0" Foreground="{StaticResource AccentBrush}"/>
                 </StackPanel>
             </Grid>
         </ScrollViewer>
         <TextBlock x:Name="Status" Grid.Row="2" TextWrapping="Wrap" Margin="0,16,0,12" Foreground="{StaticResource AccentBrush}" AutomationProperties.LiveSetting="Polite"/>
         <Grid Grid.Row="3">
-            <Button x:Name="LaterButton" Content="稍后设置" HorizontalAlignment="Left" Click="Later_Click"/>
+            <Button x:Name="LaterButton" Content="{l:Text Key=S992b43609f3ed35a}" HorizontalAlignment="Left" Click="Later_Click"/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button x:Name="BackButton" Content="上一步" Click="Back_Click"/>
-                <Button x:Name="NextButton" Content="下一步" Click="Next_Click" Style="{StaticResource PrimaryButtonStyle}"/>
+                <Button x:Name="BackButton" Content="{l:Text Key=Sd57ced27d9d76ca3}" Click="Back_Click"/>
+                <Button x:Name="NextButton" Content="{l:Text Key=S2b241ff3cb5afcc4}" Click="Next_Click" Style="{StaticResource PrimaryButtonStyle}"/>
             </StackPanel>
         </Grid>
     </Grid>
