@@ -81,7 +81,8 @@ public sealed partial class ReviewWorkspaceViewModel
         }
         var monthDays = _calendarDays.Where(item => item.Key.Year == first.Year && item.Key.Month == first.Month).ToArray();
         var pnl = monthDays.Sum(item => item.Value.CashPnl);
-        CalendarMonthSummary = $"账户现金盈亏 {Signed(pnl)} · {monthDays.Length} 个范围内日期 · 红盈绿亏；点击日期写日记。";
+        CalendarMonthSummary = TradePet.Core.Localization.UiText.Translate($"账户现金盈亏 {Signed(pnl)} · {monthDays.Length} 个范围内日期 · 红盈绿亏；点击日期查看当日记录。");
+        CalendarMonthSummary += "\n" + TradePet.Core.Localization.UiText.Translate("账户范围：日历和每日事实统计整个账户；交易列表、分析及导出使用当前筛选。");
         UpdateCalendarSelection();
     }
 

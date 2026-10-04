@@ -37,6 +37,7 @@ public partial class PetWindow : Window
     private bool _quickCardPinned;
     private QuickReviewCard? _reviewCard;
     private EntryReasonCard? _entryReasonCard;
+    private BehaviorActionCard? _behaviorActionCard;
     private bool _isDragging;
     private double _homeLeft;
     private bool _fullscreenActive;
@@ -145,21 +146,44 @@ public partial class PetWindow : Window
             _quickCardPinned = true;
             SetQuickCardVisible(true);
         }));
-        _trayMenu.Items.Add("交易日报", null, (_, _) => Dispatcher.Invoke(() => _viewModel.ShowDailyTradingReportCommand.Execute(null)));
-        _trayMenu.Items.Add("宏观日历", null, (_, _) => Dispatcher.Invoke(() => _viewModel.ShowMacroCalendarCommand.Execute(null)));
-        _trayMenu.Items.Add("显示/隐藏迷你持仓", null, (_, _) => Dispatcher.Invoke(() => _viewModel.MiniPositionVisible = !_viewModel.MiniPositionVisible));
-        _trayMenu.Items.Add("交易计划", null, (_, _) => Dispatcher.Invoke(() => _viewModel.ShowPlanPageCommand.Execute(null)));
-        _trayMenu.Items.Add("亏损区域", null, (_, _) => Dispatcher.Invoke(() => _viewModel.ShowLossZonesPageCommand.Execute(null)));
-        _trayMenu.Items.Add("复盘分析", null, (_, _) => Dispatcher.Invoke(() => _viewModel.ShowReviewPageCommand.Execute(null)));
+        _trayMenu.Items.Add("快速入场原因", null, (_, _) => Dispatcher.Invoke(() => _viewModel.ShowEntryReasonCommand.Execute(null)));
         _trayMenu.Items.Add("快速复盘", null, (_, _) => Dispatcher.Invoke(() => _viewModel.ShowQuickReviewCommand.Execute(null)));
-        _trayMenu.Items.Add("时间线", null, (_, _) => Dispatcher.Invoke(() => _viewModel.ShowTimelinePageCommand.Execute(null)));
-        _trayMenu.Items.Add("设置", null, (_, _) => Dispatcher.Invoke(() => _viewModel.ShowSettingsPageCommand.Execute(null)));
+        _trayMenu.Items.Add("记录未交易机会", null, (_, _) => Dispatcher.Invoke(() => _viewModel.ShowOpportunityCommand.Execute(null)));
+        _trayMenu.Items.Add("交易小结与改进", null, (_, _) => Dispatcher.Invoke(() => _viewModel.ShowWeeklyGoalCommand.Execute(null)));
         _trayMenu.Items.Add(new Forms.ToolStripSeparator());
-        _trayMenu.Items.Add("关闭鼠标穿透", null, (_, _) => Dispatcher.Invoke(() => _viewModel.IsMouseThrough = false));
+        var reviewTools = new Forms.ToolStripMenuItem("复盘与工具");
+        reviewTools.DropDownItems.Add("打开控制台", null, (_, _) => Dispatcher.Invoke(() => _viewModel.ShowMainWindowCommand.Execute(null)));
+        reviewTools.DropDownItems.Add("交易日报", null, (_, _) => Dispatcher.Invoke(() => _viewModel.ShowDailyTradingReportCommand.Execute(null)));
+        reviewTools.DropDownItems.Add("复盘分析", null, (_, _) => Dispatcher.Invoke(() => _viewModel.ShowReviewPageCommand.Execute(null)));
+        reviewTools.DropDownItems.Add("时间线", null, (_, _) => Dispatcher.Invoke(() => _viewModel.ShowTimelinePageCommand.Execute(null)));
+        reviewTools.DropDownItems.Add("交易计划", null, (_, _) => Dispatcher.Invoke(() => _viewModel.ShowPlanPageCommand.Execute(null)));
+        reviewTools.DropDownItems.Add("亏损区域", null, (_, _) => Dispatcher.Invoke(() => _viewModel.ShowLossZonesPageCommand.Execute(null)));
+        reviewTools.DropDownItems.Add("宏观日历", null, (_, _) => Dispatcher.Invoke(() => _viewModel.ShowMacroCalendarCommand.Execute(null)));
+        _trayMenu.Items.Add(reviewTools);
+        var displaySettings = new Forms.ToolStripMenuItem("显示与设置");
+        displaySettings.DropDownItems.Add("显示/隐藏迷你持仓", null, (_, _) => Dispatcher.Invoke(() => _viewModel.MiniPositionVisible = !_viewModel.MiniPositionVisible));
+        displaySettings.DropDownItems.Add("设置", null, (_, _) => Dispatcher.Invoke(() => _viewModel.ShowSettingsPageCommand.Execute(null)));
+        displaySettings.DropDownItems.Add("关闭鼠标穿透", null, (_, _) => Dispatcher.Invoke(() => _viewModel.IsMouseThrough = false));
+        _trayMenu.Items.Add(displaySettings);
+        _trayMenu.Items.Add(new Forms.ToolStripSeparator());
         _trayMenu.Items.Add("退出天禄交易助手", null, (_, _) => Dispatcher.Invoke(() => _viewModel.ExitCommand.Execute(null)));
-        foreach (Forms.ToolStripItem item in _trayMenu.Items)
-            item.Text = TradePet.Core.Localization.UiText.Translate(item.Text);
+        ConfigureTrayItems(_trayMenu.Items);
         _trayIcon.ContextMenuStrip = _trayMenu;
+
+        void ConfigureTrayItems(Forms.ToolStripItemCollection items)
+        {
+            foreach (Forms.ToolStripItem item in items)
+            {
+                item.Text = TradePet.Core.Localization.UiText.Translate(item.Text);
+                if (item is not Forms.ToolStripMenuItem { HasDropDownItems: true } menuItem) continue;
+                menuItem.DropDown.BackColor = _trayMenu.BackColor;
+                menuItem.DropDown.ForeColor = _trayMenu.ForeColor;
+                menuItem.DropDown.Font = _trayMenuFont;
+                menuItem.DropDown.Renderer = _trayMenu.Renderer;
+                if (menuItem.DropDown is Forms.ToolStripDropDownMenu dropDown) dropDown.ShowImageMargin = false;
+                ConfigureTrayItems(menuItem.DropDownItems);
+            }
+        }
     }
 
     public void DisposeTrayIcon()
@@ -179,6 +203,7 @@ public partial class PetWindow : Window
         ReviewCardPopup.IsOpen = false;
         if (_reviewCard is not null) _reviewCard.Completed -= ReviewCard_Completed;
         if (_entryReasonCard is not null) _entryReasonCard.Completed -= EntryReasonCard_Completed;
+        if (_behaviorActionCard is not null) _behaviorActionCard.Completed -= BehaviorActionCard_Completed;
         ReviewCardHost.Content = null;
         SpeechBubblePopup.IsOpen = false;
         PetSprite.Dispose();
@@ -456,9 +481,38 @@ public partial class PetWindow : Window
 
     private void UpdateSpeechBubble()
     {
-        ReviewCardPopup.IsOpen = !_trayResourcesDisposed && IsVisible && !_isDragging && (_reviewCard is not null || _entryReasonCard is not null);
+        ReviewCardPopup.IsOpen = !_trayResourcesDisposed && IsVisible && !_isDragging && (_reviewCard is not null || _entryReasonCard is not null || _behaviorActionCard is not null);
         SpeechBubblePopup.IsOpen = !_trayResourcesDisposed && IsVisible &&
                                    !_isDragging && _viewModel.IsBubbleVisible && !ReviewCardPopup.IsOpen;
+    }
+
+    public void ShowBehaviorActionCard(BehaviorActionCard card)
+    {
+        if (card.IsCompleted) return;
+        if (_behaviorActionCard != card)
+        {
+            if (_behaviorActionCard is not null) _behaviorActionCard.Completed -= BehaviorActionCard_Completed;
+            _behaviorActionCard = card;
+            ReviewCardHost.Content = card;
+            card.Completed += BehaviorActionCard_Completed;
+        }
+        _quickCardPinned = false;
+        SetQuickCardVisible(false);
+        if (!IsVisible) Show();
+        UpdateSpeechBubble();
+    }
+
+    private void BehaviorActionCard_Completed(BehaviorActionCard card)
+    {
+        if (_behaviorActionCard != card) return;
+        card.Completed -= BehaviorActionCard_Completed;
+        _behaviorActionCard = null;
+        if (ReferenceEquals(ReviewCardHost.Content, card))
+        {
+            ReviewCardPopup.IsOpen = false;
+            ReviewCardHost.Content = null;
+        }
+        UpdateSpeechBubble();
     }
 
     private void ResizeForScale(bool clamp = true)

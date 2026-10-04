@@ -70,7 +70,8 @@ public sealed record ReviewWorkspaceData(
     IReadOnlyList<AccountCashFlow>? CashFlows = null,
     IReadOnlyList<TradingSessionDefinition>? TradingSessions = null,
     IReadOnlyList<MarketHistoryResult>? DailyMarketData = null,
-    IReadOnlyDictionary<long, IReadOnlyList<PositionPnlSample>>? PositionSamples = null);
+    IReadOnlyDictionary<long, IReadOnlyList<PositionPnlSample>>? PositionSamples = null,
+    IReadOnlyDictionary<long, TradeEntryReasonNote>? EntryReasonNotes = null);
 
 public sealed record TradeDetailData(
     TradeRecord Trade,
@@ -88,7 +89,12 @@ public sealed record TradeDetailData(
     ReviewDataVersion Version,
     TradeEntryReasonNote? EntryReasonNote = null);
 
-public sealed record TradeEntryReasonNote(TradeKey TradeKey, string Reason, DateTimeOffset RecordedAtUtc)
+public sealed record TradeEntryReasonNote(
+    TradeKey TradeKey,
+    string Reason,
+    DateTimeOffset RecordedAtUtc,
+    PlanExecutionSelfReport? ReportedExecution = null,
+    string Emotion = "")
 {
     public static string Scope(string accountKey) => "account:" + accountKey;
     public static string SettingKey(long positionId) => "trade-entry-reason:" + positionId.ToString(System.Globalization.CultureInfo.InvariantCulture);
@@ -265,7 +271,8 @@ public sealed record SaveTradeReviewCommand(
     string SourceVersion,
     string RuleVersion,
     ReviewCompletionStatus RequestedStatus,
-    bool IsQuickReview = false);
+    bool IsQuickReview = false,
+    PlanExecutionSelfReport? ReportedExecution = null);
 
 public sealed record TradeReviewEditSubmission(
     EditSnapshot<SaveTradeReviewCommand> Snapshot,

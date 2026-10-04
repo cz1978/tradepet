@@ -648,7 +648,11 @@ public sealed partial class AppDatabase : IReviewWorkspaceRepository
         CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenConnectionAsync(cancellationToken);
+        var entryNote = value is TradeEntryReasonNote note && scopeKey == TradeEntryReasonNote.Scope(note.TradeKey.AccountKey) &&
+            settingKey == TradeEntryReasonNote.SettingKey(note.TradeKey.PositionId) ? note : null;
+        await using var transaction = entryNote is null ? null : await connection.BeginTransactionAsync(cancellationToken);
         await using var command = connection.CreateCommand();
+        command.Transaction = (SqliteTransaction?)transaction;
         command.CommandText = """
             INSERT INTO settings(scope_key, setting_key, value_json, updated_at_utc)
             VALUES ($scope, $key, $value, $updated)
@@ -661,6 +665,11 @@ public sealed partial class AppDatabase : IReviewWorkspaceRepository
         command.Parameters.AddWithValue("$value", JsonSerializer.Serialize(value, ProtocolJson.Options));
         command.Parameters.AddWithValue("$updated", Format(DateTimeOffset.UtcNow));
         await command.ExecuteNonQueryAsync(cancellationToken);
+        if (entryNote is not null && transaction is not null)
+        {
+            await BumpReviewVersionAsync(connection, (SqliteTransaction)transaction, entryNote.TradeKey.AccountKey, "metadata", cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
     }
 
     public async Task<T?> LoadSettingAsync<T>(

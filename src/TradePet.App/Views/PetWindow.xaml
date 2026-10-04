@@ -40,16 +40,42 @@
                     <Setter Property="Template">
                         <Setter.Value>
                             <ControlTemplate TargetType="{x:Type MenuItem}">
-                                <Border x:Name="MenuItemBorder" Background="{TemplateBinding Background}"
-                                        CornerRadius="6" Padding="{TemplateBinding Padding}">
-                                    <ContentPresenter ContentSource="Header" RecognizesAccessKey="True"
-                                                      HorizontalAlignment="Left" VerticalAlignment="Center"
-                                                      TextElement.Foreground="{TemplateBinding Foreground}"
-                                                      TextElement.FontFamily="{TemplateBinding FontFamily}"
-                                                      TextElement.FontSize="{TemplateBinding FontSize}"
-                                                      TextElement.FontWeight="{TemplateBinding FontWeight}" />
-                                </Border>
+                                <Grid>
+                                    <Border x:Name="MenuItemBorder" Background="{TemplateBinding Background}"
+                                            CornerRadius="6" Padding="{TemplateBinding Padding}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <ContentPresenter ContentSource="Header" RecognizesAccessKey="True"
+                                                              HorizontalAlignment="Left" VerticalAlignment="Center"
+                                                              TextElement.Foreground="{TemplateBinding Foreground}"
+                                                              TextElement.FontFamily="{TemplateBinding FontFamily}"
+                                                              TextElement.FontSize="{TemplateBinding FontSize}"
+                                                              TextElement.FontWeight="{TemplateBinding FontWeight}" />
+                                            <Path x:Name="SubmenuArrow" Grid.Column="1" Data="M 0,0 L 4,4 L 0,8"
+                                                  Stroke="{TemplateBinding Foreground}" StrokeThickness="1.5"
+                                                  Margin="18,0,0,0" VerticalAlignment="Center" Visibility="Collapsed" />
+                                        </Grid>
+                                    </Border>
+                                    <Popup x:Name="PART_Popup" Placement="Right" Focusable="False"
+                                           AllowsTransparency="True" PopupAnimation="Fade"
+                                           IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}">
+                                        <Border Background="#101721" BorderBrush="#3A4B60" BorderThickness="1"
+                                                CornerRadius="10" Padding="6" MinWidth="176">
+                                            <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle"
+                                                            KeyboardNavigation.TabNavigation="Cycle" />
+                                        </Border>
+                                    </Popup>
+                                </Grid>
                                 <ControlTemplate.Triggers>
+                                    <Trigger Property="HasItems" Value="True">
+                                        <Setter TargetName="SubmenuArrow" Property="Visibility" Value="Visible" />
+                                    </Trigger>
+                                    <Trigger Property="IsSubmenuOpen" Value="True">
+                                        <Setter TargetName="MenuItemBorder" Property="Background" Value="#1B6655" />
+                                    </Trigger>
                                     <Trigger Property="IsHighlighted" Value="True">
                                         <Setter TargetName="MenuItemBorder" Property="Background" Value="#1B6655" />
                                         <Setter Property="Foreground" Value="#FFFFFF" />
@@ -80,33 +106,39 @@
                 </Style>
             </ContextMenu.Resources>
             <MenuItem Header="{l:Text Key=S02b74652eeae4c95}" Click="ShowQuickCard_Click" />
-            <MenuItem Header="{l:Text Key=S7482b58d44b922f6}" Command="{Binding ShowDailyTradingReportCommand}" />
-            <MenuItem Header="{l:Text Key=Sfd62c7a47ec1aa6a}" Command="{Binding ShowMacroCalendarCommand}" />
-            <MenuItem Header="{l:Text Key=S7a632e2762cb093d}" Command="{Binding ShowPlanPageCommand}" />
-            <MenuItem Header="{l:Text Key=S39f12fd8d6936711}" Command="{Binding ShowLossZonesPageCommand}" />
-            <MenuItem Header="{l:Text Key=S2b9f7901b72f0549}" Command="{Binding ShowReviewPageCommand}" />
-            <MenuItem Header="{l:Text Key=Sf0849eecd0bf645e}" Command="{Binding ShowQuickReviewCommand}" />
             <MenuItem Header="{l:Text Key=S371d943a67b5707e}" Command="{Binding ShowEntryReasonCommand}" />
-            <MenuItem Header="{l:Text Key=S728a7e32a14148be}" Command="{Binding OpenReleasePageCommand}">
-                <MenuItem.Style><Style TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding UpdateAvailable, Converter={StaticResource UiTranslation}}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></MenuItem.Style>
-            </MenuItem>
-            <MenuItem Header="{l:Text Key=S67819401c5dcb20e}" Command="{Binding ShowTimelinePageCommand}" />
-            <MenuItem Header="{l:Text Key=Sd89995d3d5394519}" Command="{Binding ShowSettingsPageCommand}" />
+            <MenuItem Header="{l:Text Key=Sf0849eecd0bf645e}" Command="{Binding ShowQuickReviewCommand}" />
+            <MenuItem Header="{l:Text Key=PetRecordOpportunity}" Command="{Binding ShowOpportunityCommand}" />
+            <MenuItem Header="{l:Text Key=PetTradingSummary}" Command="{Binding ShowWeeklyGoalCommand}" />
             <Separator />
-            <MenuItem Header="{l:Text Key=S7438a1abd7803ce5}" Command="{Binding ShowMainWindowCommand}" />
-            <MenuItem Click="ToggleMiniPosition_Click">
-                <MenuItem.Style>
-                    <Style TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}">
-                        <Setter Property="Header" Value="{l:Text Key=S49e4723edb996902}" />
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding MiniPositionVisible, Converter={StaticResource UiTranslation}}" Value="True">
-                                <Setter Property="Header" Value="{l:Text Key=Se0bbc7a4bcda953b}" />
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </MenuItem.Style>
+            <MenuItem Header="{l:Text Key=PetReviewToolsMenu}">
+                <MenuItem Header="{l:Text Key=S7438a1abd7803ce5}" Command="{Binding ShowMainWindowCommand}" />
+                <MenuItem Header="{l:Text Key=S7482b58d44b922f6}" Command="{Binding ShowDailyTradingReportCommand}" />
+                <MenuItem Header="{l:Text Key=S2b9f7901b72f0549}" Command="{Binding ShowReviewPageCommand}" />
+                <MenuItem Header="{l:Text Key=S67819401c5dcb20e}" Command="{Binding ShowTimelinePageCommand}" />
+                <MenuItem Header="{l:Text Key=S7a632e2762cb093d}" Command="{Binding ShowPlanPageCommand}" />
+                <MenuItem Header="{l:Text Key=S39f12fd8d6936711}" Command="{Binding ShowLossZonesPageCommand}" />
+                <MenuItem Header="{l:Text Key=Sfd62c7a47ec1aa6a}" Command="{Binding ShowMacroCalendarCommand}" />
             </MenuItem>
-            <MenuItem Header="{l:Text Key=S30ef504d19356447}" Command="{Binding HidePetCommand}" />
+            <MenuItem Header="{l:Text Key=PetDisplaySettingsMenu}">
+                <MenuItem Click="ToggleMiniPosition_Click">
+                    <MenuItem.Style>
+                        <Style TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}">
+                            <Setter Property="Header" Value="{l:Text Key=S49e4723edb996902}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding MiniPositionVisible, Converter={StaticResource UiTranslation}}" Value="True">
+                                    <Setter Property="Header" Value="{l:Text Key=Se0bbc7a4bcda953b}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </MenuItem.Style>
+                </MenuItem>
+                <MenuItem Header="{l:Text Key=Sd89995d3d5394519}" Command="{Binding ShowSettingsPageCommand}" />
+                <MenuItem Header="{l:Text Key=S728a7e32a14148be}" Command="{Binding OpenReleasePageCommand}">
+                    <MenuItem.Style><Style TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding UpdateAvailable, Converter={StaticResource UiTranslation}}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></MenuItem.Style>
+                </MenuItem>
+                <MenuItem Header="{l:Text Key=S30ef504d19356447}" Command="{Binding HidePetCommand}" />
+            </MenuItem>
             <Separator />
             <MenuItem Header="{l:Text Key=S0a2e2fa072eca9b7}" Command="{Binding ExitCommand}" />
         </ContextMenu>
@@ -127,9 +159,9 @@
                           Placement="Custom" CustomPopupPlacementCallback="PlaceQuickCard"
                           AllowsTransparency="True" PopupAnimation="None"
                           StaysOpen="True" Focusable="False">
-        <Grid x:Name="QuickCardHost" Width="370" Height="340"
+        <Grid x:Name="QuickCardHost" Width="370" Height="382"
               MouseEnter="QuickCard_MouseEnter" MouseLeave="QuickCard_MouseLeave">
-            <Border Width="358" Height="330" HorizontalAlignment="Left" VerticalAlignment="Bottom"
+            <Border Width="358" Height="372" HorizontalAlignment="Left" VerticalAlignment="Bottom"
                     Background="#121923" BorderBrush="#2B3746" BorderThickness="1"
                     CornerRadius="18" Padding="15">
                 <Grid>
@@ -261,9 +293,12 @@
                     </Border>
 
                     <Grid Grid.Row="6" Margin="0,9,0,0">
+                        <Grid.RowDefinitions><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
                         <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
                         <Button Grid.Column="0" Content="{l:Text Key=Sf0849eecd0bf645e}" Click="OpenQuickReview_Click" Margin="0,0,5,0" Padding="8,6" />
                         <Button Grid.Column="1" Content="{l:Text Key=S7438a1abd7803ce5}" Click="OpenConsole_Click" Margin="5,0,0,0" Padding="8,6" />
+                        <Button Grid.Row="1" Grid.Column="0" Content="{l:Text Key=PetOpportunityShort}" Command="{Binding ShowOpportunityCommand}" Margin="0,6,5,0" Padding="8,6"/>
+                        <Button Grid.Row="1" Grid.Column="1" Content="{l:Text Key=PetSummaryShort}" Command="{Binding ShowWeeklyGoalCommand}" Margin="5,6,0,0" Padding="8,6"/>
                     </Grid>
                 </Grid>
             </Border>

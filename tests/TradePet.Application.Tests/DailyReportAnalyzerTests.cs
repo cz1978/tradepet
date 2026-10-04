@@ -8,6 +8,26 @@ namespace TradePet.Application.Tests;
 public sealed class DailyReportAnalyzerTests
 {
     [Fact]
+    public void PetEntryChoices_AppearInDailyReportWithoutAReviewDocumentAndKeepAccountsIsolated()
+    {
+        var data = Data(Trade(1, -5), Trade(2, 5)) with
+        {
+            EntryReasonNotes = new Dictionary<long, TradeEntryReasonNote>
+            {
+                [1] = new(new(Account, 1), "回踩入场", At, PlanExecutionSelfReport.Unsure, "急躁"),
+                [2] = new(new("other-account", 2), "foreign-entry", At, PlanExecutionSelfReport.Followed, "平静"),
+            },
+        };
+        var report = Analyze(data);
+        var section = Assert.Single(report.Sections, s => s.Title == "宠物记录与执行自报");
+        Assert.Contains(section.Lines, line => line.Contains("开仓执行自报：不确定") && line.Contains("开仓状态自报：急躁"));
+        Assert.DoesNotContain("foreign-entry", report.Markdown);
+        Assert.DoesNotContain(section.Lines, line => line.Contains("复盘执行自报"));
+        Assert.Empty(data.Documents);
+        Assert.Empty(data.Assessments);
+    }
+
+    [Fact]
     public void Report_ExportsActualProtectionChangesAndMarketBarsForReview()
     {
         var trade = Trade(1, 5);
@@ -132,8 +152,8 @@ public sealed class DailyReportAnalyzerTests
         var alert = new BehaviorOccurrence("b1", Account, Date, BehaviorRuleKind.CooldownViolation,
             "v1", 1, null, 0, BehaviorRiskLevel.Attention, ReviewEvidenceSource.LiveObservation,
             At, At, "test", "", true, "", null,
-            [new(new(Account, 1), BehaviorTradeRole.Trigger), new(new("other", 1), BehaviorTradeRole.Trigger)]);
-        var data = Data(Trade(1, -10)) with
+            [new(new(Account, 1), BehaviorTradeRole.Trigger), new(new(Account, 2), BehaviorTradeRole.PreviousContext), new(new("other", 1), BehaviorTradeRole.Trigger)]);
+        var data = Data(Trade(1, -10), Trade(2, -50)) with
         {
             Behaviors = [alert, alert with { Id = "b2" }, alert with
             {
@@ -149,6 +169,8 @@ public sealed class DailyReportAnalyzerTests
 
         Assert.Contains(discipline.Lines, l => l.Contains("2 条提醒") && l.Contains("关联净盈亏 -10 USD"));
         Assert.Contains(discipline.Lines, l => l.Contains("报复性交易风险") && l.Contains("证据不足 1 条"));
+        Assert.Contains(discipline.Lines, l => l.Contains("报复性交易风险") && l.Contains("关联净盈亏 0 USD"));
+        Assert.DoesNotContain(discipline.Lines, l => l.Contains("关联净盈亏 -60 USD"));
         Assert.Contains(actions.Lines, l => l.Contains("冷静期违规"));
         Assert.DoesNotContain(actions.Lines, l => l.Contains("报复性交易风险"));
         Assert.DoesNotContain("foreign-rule", report.Markdown);

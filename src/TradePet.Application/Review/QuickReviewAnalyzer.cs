@@ -6,6 +6,14 @@ public sealed record QuickReviewAnalysis(string ExitReason, string Explanation, 
 
 public static class QuickReviewAnalyzer
 {
+    public static string DescribeReportedExecution(PlanExecutionSelfReport? report) => report switch
+    {
+        PlanExecutionSelfReport.Followed => "按计划",
+        PlanExecutionSelfReport.Deviated => "有偏离",
+        PlanExecutionSelfReport.Unsure => "不确定",
+        _ => "未记录",
+    };
+
     public static string DescribeProtection(TradeRecord trade, IReadOnlyList<PositionPnlSample> observations)
     {
         var samples = observations.Where(sample => sample.TradeKey == new TradeKey(trade.AccountKey, trade.PositionId) &&
@@ -40,6 +48,13 @@ public static class QuickReviewAnalyzer
             .OrderBy(sample => sample.CapturedAtUtc).ToArray();
         var facts = new List<string>();
         var improvements = new List<string>();
+        if (detail.EntryReasonNote is { } entryNote)
+        {
+            if (!string.IsNullOrWhiteSpace(entryNote.Reason)) facts.Add($"入场原因（宠物记录）：{entryNote.Reason}");
+            if (entryNote.ReportedExecution.HasValue)
+                facts.Add($"开仓执行（自报）：{DescribeReportedExecution(entryNote.ReportedExecution)}。");
+            if (!string.IsNullOrWhiteSpace(entryNote.Emotion)) facts.Add($"开仓状态（自报）：{entryNote.Emotion}");
+        }
         var duration = closedAt.HasValue ? closedAt.Value - trade.OpenedAtUtc : TimeSpan.Zero;
         var holding = duration.TotalHours >= 1
             ? $"{duration.TotalHours:0.#} 小时"

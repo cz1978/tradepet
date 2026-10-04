@@ -109,6 +109,26 @@ public sealed class PetWindowTests
                 window.ContextMenu.PlacementTarget = window;
                 window.ContextMenu.IsOpen = true;
                 window.ContextMenu.UpdateLayout();
+                var topLevelItems = window.ContextMenu.Items.OfType<MenuItem>().ToArray();
+                Assert.Equal(8, topLevelItems.Length);
+                Assert.Contains(topLevelItems, item => ReferenceEquals(item.Command, viewModel.ShowEntryReasonCommand));
+                Assert.Contains(topLevelItems, item => ReferenceEquals(item.Command, viewModel.ShowOpportunityCommand));
+                Assert.Contains(topLevelItems, item => ReferenceEquals(item.Command, viewModel.ShowWeeklyGoalCommand));
+                var reviewTools = Assert.Single(topLevelItems, item => Equals(item.Header, "复盘与工具"));
+                Assert.Equal(7, reviewTools.Items.Count);
+                var dailyReport = Assert.Single(reviewTools.Items.OfType<MenuItem>(),
+                    item => ReferenceEquals(item.Command, viewModel.ShowDailyTradingReportCommand));
+                reviewTools.IsSubmenuOpen = true;
+                reviewTools.UpdateLayout();
+                var submenu = (Popup)reviewTools.Template.FindName("PART_Popup", reviewTools);
+                Assert.True(submenu.IsOpen);
+                submenu.Child.UpdateLayout();
+                Assert.True(dailyReport.IsVisible);
+                Assert.NotNull(PresentationSource.FromVisual(dailyReport));
+                reviewTools.IsSubmenuOpen = false;
+                var displaySettings = Assert.Single(topLevelItems, item => Equals(item.Header, "显示与设置"));
+                Assert.Contains(displaySettings.Items.OfType<MenuItem>(),
+                    item => ReferenceEquals(item.Command, viewModel.ShowSettingsPageCommand));
                 var quickReviewItem = Assert.Single(window.ContextMenu.Items.OfType<MenuItem>(),
                     item => Equals(item.Header, "快速复盘"));
                 Assert.Same(viewModel.ShowQuickReviewCommand, quickReviewItem.Command);
@@ -135,6 +155,7 @@ public sealed class PetWindowTests
 
                 VerifyQuickReview(window);
                 VerifyEntryReason(window);
+                VerifyBehaviorAction(window);
                 window.DisposeTrayIcon();
                 Assert.False(quickCard.IsOpen);
                 viewModel.IsBubbleVisible = false;
@@ -177,12 +198,18 @@ public sealed class PetWindowTests
             try
             {
                 var menu = (System.Windows.Forms.ContextMenuStrip)typeof(PetWindow).GetField("_trayMenu", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(englishPet)!;
-                Assert.All(menu.Items.OfType<System.Windows.Forms.ToolStripMenuItem>(), item =>
+                var trayItems = menu.Items.OfType<System.Windows.Forms.ToolStripMenuItem>().ToArray();
+                Assert.Equal(9, trayItems.Length);
+                Assert.Equal(2, trayItems.Count(item => item.HasDropDownItems));
+                Assert.All(trayItems.Concat(trayItems.SelectMany(item => item.DropDownItems.OfType<System.Windows.Forms.ToolStripMenuItem>())), item =>
                     Assert.DoesNotContain(item.Text ?? string.Empty, c => c is >= '\u3400' and <= '\u9fff'));
                 var tray = (System.Windows.Forms.NotifyIcon)typeof(PetWindow).GetField("_trayIcon", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(englishPet)!;
                 Assert.DoesNotContain(tray.Text, c => c is >= '\u3400' and <= '\u9fff');
             }
             finally { englishPet.DisposeTrayIcon(); englishPet.Close(); }
+            var goalName = typeof(TradePet.App.Runtime.TradePetRuntime).GetMethod("PetGoalName", BindingFlags.Static | BindingFlags.NonPublic)!;
+            Assert.All(TradePet.Core.Review.BehaviorGoalMeasurement.SupportedRules(BehaviorPolicy.Balanced), rule =>
+                Assert.DoesNotContain((string)goalName.Invoke(null, [rule])!, c => c is >= '\u3400' and <= '\u9fff'));
             Assert.All(vm.ReviewWorkspace.PlaybookRuleDrafts, rule => Assert.DoesNotContain(rule.Name, c => c is >= '\u3400' and <= '\u9fff'));
             vm.ReviewWorkspace.PlaybookRules = "Entry|Check entry|Keep evidence|Critical";
             Assert.True(Assert.Single(vm.ReviewWorkspace.PlaybookRuleDrafts).IsCritical);
@@ -228,13 +255,18 @@ public sealed class PetWindowTests
                 new ReviewDataVersion("Broker|1", 1, 1, 1, "rule-1", "time-1", now));
             var quick = new QuickReviewCard(detail);
             Assert.DoesNotContain("亏损", quick.ExitReason);
+            Assert.Null(quick.ReportedExecution);
+            Assert.Empty(quick.Emotion);
             var original = new TradeReviewDocument(new("Broker|1", 1), ReviewCompletionStatus.Reviewed,
-                "入场原文", "保存设置", "", "我的改进原文", "下一步", "保存设置", "", "",
-                3, "source", "rule", "source", "rule", now, now, now, IsQuickReview: true);
+                "入场原文", "保存设置", "", "我的改进原文", "下一步", "保存设置", "担心错过", "",
+                3, "source", "rule", "source", "rule", now, now, now, IsQuickReview: true,
+                ReportedExecution: PlanExecutionSelfReport.Deviated, ReportedExecutionRecordedAtUtc: now);
             var reopened = new QuickReviewCard(detail with { Document = original });
             Assert.Equal(original.ExitReason, reopened.ExitReason);
             Assert.Equal(original.ToImprove, reopened.Improvement);
             Assert.Equal(original.Summary, reopened.AnalysisSummary);
+            Assert.Equal(original.ReportedExecution, reopened.ReportedExecution);
+            Assert.Equal(original.Emotion, reopened.Emotion);
             var quickSaved = false;
             reopened.SaveReviewAsync = card => { Assert.Equal(original.Summary, card.AnalysisSummary); quickSaved = true; return Task.FromResult<string?>(null); };
             ((Button)reopened.FindName("QuickSaveButton")).RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
@@ -483,6 +515,26 @@ public sealed class PetWindowTests
         Assert.Equal(existing.ExitReason, reopenedCard.ExitReason);
         Assert.Equal(existing.ToImprove, reopenedCard.Improvement);
         Assert.Equal(existing.Summary, reopenedCard.AnalysisSummary);
+        var presetCard = new QuickReviewCard(detail with
+        {
+            Document = existing with { ExitReason = "主动平仓，接受当前亏损" },
+        });
+        var reasonChoices = ((WrapPanel)presetCard.FindName("ReasonChoices")).Children.OfType<RadioButton>().ToArray();
+        var manualLoss = reasonChoices[3];
+        Assert.Same(manualLoss, Assert.Single(reasonChoices, choice => choice.IsChecked == true));
+        manualLoss.ApplyTemplate();
+        Assert.Equal("#FF1B6655", ((Border)manualLoss.Template.FindName("ChoiceBorder", manualLoss)).Background.ToString());
+        reasonChoices[2].RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        Assert.Same(reasonChoices[2], Assert.Single(reasonChoices, choice => choice.IsChecked == true));
+        Assert.Equal("主动平仓，兑现盈利", presetCard.ExitReason);
+        var reasonBox = (TextBox)presetCard.FindName("ExitReasonBox");
+        reasonBox.Text = "触及止损价离场（推测）";
+        Assert.Same(reasonChoices[1], Assert.Single(reasonChoices, choice => choice.IsChecked == true));
+        Assert.Equal("触及止损价离场（推测）", presetCard.ExitReason);
+        reasonBox.Text = TradePet.Core.Localization.UiText.Translate("接近保本时主动平仓", "en-US");
+        Assert.Same(reasonChoices[4], Assert.Single(reasonChoices, choice => choice.IsChecked == true));
+        reasonBox.Text = "我的自定义退出原因";
+        Assert.DoesNotContain(reasonChoices, choice => choice.IsChecked == true);
         try
         {
             var focus = System.Windows.Input.Keyboard.FocusedElement;
@@ -558,6 +610,68 @@ public sealed class PetWindowTests
         save.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
         Assert.Equal(2, attempts);
         next.Dismiss();
+        Assert.False(popup.IsOpen);
+    }
+
+    private static void VerifyBehaviorAction(PetWindow pet)
+    {
+        var card = new BehaviorActionCard("记录未交易机会", "TEST", "保存机会",
+            [new("symbol", "品种", [new("TEST", "TEST")]), new("reason", "原因", [new("风险限制", "风险限制")])]);
+        Assert.Null(card.Selection("symbol"));
+        Assert.Null(card.Selection("reason"));
+        pet.ShowBehaviorActionCard(card);
+        var popup = (Popup)pet.FindName("ReviewCardPopup");
+        Assert.True(popup.IsOpen);
+        Assert.Same(card, ((ContentControl)pet.FindName("ReviewCardHost")).Content);
+        var groups = (StackPanel)card.FindName("ChoiceGroups");
+        ((RadioButton)((WrapPanel)groups.Children[1]).Children[0]).IsChecked = true;
+        ((RadioButton)((WrapPanel)groups.Children[3]).Children[0]).IsChecked = true;
+        var attempts = 0;
+        card.SaveActionAsync = response =>
+        {
+            Assert.Equal("TEST", response.Selection("symbol"));
+            Assert.Equal("风险限制", response.Selection("reason"));
+            return Task.FromResult(++attempts == 1 ? "失败，请重试" : (string?)null);
+        };
+        var save = (Button)card.FindName("SaveButton");
+        save.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        Assert.False(card.IsCompleted);
+        Assert.True(popup.IsOpen);
+        Assert.Equal("风险限制", card.Selection("reason"));
+        save.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        Assert.True(card.IsCompleted);
+        Assert.False(popup.IsOpen);
+        Assert.Equal(2, attempts);
+
+        var rules = TradePet.Core.Review.BehaviorGoalMeasurement.SupportedRules(BehaviorPolicy.Balanced);
+        var goalName = typeof(TradePet.App.Runtime.TradePetRuntime).GetMethod("PetGoalName", BindingFlags.Static | BindingFlags.NonPublic)!;
+        var summary = string.Join(Environment.NewLine, Enumerable.Repeat("交易小结与目标进度：用于检查展开后仍能查看完整记录。", 14));
+        var goalCard = new BehaviorActionCard("交易小结与改进", summary, "设为7日目标",
+            [new("rule", "只选一个改进重点", rules.Select(rule => new PetActionChoice(rule.ToString(), (string)goalName.Invoke(null, [rule])!)).ToArray())],
+            compactSummary: true);
+        pet.ShowBehaviorActionCard(goalCard);
+        goalCard.UpdateLayout();
+        var goalChoices = ((WrapPanel)((StackPanel)goalCard.FindName("ChoiceGroups")).Children[1]).Children.OfType<RadioButton>().ToArray();
+        Assert.Equal(7, goalChoices.Length);
+        var details = (Expander)goalCard.FindName("SummaryDetails");
+        Assert.Equal(Visibility.Visible, details.Visibility);
+        Assert.False(details.IsExpanded);
+        Assert.Equal(summary, ((TextBlock)goalCard.FindName("SummaryDetailsText")).Text);
+        var scroll = (ScrollViewer)goalCard.FindName("FormScroll");
+        var lastChoiceBounds = goalChoices[^1].TransformToAncestor(scroll)
+            .TransformBounds(new Rect(0, 0, goalChoices[^1].ActualWidth, goalChoices[^1].ActualHeight));
+        Assert.True(lastChoiceBounds.Bottom <= scroll.ViewportHeight, "All goal options should be visible before expanding the summary.");
+        goalChoices[0].IsChecked = true;
+        goalChoices[^1].IsChecked = true;
+        Assert.Same(goalChoices[^1], Assert.Single(goalChoices, choice => choice.IsChecked == true));
+        Assert.Equal(BehaviorRuleKind.PriceFixationScore.ToString(), goalCard.Selection("rule"));
+        goalCard.SaveActionAsync = response =>
+        {
+            Assert.Equal(BehaviorRuleKind.PriceFixationScore.ToString(), response.Selection("rule"));
+            return Task.FromResult((string?)null);
+        };
+        ((Button)goalCard.FindName("SaveButton")).RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        Assert.True(goalCard.IsCompleted);
         Assert.False(popup.IsOpen);
     }
 

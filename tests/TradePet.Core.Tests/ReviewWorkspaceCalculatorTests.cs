@@ -518,6 +518,69 @@ public sealed class ReviewWorkspaceCalculatorTests
     }
 
     [Fact]
+    public void SavedQuickReview_RemainsCompletedAfterDataChangesAcrossAllReviewCounts()
+    {
+        var date = new DateOnly(2026, 9, 1);
+        var trades = Enumerable.Range(1, 4).Select(id => Trade(id, "TEST", id)).ToArray();
+        var quick = Document(1, ReviewCompletionStatus.Reviewed, "快速复盘已保存") with { IsQuickReview = true };
+        var documents = _calculator.ProjectReviewStatuses(trades, [],
+            new Dictionary<long, TradeReviewDocument>
+            {
+                [1] = quick,
+                [2] = Document(2, ReviewCompletionStatus.Reviewed, "完整复盘旧结论"),
+                [3] = Document(3, ReviewCompletionStatus.Draft, "未完成草稿"),
+            }, [], new Dictionary<long, TradeExcursion>(),
+            new ReviewDataVersion("Broker|1", 2, 2, 1, "changed-rule", "time", Start));
+        Assert.Equal(ReviewCompletionStatus.NeedsReview, documents[1].Status);
+        Assert.True(documents[1].HasCompletedReview);
+        Assert.False(documents[2].HasCompletedReview);
+        Assert.False(documents[3].HasCompletedReview);
+        Assert.False((documents[1] with { ReviewedAtUtc = null }).HasCompletedReview);
+
+        var facts = _calculator.BuildDailyFacts("Broker|1", date, date, trades, [], documents, [],
+            new Dictionary<DateOnly, DailyState>(), 0)[date];
+        var calendar = _calculator.BuildCalendar("Broker|1", date, date,
+            [.. trades, Trade(9, "FOREIGN", 999m) with { AccountKey = "Other|9" }], [], documents,
+            new Dictionary<DateOnly, DailyJournal>(), [], 0).Single();
+        var quality = _calculator.CalculateDataQuality(trades, new Dictionary<long, TradeExcursion>(), documents,
+            new Dictionary<long, TradeReviewMetadata>(), []);
+        var period = _calculator.BuildPeriodFacts(trades, documents, [], [], quality);
+        Assert.Equal(1, facts.ReviewedTradeCount);
+        Assert.Equal(25m, facts.ReviewCompletionPercentage);
+        Assert.Equal(4, calendar.CompleteTradeCount);
+        Assert.Equal(3, calendar.PendingReviewCount);
+        Assert.Equal(1, quality.ReviewedCount);
+        Assert.Equal(1, period.ReviewedTradeCount);
+        Assert.Equal([1L], _calculator.FilterAndSort(Filter() with { Status = ReviewCompletionStatus.Reviewed }, trades,
+            new Dictionary<long, TradeReviewMetadata>(), documents, [], [], []).Select(item => item.PositionId).ToArray());
+    }
+
+    [Fact]
+    public void DailyTimeline_UsesObservedProtectionAndVolumeChangesWithoutInventingModificationTimes()
+    {
+        var date = new DateOnly(2026, 9, 1);
+        var trade = Trade(1, "TEST", 2m, Start.AddMinutes(10));
+        var key = new TradeKey(trade.AccountKey, trade.PositionId);
+        var first = new PositionPnlSample(key, Start.AddMinutes(1), 0m, 0m, 0m, 1m, 90m, 110m, 1000, "position-pnl-v1");
+        var changed = first with { CapturedAtUtc = Start.AddMinutes(2), StopLoss = 95m, TakeProfit = null, Volume = 0.5m };
+        var samples = new Dictionary<long, IReadOnlyList<PositionPnlSample>>
+        {
+            [1] = [first, first with { TradeKey = new("Other|2", 1), CapturedAtUtc = Start.AddSeconds(90), StopLoss = 80m },
+                changed, changed with { CapturedAtUtc = Start.AddMinutes(3), FloatingPnl = 10m }],
+        };
+        var facts = _calculator.BuildDailyFacts(trade.AccountKey, date, date, [trade], [],
+            new Dictionary<long, TradeReviewDocument>(), [], new Dictionary<DateOnly, DailyState>(), 0, samples)[date];
+        var change = Assert.Single(facts.Timeline, item => item.Kind == "持仓变化（采样发现）");
+        Assert.Equal(changed.CapturedAtUtc, change.AtUtc);
+        Assert.Equal(ReviewEvidenceSource.LiveObservation, change.Source);
+        Assert.Contains("止损 90 → 95", change.Summary);
+        Assert.Contains("止盈 110 → 未设置", change.Summary);
+        Assert.Contains("手数 1 → 0.5", change.Summary);
+        Assert.Contains("具体修改时刻未记录", change.Summary);
+        Assert.DoesNotContain("80", change.Summary);
+    }
+
+    [Fact]
     public void RealizedCurve_LabelsProfitPeakGivebackWithoutPretendingItIsEquityDrawdown()
     {
         var trades = new[]

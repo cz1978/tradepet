@@ -150,6 +150,13 @@ public sealed record ReviewEvidenceStamp(
     ReviewTimeBasis TimeBasis,
     string SourceVersion);
 
+public enum PlanExecutionSelfReport
+{
+    Followed,
+    Deviated,
+    Unsure,
+}
+
 public sealed record TradeReviewDocument(
     TradeKey TradeKey,
     ReviewCompletionStatus Status,
@@ -169,8 +176,14 @@ public sealed record TradeReviewDocument(
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset UpdatedAtUtc,
     DateTimeOffset? ReviewedAtUtc = null,
-    bool IsQuickReview = false)
+    bool IsQuickReview = false,
+    PlanExecutionSelfReport? ReportedExecution = null,
+    DateTimeOffset? ReportedExecutionRecordedAtUtc = null)
 {
+    [JsonIgnore]
+    public bool HasCompletedReview => Status == ReviewCompletionStatus.Reviewed ||
+        Status == ReviewCompletionStatus.NeedsReview && IsQuickReview && ReviewedAtUtc.HasValue;
+
     [JsonIgnore]
     public bool HasRequiredReviewContent =>
         !string.IsNullOrWhiteSpace(Summary) && !string.IsNullOrWhiteSpace(NextAction);

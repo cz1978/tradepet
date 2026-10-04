@@ -77,15 +77,28 @@ public sealed class AppDatabaseTests : IAsyncLifetime
             await _database.UpsertTradeAsync(new TradeRecord(account, 77, "TEST", TradeSide.Buy,
                 at, null, date, null, 100, null, 1, 1, 0, 0, false));
             var key = new TradeKey(account, 77);
+            var before = await _database.LoadReviewDataVersionAsync(account);
             await _database.SaveSettingAsync(TradeEntryReasonNote.Scope(account), TradeEntryReasonNote.SettingKey(77),
-                new TradeEntryReasonNote(key, account == "Broker|1" ? "回踩入场" : "突破入场", at));
+                new TradeEntryReasonNote(key, account == "Broker|1" ? "回踩入场" : "突破入场", at,
+                    account == "Broker|1" ? PlanExecutionSelfReport.Deviated : null,
+                    account == "Broker|1" ? "急躁" : ""));
+            Assert.True((await _database.LoadReviewDataVersionAsync(account)).MetadataVersion > before.MetadataVersion);
         }
         var reopened = new AppDatabase(Path.Combine(_testDirectory, "test.db"));
         var detail = await reopened.LoadTradeDetailAsync(new TradeKey("Broker|1", 77));
         Assert.Equal("回踩入场", detail!.EntryReasonNote!.Reason);
+        Assert.Equal(PlanExecutionSelfReport.Deviated, detail.EntryReasonNote.ReportedExecution);
+        Assert.Equal("急躁", detail.EntryReasonNote.Emotion);
         Assert.Null(detail.Document);
         var other = await reopened.LoadTradeDetailsAsync([new TradeKey("Broker|2", 77)]);
         Assert.Equal("突破入场", Assert.Single(other).EntryReasonNote!.Reason);
+        Assert.Null(Assert.Single(other).EntryReasonNote!.ReportedExecution);
+        var workspace = await reopened.LoadWorkspaceAsync("Broker|1", date, date);
+        var entry = Assert.Single(workspace.EntryReasonNotes!);
+        Assert.Equal(77, entry.Key);
+        Assert.Equal(PlanExecutionSelfReport.Deviated, entry.Value.ReportedExecution);
+        Assert.Equal("急躁", entry.Value.Emotion);
+        Assert.Empty((await reopened.LoadWorkspaceAsync("Broker|3", date, date)).EntryReasonNotes!);
         Assert.Empty(await reopened.LoadSavedTradeReviewsAsync("Broker|1"));
     }
 
@@ -1587,6 +1600,8 @@ public sealed class AppDatabaseTests : IAsyncLifetime
         Assert.Equal(ImprovementGoalStatus.Active, active.Status);
         Assert.Equal(3, active.BaselineOpportunityCount);
         Assert.Equal(first.Id, active.PreviousVersionId);
+        Assert.Equal(active, Assert.Single(await reopened.LoadActiveImprovementGoalsAsync(accountKey)));
+        Assert.Empty(await reopened.LoadActiveImprovementGoalsAsync("Other|999"));
     }
 
     [Fact]

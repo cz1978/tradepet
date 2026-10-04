@@ -50,7 +50,9 @@ public sealed class ReviewWorkspaceCalculator
             .Where(trade => filter.Symbol is null || string.Equals(filter.Symbol.Trim(), trade.Symbol, StringComparison.OrdinalIgnoreCase))
             .Where(trade => filter.Side is null || trade.Side == filter.Side)
             .Where(trade => MatchesMetadata(trade, filter, tags, metadata))
-            .Where(trade => filter.Status is null || GetStatus(trade, documents) == filter.Status)
+            .Where(trade => filter.Status is null || (filter.Status == ReviewCompletionStatus.Reviewed
+                ? documents.GetValueOrDefault(trade.PositionId)?.HasCompletedReview == true
+                : GetStatus(trade, documents) == filter.Status))
             .Where(trade => assessmentTrades is null || assessmentTrades.Contains(new TradeKey(trade.AccountKey, trade.PositionId)))
             .Where(trade => campaignMembers is null || campaignMembers.Contains(trade.PositionId))
             .Where(trade => MatchesSearch(trade, filter.Search, metadata, documents, dealTickets))
@@ -68,7 +70,7 @@ public sealed class ReviewWorkspaceCalculator
             ReviewSortOrder.BehaviorFirst => selected.OrderByDescending(item =>
                     behaviorTrades.Contains(new TradeKey(item.AccountKey, item.PositionId)))
                 .ThenByDescending(item => item.ClosedAtUtc).ToArray(),
-            ReviewSortOrder.OldestPending => selected.OrderBy(item => GetStatus(item, documents) == ReviewCompletionStatus.Reviewed)
+            ReviewSortOrder.OldestPending => selected.OrderBy(item => documents.GetValueOrDefault(item.PositionId)?.HasCompletedReview == true)
                 .ThenBy(item => item.ClosedAtUtc).ToArray(),
             _ => selected.OrderByDescending(item => item.ClosedAtUtc).ToArray(),
         };
@@ -89,9 +91,10 @@ public sealed class ReviewWorkspaceCalculator
         var cashByDate = deals
             .GroupBy(item => DateOnly.FromDateTime(item.OccurredAtUtc.ToOffset(offset).DateTime))
             .ToDictionary(group => group.Key, group => group.Sum(item => item.NetPnl));
-        var openingByDate = trades.GroupBy(item => item.OpenServerDate)
+        var scopedTrades = trades.Where(item => item.AccountKey == accountKey).ToArray();
+        var openingByDate = scopedTrades.GroupBy(item => item.OpenServerDate)
             .ToDictionary(group => group.Key, group => group.Count());
-        var completeByDate = trades.Where(item => item.IsComplete && item.CloseServerDate is not null)
+        var completeByDate = scopedTrades.Where(item => item.IsComplete && item.CloseServerDate is not null)
             .GroupBy(item => item.CloseServerDate!.Value)
             .ToDictionary(group => group.Key, group => group.ToArray());
         var gaps = dataGapDates?.ToHashSet() ?? [];
@@ -104,7 +107,7 @@ public sealed class ReviewWorkspaceCalculator
                 cashByDate.GetValueOrDefault(date),
                 openingByDate.GetValueOrDefault(date),
                 completed.Length,
-                completed.Count(item => GetStatus(item, documents) is not ReviewCompletionStatus.Reviewed),
+                completed.Count(item => !documents.TryGetValue(item.PositionId, out var document) || !document.HasCompletedReview),
                 journals.ContainsKey(date),
                 gaps.Contains(date)));
             if (date == to)
@@ -124,7 +127,8 @@ public sealed class ReviewWorkspaceCalculator
         IReadOnlyDictionary<long, TradeReviewDocument> documents,
         IReadOnlyCollection<BehaviorOccurrence> behaviors,
         IReadOnlyDictionary<DateOnly, DailyState> dailyStates,
-        int serverUtcOffsetSeconds)
+        int serverUtcOffsetSeconds,
+        IReadOnlyDictionary<long, IReadOnlyList<PositionPnlSample>>? positionSamples = null)
     {
         var offset = TimeSpan.FromSeconds(serverUtcOffsetSeconds);
         var scopedTrades = trades.Where(item => item.AccountKey == accountKey).ToArray();
@@ -185,13 +189,13 @@ public sealed class ReviewWorkspaceCalculator
                 : dailyDeals.Where(item => item.OccurredAtUtc > targetAt.Value).ToArray();
             var reviewedCount = completed.Count(item =>
                 documents.TryGetValue(item.PositionId, out var document) &&
-                document.Status == ReviewCompletionStatus.Reviewed);
+                document.HasCompletedReview);
             var openingsAfterLoss = CountOpeningsAfterLossStreak(
                 completed, opened, state?.ConsecutiveLossThresholdAtObservation ?? 0);
             var cooldown = dailyBehaviors.Where(item => item.Rule == BehaviorRuleKind.CooldownViolation &&
                 item.Level is BehaviorRiskLevel.Attention or BehaviorRiskLevel.Critical).ToArray();
             var timeline = BuildDailyTimeline(
-                date, offset, accountKey, activeDuringDay, opened, completed, dailyDeals, dailyBehaviors);
+                date, offset, accountKey, activeDuringDay, opened, completed, dailyDeals, dailyBehaviors, positionSamples);
 
             result[date] = new DailyReviewFacts(
                 date,
@@ -723,7 +727,8 @@ public sealed class ReviewWorkspaceCalculator
         IReadOnlyCollection<TradeRecord> opened,
         IReadOnlyCollection<TradeRecord> completed,
         IReadOnlyCollection<DealRecord> deals,
-        IReadOnlyCollection<BehaviorOccurrence> behaviors)
+        IReadOnlyCollection<BehaviorOccurrence> behaviors,
+        IReadOnlyDictionary<long, IReadOnlyList<PositionPnlSample>>? positionSamples)
     {
         var dayStart = new DateTimeOffset(date.ToDateTime(TimeOnly.MinValue), offset).ToUniversalTime();
         var events = new List<DailyProcessEvent>();
@@ -731,7 +736,7 @@ public sealed class ReviewWorkspaceCalculator
             .Where(item => item.OpenServerDate < date &&
                 (!item.IsComplete || item.CloseServerDate is null || item.CloseServerDate >= date))
             .Select(item => new DailyProcessEvent(dayStart, "前日持有",
-                $"#{item.PositionId} {item.Symbol} {item.Side} · 剩余 {item.RemainingVolume:0.#####}",
+                $"#{item.PositionId} {item.Symbol} {item.Side} · 此前开仓，日初持仓手数未重建。",
                 ReviewEvidenceSource.Mt5Deal, [new TradeKey(item.AccountKey, item.PositionId)])));
         events.AddRange(opened.Select(item => new DailyProcessEvent(item.OpenedAtUtc, "首次开仓",
             $"#{item.PositionId} {item.Symbol} {item.Side} · {item.OpeningVolume:0.#####} @ {item.EntryPrice:0.#####}",
@@ -744,7 +749,31 @@ public sealed class ReviewWorkspaceCalculator
             ReviewEvidenceSource.Mt5Deal, [new TradeKey(item.AccountKey, item.PositionId)])));
         events.AddRange(behaviors.Select(item => new DailyProcessEvent(item.EventAtUtc, $"规则：{item.Rule}",
             item.Summary, item.Source, item.TradeLinks.Select(link => link.TradeKey).Distinct().ToArray())));
+        foreach (var trade in allTrades)
+        {
+            var key = new TradeKey(accountKey, trade.PositionId);
+            var samples = positionSamples?.GetValueOrDefault(trade.PositionId)?
+                .Where(item => item.TradeKey == key && item.AlgorithmVersion == "position-pnl-v1" &&
+                    item.CapturedAtUtc >= trade.OpenedAtUtc && (trade.ClosedAtUtc is null || item.CapturedAtUtc <= trade.ClosedAtUtc))
+                .OrderBy(item => item.CapturedAtUtc).ToArray() ?? [];
+            for (var index = 1; index < samples.Length; index++)
+            {
+                var before = samples[index - 1];
+                var after = samples[index];
+                if (DateOnly.FromDateTime(after.CapturedAtUtc.ToOffset(offset).DateTime) != date) continue;
+                var changes = new List<string>();
+                if (before.StopLoss != after.StopLoss) changes.Add($"止损 {Price(before.StopLoss)} → {Price(after.StopLoss)}");
+                if (before.TakeProfit != after.TakeProfit) changes.Add($"止盈 {Price(before.TakeProfit)} → {Price(after.TakeProfit)}");
+                if (before.Volume != after.Volume) changes.Add($"手数 {before.Volume:0.#####} → {after.Volume:0.#####}");
+                if (changes.Count == 0) continue;
+                events.Add(new DailyProcessEvent(after.CapturedAtUtc, "持仓变化（采样发现）",
+                    $"#{trade.PositionId} {trade.Symbol} · {string.Join("；", changes.Select(TradePet.Core.Localization.UiText.Translate))} · 变化发生在两次采样之间，具体修改时刻未记录。",
+                    ReviewEvidenceSource.LiveObservation, [key]));
+            }
+        }
         return events.OrderBy(item => item.AtUtc).ThenBy(item => item.Kind, StringComparer.Ordinal).ToArray();
+
+        static string Price(decimal? value) => value is null or 0m ? "未设置" : value.Value.ToString("0.#####", CultureInfo.InvariantCulture);
     }
 
     public ReviewDataQuality CalculateDataQuality(
@@ -767,7 +796,7 @@ public sealed class ReviewWorkspaceCalculator
         var missingPlans = complete.Where(item =>
             !metadata.TryGetValue(item.PositionId, out var value) || value.PlanId is null).ToArray();
         var missingReviews = complete.Where(item =>
-            !documents.TryGetValue(item.PositionId, out var value) || value.Status != ReviewCompletionStatus.Reviewed).ToArray();
+            !documents.TryGetValue(item.PositionId, out var value) || !value.HasCompletedReview).ToArray();
         var marketCovered = complete.Where(item => marketRanges.Any(range =>
             range.AccountKey == item.AccountKey &&
             string.Equals(range.Symbol, item.Symbol, StringComparison.OrdinalIgnoreCase) &&
@@ -871,7 +900,9 @@ public sealed class ReviewWorkspaceCalculator
         IReadOnlyDictionary<TradeKey, TradeRecord> trades,
         BehaviorRuleKind? rule = null)
     {
-        var selected = occurrences.Where(item => rule is null || item.Rule == rule).ToArray();
+        var selected = occurrences.Where(item => (rule is null || item.Rule == rule) &&
+            !item.EvidenceInsufficient && string.IsNullOrWhiteSpace(item.MissingData) &&
+            item.Level is BehaviorRiskLevel.Attention or BehaviorRiskLevel.Critical).ToArray();
         var keys = selected.SelectMany(item => item.TradeLinks)
             .Where(link => link.Role == BehaviorTradeRole.Trigger)
             .Select(link => link.TradeKey)
@@ -935,7 +966,9 @@ public sealed class ReviewWorkspaceCalculator
         IReadOnlyDictionary<TradeKey, TradeRecord> trades,
         BehaviorRuleKind? rule = null)
     {
-        var selected = occurrences.Where(item => rule is null || item.Rule == rule).ToArray();
+        var selected = occurrences.Where(item => (rule is null || item.Rule == rule) &&
+            !item.EvidenceInsufficient && string.IsNullOrWhiteSpace(item.MissingData) &&
+            item.Level is BehaviorRiskLevel.Attention or BehaviorRiskLevel.Critical).ToArray();
         var hitKeys = selected.SelectMany(item => item.TradeLinks)
             .Where(link => link.Role == BehaviorTradeRole.Trigger)
             .Select(link => link.TradeKey)
@@ -963,7 +996,8 @@ public sealed class ReviewWorkspaceCalculator
         var keySet = keys.ToHashSet();
         var selectedAssessments = assessments.Where(item => keySet.Contains(item.TradeKey)).ToArray();
         var ruleSummary = SummarizeRules(selectedAssessments);
-        var selectedOccurrences = occurrences.Where(item =>
+        var selectedOccurrences = occurrences.Where(item => !item.EvidenceInsufficient && string.IsNullOrWhiteSpace(item.MissingData) &&
+            item.Level is BehaviorRiskLevel.Attention or BehaviorRiskLevel.Critical &&
             item.TradeLinks.Any(link => link.Role == BehaviorTradeRole.Trigger && keySet.Contains(link.TradeKey))).ToArray();
         var repeated = selectedOccurrences.GroupBy(item => item.Rule)
             .OrderByDescending(group => group.Count()).ThenBy(group => group.Key)
@@ -978,7 +1012,7 @@ public sealed class ReviewWorkspaceCalculator
         return new PeriodReviewFacts(
             trades.Count,
             trades.Count(item => documents.TryGetValue(item.PositionId, out var document) &&
-                                 document.Status == ReviewCompletionStatus.Reviewed),
+                                 document.HasCompletedReview),
             ruleSummary.Passed,
             ruleSummary.Failed,
             ruleSummary.Unknown,
@@ -1002,7 +1036,7 @@ public sealed class ReviewWorkspaceCalculator
             var activeFrom = goal.StartServerDate > from ? goal.StartServerDate : from;
             var activeTo = goal.EndServerDate is { } end && end < to ? end : to;
             var applicableDays = activeTo < activeFrom ? 0 : activeTo.DayNumber - activeFrom.DayNumber + 1;
-            var selected = observations.Where(item => item.GoalId == goal.Id &&
+            var selected = observations.Where(item => item.GoalId == goal.Id && item.AccountKey == goal.AccountKey &&
                 item.ServerDate >= activeFrom && item.ServerDate <= activeTo).ToArray();
             var observedDays = selected.Select(item => item.ServerDate).Distinct().Count();
             var pass = selected.Sum(item => item.PassCount);

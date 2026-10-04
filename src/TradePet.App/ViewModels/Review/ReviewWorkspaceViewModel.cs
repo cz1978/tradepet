@@ -597,13 +597,7 @@ public sealed partial class ReviewWorkspaceViewModel : ObservableObject
         foreach (var trade in snapshot.Trades)
         {
             snapshot.Documents.TryGetValue(trade.PositionId, out var document);
-            var status = document?.Status switch
-            {
-                ReviewCompletionStatus.Draft => "已保存复盘",
-                ReviewCompletionStatus.Reviewed => "已复盘",
-                ReviewCompletionStatus.NeedsReview => "需重审",
-                _ => "待复盘",
-            };
+            var status = FormatTradeReviewStatus(document);
             data.Metadata.TryGetValue(trade.PositionId, out var metadata);
             var row = new WorkspaceTradeRow(trade.PositionId, BrokerTime(trade.ClosedAtUtc)?.ToString("MM-dd HH:mm") ?? "持仓中",
                 trade.Symbol, trade.Side == TradeSide.Buy ? "买" : "卖", Signed(trade.NetPnl), status,
@@ -695,10 +689,10 @@ public sealed partial class ReviewWorkspaceViewModel : ObservableObject
                     $"实时 {behaviorEvidence.LiveOccurrenceCount} 次 · 历史重算 {behaviorEvidence.RecalculatedOccurrenceCount} 次",
                     new RelayCommand(() => ApplyAnalysisDrilldown(
                         "行为规则命中样本", behaviorEvidence.HitSample.Trades, data))),
-                new BehaviorSampleRow("同筛选未命中", behaviorEvidence.UnhitSample.TradeCount,
-                    Signed(behaviorEvidence.UnhitSample.NetPnl), "同一筛选集合，仅作相关样本对照",
+                new BehaviorSampleRow("同筛选未记录命中", behaviorEvidence.UnhitSample.TradeCount,
+                    Signed(behaviorEvidence.UnhitSample.NetPnl), "同一筛选集合，仅作相关样本对照；未记录提醒不代表行为没有发生。",
                     new RelayCommand(() => ApplyAnalysisDrilldown(
-                        "行为规则未命中样本", behaviorEvidence.UnhitSample.Trades, data))),
+                        "未记录行为命中样本", behaviorEvidence.UnhitSample.Trades, data))),
             ]);
         Playbooks.ReplaceWith(data.Playbooks.OrderByDescending(item => item.Version).Select(item =>
             new PlaybookRow(item.Name, $"v{item.Version}", item.Rules.Count, item.IsActive ? "启用" : "历史", item.EffectiveFromUtc.ToString("yyyy-MM-dd"), new RelayCommand(() => LoadPlaybookDraft(item)))));
@@ -708,9 +702,9 @@ public sealed partial class ReviewWorkspaceViewModel : ObservableObject
         Goals.ReplaceWith(data.Goals.Select(item =>
         {
             goalProgress.TryGetValue(item.Id, out var progress);
-            var observationSummary = progress is null || progress.OpportunityCount == 0
-                ? $"当前范围无触发机会 · 无机会日 {progress?.NoOpportunityDayCount ?? 0} 天 · 无法计算执行率"
-                : $"机会 {progress.OpportunityCount} · 通过 {progress.PassCount} · 失败 {progress.FailCount} · 执行率 {progress.AdherencePercentage:0.##}% · 无机会日 {progress.NoOpportunityDayCount} 天";
+            var adherence = progress?.AdherencePercentage is { } percentage ? $"{percentage:0.##}%" : "—";
+            var observationSummary = progress is null ? "当前范围没有目标观察记录" :
+                $"机会 {progress.OpportunityCount} · 通过 {progress.PassCount} · 失败 {progress.FailCount} · 执行率 {adherence} · 未知 {progress.UnknownObservationCount} · 不适用 {progress.NotApplicableObservationCount} · 未记录观察 {progress.NoOpportunityDayCount} 天";
             var baseline = item.BaselineOpportunityCount == 0
                 ? "基线：缺少合格机会样本"
                 : $"基线 {item.BaselineFromServerDate:yyyy-MM-dd}—{item.BaselineToServerDate:yyyy-MM-dd} · {item.BaselinePassCount}/{item.BaselinePassCount + item.BaselineFailCount} · {item.BaselineValue:0.##}%";
@@ -960,13 +954,7 @@ public sealed partial class ReviewWorkspaceViewModel : ObservableObject
             Emotion = pendingDraft?.Emotion ?? document?.Emotion ?? string.Empty;
             MarketCondition = pendingDraft?.MarketCondition ?? document?.MarketCondition ?? string.Empty;
             DocumentRevision = pendingDraft?.ExpectedRevision ?? document?.Revision ?? 0;
-            DocumentStatus = document?.Status switch
-            {
-                ReviewCompletionStatus.Draft => "已保存复盘",
-                ReviewCompletionStatus.Reviewed => "已复盘",
-                ReviewCompletionStatus.NeedsReview => "需重审",
-                _ => "待复盘",
-            };
+            DocumentStatus = FormatTradeReviewStatus(document);
             Attachments.ReplaceWith(detail.Attachments.Select(CreateAttachmentRow));
             TradeDeals.ReplaceWith(detail.Deals.OrderBy(item => item.OccurredAtUtc).Select(item => new TradeDealRow(
                 BrokerTime(item.OccurredAtUtc).ToString("MM-dd HH:mm:ss"), item.Ticket.ToString(CultureInfo.InvariantCulture),
@@ -1091,13 +1079,7 @@ public sealed partial class ReviewWorkspaceViewModel : ObservableObject
         CancelPendingReviewAutoSave();
         HasUnsavedReviewChanges = false;
         DocumentRevision = receipt.Value.Revision;
-        DocumentStatus = receipt.Value.Status switch
-        {
-            ReviewCompletionStatus.Draft => "已保存复盘",
-            ReviewCompletionStatus.Reviewed => "已复盘",
-            ReviewCompletionStatus.NeedsReview => "需重审",
-            _ => "待复盘",
-        };
+        DocumentStatus = FormatTradeReviewStatus(receipt.Value);
         if (_tradeEditorKey is { } key)
         {
             _tradeDrafts.Remove(key);
@@ -1562,12 +1544,7 @@ public sealed partial class ReviewWorkspaceViewModel : ObservableObject
                 $"{trade.Symbol} · {(trade.Side == TradeSide.Buy ? "买入" : "卖出")} · {Signed(trade.NetPnl)} · #{trade.PositionId}",
                 $"保存于 {BrokerTime(document.UpdatedAtUtc):yyyy-MM-dd HH:mm} 服务器",
                 $"平仓 {BrokerTime(trade.ClosedAtUtc):yyyy-MM-dd HH:mm} 服务器",
-                document.Status switch
-                {
-                    ReviewCompletionStatus.Reviewed => "已复盘",
-                    ReviewCompletionStatus.NeedsReview => "数据更新，需重审",
-                    _ => "已保存复盘",
-                },
+                FormatTradeReviewStatus(document),
                 document.Summary, document.ExitReason, document.ToImprove, document.NextAction,
                 new AsyncRelayCommand(async () =>
                 {
@@ -1636,8 +1613,8 @@ public sealed partial class ReviewWorkspaceViewModel : ObservableObject
         DailyFacts.Add(new DailyFactRow("当日完整交易净盈亏", Signed(facts.CompleteTradeNetPnl),
             $"按最终平仓服务器日汇总，共 {facts.CompleteTradeCount} 笔。"));
         DailyFacts.Add(new DailyFactRow("费用总额", Signed(facts.Fees), "佣金、隔夜费和其他费用，按成交发生日汇总。"));
-        DailyFacts.Add(new DailyFactRow("复盘完成率", $"{facts.ReviewCompletionPercentage:0.##}%",
-            $"{facts.ReviewedTradeCount} / {facts.CompleteTradeCount} 笔完整交易。"));
+        DailyFacts.Add(new DailyFactRow("复盘完成率", facts.CompleteTradeCount == 0 ? "—" : $"{facts.ReviewCompletionPercentage:0.#}%",
+            $"{facts.ServerDate:yyyy-MM-dd} 服务器日 · 已复盘 {facts.ReviewedTradeCount} / {facts.CompleteTradeCount} 笔，待复盘 {facts.CompleteTradeCount - facts.ReviewedTradeCount} 笔；快速复盘保存即完成。"));
         DailyFacts.Add(new DailyFactRow("连续亏损后的开仓",
             facts.OpeningsAfterLossStreakCount?.ToString(CultureInfo.InvariantCulture) ?? "无法判断",
             facts.OpeningsAfterLossStreakCount is null
@@ -2499,14 +2476,23 @@ public sealed partial class ReviewWorkspaceViewModel : ObservableObject
         _ => "草稿",
     };
 
+    private static string FormatTradeReviewStatus(TradeReviewDocument? document) => document?.Status switch
+    {
+        ReviewCompletionStatus.Reviewed => "已复盘",
+        ReviewCompletionStatus.NeedsReview when document.HasCompletedReview => "已复盘 · 数据更新",
+        ReviewCompletionStatus.NeedsReview => "需重审",
+        ReviewCompletionStatus.Draft => "草稿已保存",
+        _ => "待复盘",
+    };
+
     private static string FormatDailyJournalStatus(DailyJournal? journal, string? currentSourceVersion) => journal?.Status switch
     {
         ReviewCompletionStatus.Reviewed when
-            (journal.ReviewedSourceVersion ?? journal.SourceVersion) != currentSourceVersion => "需重审",
-        ReviewCompletionStatus.Reviewed => "已完成",
-        ReviewCompletionStatus.NeedsReview => "需重审",
-        ReviewCompletionStatus.Draft => "草稿",
-        _ => "待记录",
+            (journal.ReviewedSourceVersion ?? journal.SourceVersion) != currentSourceVersion => "日记需重审",
+        ReviewCompletionStatus.Reviewed => "日记已完成",
+        ReviewCompletionStatus.NeedsReview => "日记需重审",
+        ReviewCompletionStatus.Draft => "日记草稿",
+        _ => "日记待记录",
     };
 
     private static string JoinTradeIds(IEnumerable<TradeKey> keys)

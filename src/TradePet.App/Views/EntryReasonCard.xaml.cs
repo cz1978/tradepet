@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using RadioButton = System.Windows.Controls.RadioButton;
 using TradePet.Core.Domain;
 
 namespace TradePet.App.Views;
@@ -9,6 +10,11 @@ public partial class EntryReasonCard : System.Windows.Controls.UserControl
     private bool _saving;
     public bool IsCompleted { get; private set; }
     public string Reason => ReasonBox.Text.Trim();
+    public PlanExecutionSelfReport? ReportedExecution => Enum.TryParse<PlanExecutionSelfReport>(
+        ExecutionChoices.Children.OfType<RadioButton>().FirstOrDefault(item => item.IsChecked == true)?.Tag as string,
+        out var value) ? value : null;
+    public string Emotion => EmotionChoices.Children.OfType<RadioButton>()
+        .FirstOrDefault(item => item.IsChecked == true)?.Tag as string ?? string.Empty;
     public Func<EntryReasonCard, Task<string?>>? SaveReasonAsync { get; set; }
     public event Action<EntryReasonCard>? Completed;
 
@@ -30,12 +36,13 @@ public partial class EntryReasonCard : System.Windows.Controls.UserControl
         if (_saving || IsCompleted) return;
         if (Reason.Length == 0) { StatusText.Text = TradePet.Core.Localization.UiText.Translate("请选择原因，或点击跳过。"); return; }
         _saving = true;
+        EntryForm.IsEnabled = false;
         FooterButtons.IsEnabled = false;
         StatusText.Text = TradePet.Core.Localization.UiText.Translate("正在记录…");
         string? error;
         try { error = SaveReasonAsync is null ? "本地记录尚未就绪，请稍后重试。" : await SaveReasonAsync(this); }
         catch (Exception) { error = "记录失败，内容仍保留，请重试。"; }
-        finally { _saving = false; FooterButtons.IsEnabled = true; }
+        finally { _saving = false; EntryForm.IsEnabled = true; FooterButtons.IsEnabled = true; }
         if (error is not null) { StatusText.Text = TradePet.Core.Localization.UiText.Translate(error); return; }
         Dismiss();
     }

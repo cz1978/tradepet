@@ -1,5 +1,711 @@
 [
   {
+    "key": "PetGoalSummaryDetails",
+    "source": "完整小结与目标进度",
+    "english": "Full summary and goal progress",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetGoalPatientAfterLoss",
+    "source": "亏损后不急于再开",
+    "english": "Avoid rushing back in after a loss",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetGoalLossZoneReentry",
+    "source": "减少亏损区域重复进场",
+    "english": "Reduce repeated entries in loss zones",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetGoalPriceReentry",
+    "source": "控制同价位重复进场",
+    "english": "Limit repeated entries at the same price",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetGoalPriceConcentration",
+    "source": "减少同价位集中交易",
+    "english": "Reduce trading concentrated at one price",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetReviewToolsMenu",
+    "source": "复盘与工具",
+    "english": "Review and tools",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetDisplaySettingsMenu",
+    "source": "显示与设置",
+    "english": "Display and settings",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavior2347ff2b5877",
+    "source": "日记需重审",
+    "english": "Journal needs reassessment",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavior9e8e1f75908d",
+    "source": "日记已完成",
+    "english": "Journal completed",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavior0e18174fdcc2",
+    "source": "日记草稿",
+    "english": "Journal draft",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavior2f02b707a6a9",
+    "source": "日记待记录",
+    "english": "Journal not recorded",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavior04c14eb817db",
+    "source": "#{0} {1} {2} · 此前开仓，日初持仓手数未重建。",
+    "english": "#{0} {1} {2} · Opened earlier; volume at the start of this day has not been reconstructed.",
+    "template": true,
+    "preserve": [
+      0,
+      1
+    ]
+  },
+  {
+    "key": "PetBehaviora3d3a0865b90",
+    "source": "账户现金盈亏 {0} · {1} 个范围内日期 · 红盈绿亏；点击日期查看当日记录。",
+    "english": "Account cash P&L {0} · {1} dates in range · Red for gains, green for losses; select a day to view its records.",
+    "template": true,
+    "preserve": [
+      0
+    ]
+  },
+  {
+    "key": "PetBehaviorac23a8643f2b",
+    "source": "同筛选未记录命中",
+    "english": "Same-filter trades without recorded hits",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavior5ab5ed618c15",
+    "source": "同一筛选集合，仅作相关样本对照；未记录提醒不代表行为没有发生。",
+    "english": "Same filtered set, for association only. No recorded alert does not establish that a behavior did not occur.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavior88d1a14bc179",
+    "source": "未记录行为命中样本",
+    "english": "Sample without recorded behavior hits",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavior6fa68bfd79a3",
+    "source": "当前范围没有目标观察记录",
+    "english": "No goal observations recorded for this range",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavior2eb930810488",
+    "source": "机会 {0} · 通过 {1} · 失败 {2} · 执行率 {3} · 未知 {4} · 不适用 {5} · 未记录观察 {6} 天",
+    "english": "Opportunities {0} · Passed {1} · Failed {2} · Adherence {3} · Unknown {4} · Inapplicable {5} · {6} days without recorded observations",
+    "template": true,
+    "preserve": []
+  },
+  {
+    "key": "PetActionClose",
+    "source": "关闭",
+    "english": "Close",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetRecordOpportunity",
+    "source": "记录未交易机会",
+    "english": "Record untraded opportunity",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetTradingSummary",
+    "source": "交易小结与改进",
+    "english": "Trading summary and improvement",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetOpportunityShort",
+    "source": "未交易机会",
+    "english": "Untraded opportunities",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetSummaryShort",
+    "source": "交易小结",
+    "english": "Trading summary",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehaviored6341cbd511",
+    "source": "草稿已保存",
+    "english": "Draft saved",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehaviora58f11eacbe9",
+    "source": "已复盘 · 数据更新",
+    "english": "Reviewed · data updated",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavior5dcbbc6524af",
+    "source": "暂不能记录机会",
+    "english": "Opportunity capture is unavailable",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavior25216f506e98",
+    "source": "请等待账户连接和服务器时间就绪。",
+    "english": "Wait for the account and server clock to connect.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavior19982901d1a1",
+    "source": "暂无可选品种",
+    "english": "No symbols available",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavior617fa87b5d97",
+    "source": "连接终端并载入品种后即可点选记录。",
+    "english": "Connect the terminal and load symbols to select one.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavioraeec50a7ddd4",
+    "source": "点选后保存。未记录的价格和交易条件保留为空，事后发现单独统计。",
+    "english": "Select choices and save. Unrecorded prices and setup conditions stay empty; hindsight observations are counted separately.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavior8b02544f3443",
+    "source": "保存机会",
+    "english": "Save opportunity",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavior8f6363220575",
+    "source": "记录类型",
+    "english": "Record type",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehaviorcc8fc453aef2",
+    "source": "当时记录",
+    "english": "Recorded at the time",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavior6b3827e00773",
+    "source": "主动跳过",
+    "english": "Deliberately skipped",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehaviora05dbc8a92a6",
+    "source": "未交易原因",
+    "english": "Reason for not trading",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavior7bad987ee5c8",
+    "source": "条件未齐",
+    "english": "Conditions not met",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavior3e71c67e78c7",
+    "source": "风险限制",
+    "english": "Risk limit",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavior7e5b0eac4687",
+    "source": "遵守冷静期",
+    "english": "Respected cooldown",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehaviorec1647ae9a34",
+    "source": "犹豫未做",
+    "english": "Hesitated",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavioraa8b564274e2",
+    "source": "方向（选填）",
+    "english": "Direction (optional)",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehaviorf55b90afd6c8",
+    "source": "请选择品种、记录类型和未交易原因。",
+    "english": "Select a symbol, record type and reason.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehaviorc0ae080d7679",
+    "source": "事后发现请使用“事后发现”类型。",
+    "english": "Use the hindsight type for an opportunity found afterwards.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavior6379f16939c4",
+    "source": "暂不能生成交易小结",
+    "english": "Trading summary is unavailable",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavior3de9a895456a",
+    "source": "关联盈亏按每笔去重，是共同出现的记录，不代表该行为造成的损失。",
+    "english": "Related P&L counts each trade once. Co-occurrence does not establish losses caused by a behavior.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavior5694b8ff6fad",
+    "source": "请先启用行为规则，才能选择自动观察的改进目标。",
+    "english": "Enable behavior rules before choosing an automatically observed goal.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavior404c81735e53",
+    "source": "点选一项，作为未来 7 个服务器日的改进目标；无适用机会或证据不足不会记为通过。",
+    "english": "Select one goal for the next 7 server days. Inapplicable opportunities or insufficient evidence do not count as passes.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavior1bc1f1046864",
+    "source": "设为7日目标",
+    "english": "Set 7-day goal",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavior45ea60bd52ee",
+    "source": "只选一个改进重点",
+    "english": "Choose one improvement focus",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavior8e6c87ea06dd",
+    "source": "请选择一个改进重点。",
+    "english": "Select an improvement focus.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehaviorc9dead8f4f48",
+    "source": "交易日或规则已更新，请关闭后重新打开小结。",
+    "english": "The server day or rules changed. Close and reopen the summary.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavior62c27b4efe79",
+    "source": "该规则已有活动目标，可直接继续观察。",
+    "english": "This rule already has an active goal. Continue observing it.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehaviorcca4825becd6",
+    "source": "连亏后遵守冷静期",
+    "english": "Respect cooldown after consecutive losses",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavior14ca2e1a8f12",
+    "source": "亏损后不放大手数",
+    "english": "Avoid increasing size after a loss",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehaviord1db056429ee",
+    "source": "减少密集开仓",
+    "english": "Reduce bursts of entries",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehaviorfe63887fcc56",
+    "source": "仅统计规则版本一致的适用开仓；通过率分母为已知通过与失败，未知及不适用单列。",
+    "english": "Count applicable entries under the same rule version. Pass rate uses known passes and failures; unknown and inapplicable observations stay separate.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavior3b89e7caa1a7",
+    "source": "7个服务器日结束后复核，未观察到机会不判定达成。",
+    "english": "Review after 7 server days. No observed opportunities does not mean the goal was achieved.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavior9d8ab1ed5ee8",
+    "source": "改进目标观察",
+    "english": "Improvement goal observations",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehaviora445d9bdae28",
+    "source": "持仓变化记录",
+    "english": "Observed position changes",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavior8c7e28802d0a",
+    "source": "持仓变化（采样发现）",
+    "english": "Position change observed in samples",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehaviorc240efab7f3f",
+    "source": "账户范围：日历和每日事实统计整个账户；交易列表、分析及导出使用当前筛选。",
+    "english": "Scope: the calendar and daily facts cover the account; the trade list, analytics and export use the current filters.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavior961a6850db28",
+    "source": "{0} 服务器日 · 已复盘 {1} / {2} 笔，待复盘 {3} 笔；快速复盘保存即完成。",
+    "english": "{0} server day · Reviewed {1} / {2} trades; {3} pending. Saving a quick review completes it.",
+    "template": true,
+    "preserve": [
+      0
+    ]
+  },
+  {
+    "key": "PetBehavior179ab4caec83",
+    "source": "当日 {0} 笔尚未复盘，可在宠物快速复盘中保存；保存即计入完成，无需再确认。",
+    "english": "{0} trades for this day are pending. Save a pet quick review to complete them; no further confirmation is needed.",
+    "template": true,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavior5eff5bcce38b",
+    "source": "{0} 至 {1} 服务器日",
+    "english": "{0} to {1} server days",
+    "template": true,
+    "preserve": [
+      0,
+      1
+    ]
+  },
+  {
+    "key": "PetBehavior7bfa7da293f2",
+    "source": "完整平仓 {0} 笔 · 净盈亏 {1} {2}",
+    "english": "{0} completed trades · Net P&L {1} {2}",
+    "template": true,
+    "preserve": [
+      2
+    ]
+  },
+  {
+    "key": "PetBehavior5b2ca5e1203a",
+    "source": "已复盘 {0} / {1} 笔；快速复盘保存即完成。",
+    "english": "Reviewed {0} / {1} trades; saving a quick review completes it.",
+    "template": true,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavior81e817eeb88d",
+    "source": "执行自报 {0} 笔，其中按计划 {1} 笔；未自报不推断。",
+    "english": "{0} execution self-reports, including {1} following the plan; unanswered trades stay unclassified.",
+    "template": true,
+    "preserve": []
+  },
+  {
+    "key": "PetBehaviord0b22c4dfe07",
+    "source": "{0} · 提醒 {1} 次 · 关联完整平仓 {2} 笔 · 净盈亏 {3}",
+    "english": "{0} · {1} alerts · {2} related completed trades · Net P&L {3}",
+    "template": true,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavior95ed6437f4e6",
+    "source": "目标「{0}」· 机会 {1} · 通过 {2} · 失败 {3} · 未知 {4}",
+    "english": "Goal \"{0}\" · Opportunities {1} · Passed {2} · Failed {3} · Unknown {4}",
+    "template": true,
+    "preserve": [
+      0
+    ]
+  },
+  {
+    "key": "PetBehavior5cc1aa792df1",
+    "source": "当时记录 {0} 条，主动跳过 {1} 条，事后发现 {2} 条；三类分别统计，不推算未成交盈亏。",
+    "english": "Recorded at the time: {0}; deliberately skipped: {1}; hindsight: {2}. Counted separately without hypothetical untraded P&L.",
+    "template": true,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavior3c585a664446",
+    "source": "{0} · {1} · {2} · 原因：{3}",
+    "english": "{0} · {1} · {2} · Reason: {3}",
+    "template": true,
+    "preserve": [
+      0,
+      1,
+      3
+    ]
+  },
+  {
+    "key": "PetBehaviordc5583e460bf",
+    "source": "{0} · 机会 {1} · 通过 {2} · 失败 {3} · 未知 {4} · 不适用 {5}；无适用机会不判定达成。",
+    "english": "{0} · Opportunities {1} · Passed {2} · Failed {3} · Unknown {4} · Inapplicable {5}; no eligible opportunities does not establish achievement.",
+    "template": true,
+    "preserve": [
+      0
+    ]
+  },
+  {
+    "key": "PetBehavior0c8547a207f0",
+    "source": "止损 {0} → {1}",
+    "english": "Stop loss {0} → {1}",
+    "template": true,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavior82db8f21e8b0",
+    "source": "止盈 {0} → {1}",
+    "english": "Take profit {0} → {1}",
+    "template": true,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavior7a8dd8bd4395",
+    "source": "手数 {0} → {1}",
+    "english": "Volume {0} → {1}",
+    "template": true,
+    "preserve": []
+  },
+  {
+    "key": "PetBehavior681bce3b4747",
+    "source": "#{0} {1} · {2} · 变化发生在两次采样之间，具体修改时刻未记录。",
+    "english": "#{0} {1} · {2} · The change occurred between samples; its exact modification time was not recorded.",
+    "template": true,
+    "preserve": [
+      0,
+      1
+    ]
+  },
+  {
+    "key": "PetEntryExecution",
+    "source": "入场是否按计划（选填，自报）",
+    "english": "Entry followed your plan? (optional, self-reported)",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetReviewExecution",
+    "source": "本笔是否按计划（选填，自报）",
+    "english": "Trade followed your plan? (optional, self-reported)",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetEntryEmotion",
+    "source": "开仓时状态（选填）",
+    "english": "State at entry (optional)",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetReviewEmotion",
+    "source": "交易时状态（选填）",
+    "english": "State during the trade (optional)",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetExecutionFollowed",
+    "source": "按计划",
+    "english": "Followed plan",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetExecutionDeviated",
+    "source": "有偏离",
+    "english": "Deviated",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetExecutionUnsure",
+    "source": "不确定",
+    "english": "Unsure",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetEmotionCalm",
+    "source": "平静",
+    "english": "Calm",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetEmotionRushed",
+    "source": "急躁",
+    "english": "Rushed",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetEmotionFomo",
+    "source": "担心错过",
+    "english": "Fear of missing out",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetEmotionRecover",
+    "source": "想扳回",
+    "english": "Want to recover losses",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetEntryReasonFact",
+    "source": "入场原因（宠物记录）：{0}",
+    "english": "Entry reason (pet record): {0}",
+    "template": true,
+    "preserve": [
+      0
+    ]
+  },
+  {
+    "key": "PetEntryExecutionFact",
+    "source": "开仓执行（自报）：{0}。",
+    "english": "Entry execution (self-reported): {0}.",
+    "template": true,
+    "preserve": []
+  },
+  {
+    "key": "PetEntryEmotionFact",
+    "source": "开仓状态（自报）：{0}",
+    "english": "Entry state (self-reported): {0}",
+    "template": true,
+    "preserve": []
+  },
+  {
+    "key": "PetSelfReportSection",
+    "source": "宠物记录与执行自报",
+    "english": "Pet records and self-reported execution",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetSelfReportExplanation",
+    "source": "来自宠物弹框及已有复盘记录的用户自报；未填写保持未记录，自报不替代自动规则证据。",
+    "english": "Self-reports from pet cards and existing reviews. Unanswered items stay unrecorded; self-reports do not replace automatic rule evidence.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetReportEntryReason",
+    "source": "入场原因：{0}",
+    "english": "Entry reason: {0}",
+    "template": true,
+    "preserve": [
+      0
+    ]
+  },
+  {
+    "key": "PetReportEntryExecution",
+    "source": "开仓执行自报：{0}",
+    "english": "Entry execution self-report: {0}",
+    "template": true,
+    "preserve": []
+  },
+  {
+    "key": "PetReportEntryEmotion",
+    "source": "开仓状态自报：{0}",
+    "english": "Entry state self-report: {0}",
+    "template": true,
+    "preserve": []
+  },
+  {
+    "key": "PetReportReviewExecution",
+    "source": "复盘执行自报：{0}",
+    "english": "Review execution self-report: {0}",
+    "template": true,
+    "preserve": []
+  },
+  {
+    "key": "PetReportReviewEmotion",
+    "source": "交易状态自报：{0}",
+    "english": "Trade state self-report: {0}",
+    "template": true,
+    "preserve": []
+  },
+  {
+    "key": "PetExportExecution",
+    "source": "执行情况（自报）",
+    "english": "Execution (self-reported)",
+    "template": false,
+    "preserve": []
+  },
+  {
     "key": "S1c669c747bc4052e",
     "source": "  ·  服务器交易日 ",
     "english": "  ·  Server trading day ",

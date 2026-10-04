@@ -152,6 +152,8 @@ public sealed class MainViewModel : ObservableObject
         ShowReviewPageCommand = new RelayCommand(() => ShowConsolePage?.Invoke(3));
         ShowQuickReviewCommand = AsyncCommand(() => ShowQuickReviewAsync?.Invoke() ?? Task.CompletedTask);
         ShowEntryReasonCommand = AsyncCommand(() => ShowEntryReasonAsync?.Invoke() ?? Task.CompletedTask);
+        ShowOpportunityCommand = AsyncCommand(() => ShowOpportunityAsync?.Invoke() ?? Task.CompletedTask);
+        ShowWeeklyGoalCommand = AsyncCommand(() => ShowWeeklyGoalAsync?.Invoke() ?? Task.CompletedTask);
         CheckUpdatesCommand = AsyncCommand(() => CheckUpdatesAsync?.Invoke() ?? Task.CompletedTask);
         OpenReleasePageCommand = new RelayCommand(() => OpenReleasePage?.Invoke());
         ShowDailyTradingReportCommand = AsyncCommand(() => ShowDailyTradingReportAsync?.Invoke() ?? Task.CompletedTask);
@@ -176,6 +178,8 @@ public sealed class MainViewModel : ObservableObject
     public Func<Task>? ShowDailyTradingReportAsync { get; set; }
     public Func<Task>? ShowQuickReviewAsync { get; set; }
     public Func<Task>? ShowEntryReasonAsync { get; set; }
+    public Func<Task>? ShowOpportunityAsync { get; set; }
+    public Func<Task>? ShowWeeklyGoalAsync { get; set; }
     public Func<Task>? CheckUpdatesAsync { get; set; }
     public Action? OpenReleasePage { get; set; }
     public Action? ShowMacroCalendar { get; set; }
@@ -203,6 +207,8 @@ public sealed class MainViewModel : ObservableObject
     public ICommand ShowReviewPageCommand { get; }
     public ICommand ShowQuickReviewCommand { get; }
     public ICommand ShowEntryReasonCommand { get; }
+    public ICommand ShowOpportunityCommand { get; }
+    public ICommand ShowWeeklyGoalCommand { get; }
     public ICommand CheckUpdatesCommand { get; }
     public ICommand OpenReleasePageCommand { get; }
     public ICommand ShowDailyTradingReportCommand { get; }

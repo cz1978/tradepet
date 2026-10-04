@@ -23,7 +23,8 @@ public sealed partial class TradePetRuntime
         if (_cancellation.IsCancellationRequested) return;
         var canShow = false;
         await OnUiAsync(() => canShow = !_viewModel.IsFocusMode &&
-            _quickReviewCard is null && _entryReasonCard is null && (CanShowAutomaticPrompt?.Invoke() ?? true));
+            _quickReviewCard is null && _entryReasonCard is null && _behaviorActionCard is null &&
+            Volatile.Read(ref _openingBehaviorAction) == 0 && (CanShowAutomaticPrompt?.Invoke() ?? true));
         if (!canShow) return;
         try
         {
@@ -41,6 +42,7 @@ public sealed partial class TradePetRuntime
 
     private async Task ShowEntryReasonAsync(bool showEmptyMessage)
     {
+        if (_behaviorActionCard is not null) { await OnUiAsync(() => ShowBehaviorActionCard?.Invoke(_behaviorActionCard)); return; }
         if (_quickReviewCard is not null) { await OnUiAsync(() => ShowQuickReviewCard?.Invoke(_quickReviewCard)); return; }
         if (_entryReasonCard is not null) { await OnUiAsync(() => ShowEntryReasonCard?.Invoke(_entryReasonCard)); return; }
         var session = _accountSessions.Current;
@@ -59,7 +61,7 @@ public sealed partial class TradePetRuntime
             { _pendingEntryReasons.TryRemove(pending.Key, out _); continue; }
             await OnUiAsync(() =>
             {
-                if (!_accountSessions.IsCurrent(session.AccountKey, session.Generation) || _entryReasonCard is not null || _quickReviewCard is not null ||
+                if (!_accountSessions.IsCurrent(session.AccountKey, session.Generation) || _entryReasonCard is not null || _quickReviewCard is not null || _behaviorActionCard is not null ||
                     !showEmptyMessage && !_viewModel.EntryReasonPromptEnabled) return;
                 var card = new EntryReasonCard(trade, _serverUtcOffsetSeconds);
                 card.SaveReasonAsync = async response =>
@@ -68,7 +70,8 @@ public sealed partial class TradePetRuntime
                     if (!_persistenceAvailable || !_accountSessions.IsCurrent(key.AccountKey, session.Generation))
                         return "账户已切换或存储不可写，内容仍保留。";
                     await _database.SaveSettingAsync(TradeEntryReasonNote.Scope(key.AccountKey), TradeEntryReasonNote.SettingKey(key.PositionId),
-                        new TradeEntryReasonNote(key, response.Reason, _timeProvider.GetUtcNow()), _cancellation.Token);
+                        new TradeEntryReasonNote(key, response.Reason, _timeProvider.GetUtcNow(),
+                            response.ReportedExecution, response.Emotion), _cancellation.Token);
                     return null;
                 };
                 _entryReasonCard = card;

@@ -74,6 +74,7 @@ public partial class App : System.Windows.Application
         _runtime = new TradePetRuntime(viewModel, dependencies);
         _runtime.ShowQuickReviewCard = _petWindow.ShowQuickReviewCard;
         _runtime.ShowEntryReasonCard = _petWindow.ShowEntryReasonCard;
+        _runtime.ShowBehaviorActionCard = _petWindow.ShowBehaviorActionCard;
         _runtime.CanShowAutomaticPrompt = () => _petWindow.IsVisible;
         _mainWindow.SaveGuideCompletionAsync = _runtime.CompleteConsoleGuideAsync;
         viewModel.ShowSetup = () =>
@@ -103,6 +104,8 @@ public partial class App : System.Windows.Application
             await _runtime.ShowQuickReviewAsync();
         };
         viewModel.ShowEntryReasonAsync = async () => { _petWindow.Show(); await _runtime.ShowEntryReasonAsync(); };
+        viewModel.ShowOpportunityAsync = async () => { _petWindow.Show(); await _runtime.ShowOpportunityAsync(); };
+        viewModel.ShowWeeklyGoalAsync = async () => { _petWindow.Show(); await _runtime.ShowWeeklyGoalAsync(); };
         viewModel.CheckUpdatesAsync = _runtime.CheckForUpdatesAsync;
         viewModel.OpenReleasePage = _runtime.OpenReleasePage;
         viewModel.ShowDailyTradingReportAsync = _runtime.ShowDailyTradingReportAsync;

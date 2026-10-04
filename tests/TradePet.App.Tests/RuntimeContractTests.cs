@@ -432,13 +432,13 @@ public sealed class RuntimeContractTests
         Assert.Equal("持仓浮盈回吐的复盘依据", row.Summary);
         Assert.Equal("主动止盈", row.ExitReason);
         Assert.Equal("检查退出条件", row.NextAction);
-        Assert.Equal("已保存复盘", row.Status);
+        Assert.Equal("草稿已保存", row.Status);
         Assert.Equal(row, viewModel.SelectedSavedReview);
         viewModel.ApplyDetail(detail with { Document = document }, sessionGeneration: 1);
         Assert.Equal("持仓浮盈回吐的复盘依据", viewModel.Summary);
         Assert.Equal("主动止盈", viewModel.ExitReason);
         Assert.Equal("控制回吐", viewModel.ToImprove);
-        Assert.Equal("已保存复盘", viewModel.DocumentStatus);
+        Assert.Equal("草稿已保存", viewModel.DocumentStatus);
         viewModel.ResetAccountState("account-b", preserveTradeDraft: false);
         Assert.Empty(viewModel.SavedReviews);
         Assert.Null(viewModel.SelectedSavedReview);

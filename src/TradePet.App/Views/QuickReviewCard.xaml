@@ -8,16 +8,28 @@
             <TextBlock x:Name="TradeText" Foreground="#AAB7C4" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,10" />
         </StackPanel>
         <ScrollViewer Grid.Row="1" MaxHeight="320" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-            <StackPanel>
+            <StackPanel x:Name="ReviewForm">
                 <TextBlock Text="{l:Text Key=S9c64fcdbb59fd424}" FontSize="12" />
                 <TextBlock Text="{Binding Text, ElementName=ExitReasonBox, Converter={StaticResource UiTranslation}}" Foreground="{StaticResource AccentBrush}" TextWrapping="Wrap" Margin="0,5,0,4" />
-                <WrapPanel Margin="0,3,0,0">
-                    <WrapPanel.Resources><Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}"><Setter Property="Padding" Value="8,4"/><Setter Property="Margin" Value="0,0,5,5"/><Setter Property="FontSize" Value="11"/></Style></WrapPanel.Resources>
-                    <Button Content="{l:Text Key=Sd42d5a0c62bc53bf}" Tag="触发预设止盈价，自动平仓" Click="ReasonPreset_Click" />
-                    <Button Content="{l:Text Key=S97176dcd1cfb4cae}" Tag="触发预设止损价，自动平仓" Click="ReasonPreset_Click" />
-                    <Button Content="{l:Text Key=Sf786b730e290eddb}" Tag="主动平仓，兑现盈利" Click="ReasonPreset_Click" />
-                    <Button Content="{l:Text Key=Sace5e985f21e1727}" Tag="主动平仓，接受当前亏损" Click="ReasonPreset_Click" />
-                    <Button Content="{l:Text Key=Sc7102dbc7f6dad70}" Tag="接近保本时主动平仓" Click="ReasonPreset_Click" />
+                <WrapPanel x:Name="ReasonChoices" Margin="0,3,0,0">
+                    <RadioButton Content="{l:Text Key=Sd42d5a0c62bc53bf}" Tag="触发预设止盈价，自动平仓" GroupName="ReviewExitReason" Style="{StaticResource PetQuickChoiceStyle}" Click="ReasonPreset_Click" />
+                    <RadioButton Content="{l:Text Key=S97176dcd1cfb4cae}" Tag="触发预设止损价，自动平仓" GroupName="ReviewExitReason" Style="{StaticResource PetQuickChoiceStyle}" Click="ReasonPreset_Click" />
+                    <RadioButton Content="{l:Text Key=Sf786b730e290eddb}" Tag="主动平仓，兑现盈利" GroupName="ReviewExitReason" Style="{StaticResource PetQuickChoiceStyle}" Click="ReasonPreset_Click" />
+                    <RadioButton Content="{l:Text Key=Sace5e985f21e1727}" Tag="主动平仓，接受当前亏损" GroupName="ReviewExitReason" Style="{StaticResource PetQuickChoiceStyle}" Click="ReasonPreset_Click" />
+                    <RadioButton Content="{l:Text Key=Sc7102dbc7f6dad70}" Tag="接近保本时主动平仓" GroupName="ReviewExitReason" Style="{StaticResource PetQuickChoiceStyle}" Click="ReasonPreset_Click" />
+                </WrapPanel>
+                <TextBlock Text="{l:Text Key=PetReviewExecution}" FontSize="11" Margin="0,6,0,5"/>
+                <WrapPanel x:Name="ExecutionChoices">
+                    <RadioButton Content="{l:Text Key=PetExecutionFollowed}" Tag="Followed" GroupName="ReviewExecution" Style="{StaticResource PetQuickChoiceStyle}"/>
+                    <RadioButton Content="{l:Text Key=PetExecutionDeviated}" Tag="Deviated" GroupName="ReviewExecution" Style="{StaticResource PetQuickChoiceStyle}"/>
+                    <RadioButton Content="{l:Text Key=PetExecutionUnsure}" Tag="Unsure" GroupName="ReviewExecution" Style="{StaticResource PetQuickChoiceStyle}"/>
+                </WrapPanel>
+                <TextBlock Text="{l:Text Key=PetReviewEmotion}" FontSize="11" Margin="0,4,0,5"/>
+                <WrapPanel x:Name="EmotionChoices">
+                    <RadioButton Content="{l:Text Key=PetEmotionCalm}" Tag="平静" GroupName="ReviewEmotion" Style="{StaticResource PetQuickChoiceStyle}"/>
+                    <RadioButton Content="{l:Text Key=PetEmotionRushed}" Tag="急躁" GroupName="ReviewEmotion" Style="{StaticResource PetQuickChoiceStyle}"/>
+                    <RadioButton Content="{l:Text Key=PetEmotionFomo}" Tag="担心错过" GroupName="ReviewEmotion" Style="{StaticResource PetQuickChoiceStyle}"/>
+                    <RadioButton Content="{l:Text Key=PetEmotionRecover}" Tag="想扳回" GroupName="ReviewEmotion" Style="{StaticResource PetQuickChoiceStyle}"/>
                 </WrapPanel>
                 <TextBlock Text="{l:Text Key=Sae2cdad238f1b0b9}" FontSize="12" Margin="0,5,0,4" />
                 <TextBlock Text="{Binding Text, ElementName=ImproveBox, Converter={StaticResource UiTranslation}}" Foreground="#AAB7C4" FontSize="11" TextWrapping="Wrap" />
@@ -27,7 +39,7 @@
                 <Expander Header="{l:Text Key=S3a36ae4639a4f93f}" Foreground="#AAB7C4" FontSize="11" Margin="0,7,0,0" IsExpanded="False">
                     <StackPanel>
                         <TextBlock Text="{l:Text Key=S35f31548c96a1c98}" FontSize="11" Margin="0,6,0,4" />
-                        <TextBox x:Name="ExitReasonBox" MinHeight="38" AcceptsReturn="True" TextWrapping="Wrap" />
+                        <TextBox x:Name="ExitReasonBox" MinHeight="38" AcceptsReturn="True" TextWrapping="Wrap" TextChanged="ExitReasonBox_TextChanged" />
                         <TextBlock Text="{l:Text Key=S7bf5937d0c1b7f2d}" FontSize="11" Margin="0,6,0,4" />
                         <TextBox x:Name="ImproveBox" MinHeight="54" AcceptsReturn="True" TextWrapping="Wrap" />
                     </StackPanel>

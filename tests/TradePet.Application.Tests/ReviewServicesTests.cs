@@ -10,6 +10,33 @@ public sealed class ReviewServicesTests
     private static readonly DateTimeOffset Now = new(2026, 9, 6, 4, 0, 0, TimeSpan.Zero);
 
     [Fact]
+    public async Task PetSelfReport_IsSavedWithoutCreatingRuleAssessmentsAndSurvivesGeneralEdits()
+    {
+        var repository = FakeRepository.Create();
+        var service = new JournalService(repository, new FixedTimeProvider(Now));
+        var command = new SaveTradeReviewCommand(new("Broker|1", 1), "回踩入场", "主动平仓", "", "", "",
+            "交易过程", "想扳回", "", "source-1", "rule-1", ReviewCompletionStatus.Reviewed,
+            IsQuickReview: true, ReportedExecution: PlanExecutionSelfReport.Followed);
+        var saved = await service.SaveTradeReviewAsync(command, 0);
+        Assert.True(saved.IsSaved);
+        Assert.Equal(PlanExecutionSelfReport.Followed, saved.Value!.ReportedExecution);
+        Assert.Equal(Now, saved.Value.ReportedExecutionRecordedAtUtc);
+        Assert.Equal("想扳回", saved.Value.Emotion);
+        Assert.Empty(repository.Assessments);
+
+        var edited = await service.SaveTradeReviewAsync(command with
+        {
+            Summary = "收盘后补充总结", IsQuickReview = false, ReportedExecution = null, RequestedStatus = ReviewCompletionStatus.Draft,
+        }, 1);
+        Assert.True(edited.IsSaved);
+        Assert.Equal(PlanExecutionSelfReport.Followed, edited.Value!.ReportedExecution);
+        Assert.True(edited.Value.HasCompletedReview);
+        Assert.Equal(ReviewCompletionStatus.Reviewed, edited.Value.Status);
+        Assert.Equal(Now, edited.Value.ReportedExecutionRecordedAtUtc);
+        Assert.Empty(repository.Assessments);
+    }
+
+    [Fact]
     public async Task QuickReview_SaveCountsAsCompletedWithoutFullReviewAssessmentsAndUsesTradeBasis()
     {
         var repository = FakeRepository.Create();
@@ -612,6 +639,31 @@ public sealed class ReviewServicesTests
         Assert.Throws<InvalidDataException>(() => service.Build(
             snapshot, [detail], workspace with { Opportunities = [] },
             ReviewExportMode.PublicShare, includedAttachments: [repository.OpportunityAttachments[0]]));
+    }
+
+    [Fact]
+    public void Export_UsesTheSameProjectedCompletionStatusAsWorkspace()
+    {
+        var trades = new[] { Trade(1, 10m), Trade(2, -5m) };
+        var quick = Document(ReviewCompletionStatus.Reviewed, 1, "快速复盘") with { IsQuickReview = true, ReviewedAtUtc = Now };
+        var full = quick with { TradeKey = new("Broker|1", 2), IsQuickReview = false };
+        var filter = new ReviewWorkspaceFilter("Broker|1", new(2026, 9, 1), new(2026, 9, 30));
+        var version = new ReviewDataVersion("Broker|1", 1, 1, 1, "rule-1", "time-1", Now);
+        var snapshot = new ReviewWorkspaceSnapshot(filter,
+            new TradePet.Core.Trading.ReviewAnalyticsCalculator().Calculate(new ReviewFilter("Broker|1", filter.FromServerDate, filter.ToServerDate), trades),
+            trades, new Dictionary<long, TradeReviewDocument>
+            {
+                [1] = quick with { Status = ReviewCompletionStatus.NeedsReview },
+                [2] = full with { Status = ReviewCompletionStatus.NeedsReview },
+            }, [], [], [], new ReviewDataQuality(2, 0, 0, 0, 1, 0, 0, 0, 0, 50m, 0, new Dictionary<string, int>()),
+            version, 2, 1, 100);
+        var details = trades.Select(trade => new TradeDetailSnapshot(trade, [], null, trade.PositionId == 1 ? quick : full,
+            null, [], null, null, [], [], [], null, version.Token)).ToArray();
+        var package = new ReviewExportService().Build(snapshot, details);
+        var csv = System.Text.Encoding.UTF8.GetString(package.Entries.Single(item => item.Path == "trades.csv").Content);
+        var markdown = System.Text.Encoding.UTF8.GetString(package.Entries.Single(item => item.Path == "review.md").Content);
+        Assert.Equal(2, csv.Split("NeedsReview").Length - 1);
+        Assert.Contains("复盘完成率：50%", markdown);
     }
 
     [Fact]

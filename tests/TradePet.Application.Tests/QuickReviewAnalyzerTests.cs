@@ -7,6 +7,21 @@ namespace TradePet.Application.Tests;
 public sealed class QuickReviewAnalyzerTests
 {
     [Fact]
+    public void EntryPetChoices_AreShownAsSelfReportsWithoutInventingRuleEvidence()
+    {
+        var detail = Detail() with
+        {
+            EntryReasonNote = new(new("Broker|1", 1), "回踩入场", ClosedAt.AddMinutes(-9),
+                PlanExecutionSelfReport.Followed, "担心错过"),
+        };
+        var analysis = QuickReviewAnalyzer.Analyze(detail);
+        Assert.Contains("开仓执行（自报）：按计划", analysis.Explanation);
+        Assert.Contains("开仓状态（自报）：担心错过", analysis.Explanation);
+        Assert.DoesNotContain("规则全部通过", analysis.Explanation);
+        Assert.Empty(detail.Assessments);
+    }
+
+    [Fact]
     public void ProtectionAndRisk_AreReportedFromActualSamplesAndRecordedInitialRisk()
     {
         var detail = Detail() with

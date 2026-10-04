@@ -76,7 +76,6 @@ public sealed class ReviewQueryService
         var pageSize = Math.Clamp(filter.PageSize, 1, 100);
         var page = Math.Max(1, filter.Page);
         var paged = selected.Skip((page - 1) * pageSize).Take(pageSize).ToArray();
-        var pagedIds = paged.Select(item => item.PositionId).ToHashSet();
         var analyticsFilter = new ReviewFilter(
             filter.AccountKey, filter.FromServerDate, filter.ToServerDate, filter.Symbol, filter.Side,
             filter.Strategy, filter.Setup, filter.Tags?.Count == 1 ? filter.Tags[0] : null,
@@ -91,7 +90,7 @@ public sealed class ReviewQueryService
         var dailyFacts = _workspaceCalculator.BuildDailyFacts(
             filter.AccountKey, filter.FromServerDate, filter.ToServerDate, data.Trades, data.Deals,
             effectiveDocuments, data.Behaviors, data.DailyStates ?? new Dictionary<DateOnly, DailyState>(),
-            filter.ServerUtcOffsetSeconds);
+            filter.ServerUtcOffsetSeconds, data.PositionSamples);
         cancellationToken.ThrowIfCancellationRequested();
         var quality = _workspaceCalculator.CalculateDataQuality(selected, data.Excursions, effectiveDocuments,
             data.Metadata, data.MarketRanges);
@@ -141,7 +140,7 @@ public sealed class ReviewQueryService
             selected, data.TradingSessions ?? [], data.Excursions, data.Deals);
         var snapshot = new ReviewWorkspaceSnapshot(
             filter, analytics, paged,
-            effectiveDocuments.Where(item => pagedIds.Contains(item.Key)).ToDictionary(),
+            effectiveDocuments,
             calendar, _workspaceCalculator.BuildRealizedCurve(selected), data.Behaviors, quality,
             data.Version, selected.Count, page, pageSize, comparison, dailyFacts, fees, dailyCash, riskSamples,
             behaviorEvidence, periodFacts, goalProgress, equityAnalysis, sessionPerformance, selected);
@@ -268,6 +267,9 @@ public sealed class JournalService
                 detail.Trade, detail.Deals, detail.Assessments, detail.Excursion)
             : null;
         var status = command.IsQuickReview ? ReviewCompletionStatus.Reviewed
+            : existing is { IsQuickReview: true, HasCompletedReview: true } &&
+              command.RequestedStatus is ReviewCompletionStatus.Draft or ReviewCompletionStatus.Reviewed
+            ? existing.Status
             : command.RequestedStatus == ReviewCompletionStatus.Reviewed
             ? ReviewCompletionStatus.Draft
             : command.RequestedStatus;
@@ -277,7 +279,11 @@ public sealed class JournalService
             expectedRevision + 1, basis?.SourceVersion ?? command.SourceVersion, basis?.RuleVersion ?? command.RuleVersion,
             basis?.SourceVersion ?? existing?.ReviewedSourceVersion, basis?.RuleVersion ?? existing?.ReviewedRuleVersion,
             existing?.CreatedAtUtc ?? now, now, command.IsQuickReview ? now : existing?.ReviewedAtUtc,
-            command.IsQuickReview || existing?.IsQuickReview == true).Normalize();
+            command.IsQuickReview || existing?.IsQuickReview == true,
+            command.ReportedExecution ?? existing?.ReportedExecution,
+            command.ReportedExecution.HasValue &&
+                (command.ReportedExecution != existing?.ReportedExecution || existing?.ReportedExecutionRecordedAtUtc is null)
+                ? now : existing?.ReportedExecutionRecordedAtUtc).Normalize();
         return await _repository.SaveTradeReviewDocumentAsync(document, expectedRevision, cancellationToken);
     }
 
@@ -1166,6 +1172,8 @@ public sealed class ReviewExportService
             ? SanitizePublicText(workspaceData?.Currency ?? string.Empty, snapshot.Filter.AccountKey)
             : workspaceData?.Currency ?? string.Empty;
         var exportedTrades = snapshot.AllFilteredTrades ?? snapshot.Trades;
+        details = details.Select(detail => snapshot.Documents.TryGetValue(detail.Trade.PositionId, out var document)
+            ? detail with { Document = document } : detail).ToArray();
         var detailByPosition = details.ToDictionary(detail => detail.Trade.PositionId);
         if (exportedTrades.Any(trade => trade.AccountKey != snapshot.Filter.AccountKey ||
                                         !detailByPosition.TryGetValue(trade.PositionId, out var detail) ||
@@ -1197,7 +1205,7 @@ public sealed class ReviewExportService
         }
         var netPnl = exportedTrades.Sum(trade => trade.NetPnl);
         var revisionTotal = details.Sum(detail => detail.Document?.Revision ?? 0);
-        var reviewedCount = details.Count(detail => detail.Document?.Status == ReviewCompletionStatus.Reviewed);
+        var reviewedCount = details.Count(detail => detail.Document?.HasCompletedReview == true);
         var reviewCompletionPercentage = exportedTrades.Count == 0
             ? 0m : 100m * reviewedCount / exportedTrades.Count;
         var publicIds = exportedTrades.Select((trade, index) => (trade.PositionId, Id: $"T{index + 1:D6}"))
@@ -1647,6 +1655,8 @@ public sealed class ReviewExportService
                 Field("做得好", document.DidWell); Field("待改进", document.ToImprove);
                 Field("下次行动", document.NextAction); Field("总结", document.Summary);
                 Field("情绪", document.Emotion); Field("市场状态", document.MarketCondition);
+                if (document.ReportedExecution.HasValue)
+                    Field("执行情况（自报）", QuickReviewAnalyzer.DescribeReportedExecution(document.ReportedExecution));
             }
             if (detail.Document is null) Field("入场原因", detail.RecordedEntryReason);
             if (detail.Deals.Count == 0)

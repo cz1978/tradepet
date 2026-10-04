@@ -136,7 +136,8 @@ public static class DailyReportAnalyzer
         if (behaviors.Length == 0) discipline.Add("没有记录到需注意或严重级别的行为提醒；这不代表全天没有风险或规则全部通过。");
         foreach (var group in behaviors.GroupBy(b => b.Rule))
         {
-            var linkedIds = group.SelectMany(b => b.TradeLinks).Where(l => l.TradeKey.AccountKey == data.AccountKey)
+            var linkedIds = group.Where(b => !b.EvidenceInsufficient && string.IsNullOrWhiteSpace(b.MissingData))
+                .SelectMany(b => b.TradeLinks).Where(l => l.Role == BehaviorTradeRole.Trigger && l.TradeKey.AccountKey == data.AccountKey)
                 .Select(l => l.TradeKey.PositionId).Where(selectedIds.Contains).Distinct().ToHashSet();
             discipline.Add($"{RuleName(group.Key)}：{group.Count()} 条提醒，其中证据不足 {group.Count(b => b.EvidenceInsufficient || !string.IsNullOrWhiteSpace(b.MissingData))} 条；关联当日完整交易 {linkedIds.Count} 笔，关联净盈亏 {Money(completed.Where(t => linkedIds.Contains(t.PositionId)).Sum(t => t.NetPnl))}。关联不等于归因，不同规则之间可能重复关联。");
         }
@@ -145,6 +146,54 @@ public static class DailyReportAnalyzer
         foreach (var a in assessments.Where(a => a.Status == RuleAssessmentStatus.Failed))
             discipline.Add($"#{a.TradeKey.PositionId} · 规则 {a.RuleId} 未通过；证据：{Present(a.EvidenceReference)}；备注：{Present(a.Notes)}。");
         sections.Add(new("执行纪律与关联结果", discipline));
+
+        var selfReports = new List<string>();
+        foreach (var trade in data.Trades.Where(t => t.AccountKey == data.AccountKey &&
+                     (t.OpenServerDate == date || t.IsComplete && t.CloseServerDate == date))
+                     .OrderBy(t => t.OpenedAtUtc).ThenBy(t => t.PositionId))
+        {
+            var entry = data.EntryReasonNotes?.GetValueOrDefault(trade.PositionId);
+            if (entry?.TradeKey.AccountKey != data.AccountKey) entry = null;
+            var document = data.Documents.GetValueOrDefault(trade.PositionId);
+            if (document?.TradeKey.AccountKey != data.AccountKey) document = null;
+            var fields = new List<string>();
+            if (!string.IsNullOrWhiteSpace(entry?.Reason)) fields.Add($"入场原因：{entry.Reason}");
+            if (entry?.ReportedExecution is { } entryExecution)
+                fields.Add($"开仓执行自报：{QuickReviewAnalyzer.DescribeReportedExecution(entryExecution)}");
+            if (!string.IsNullOrWhiteSpace(entry?.Emotion)) fields.Add($"开仓状态自报：{entry.Emotion}");
+            if (document?.ReportedExecution is { } reviewExecution)
+                fields.Add($"复盘执行自报：{QuickReviewAnalyzer.DescribeReportedExecution(reviewExecution)}");
+            if (!string.IsNullOrWhiteSpace(document?.Emotion)) fields.Add($"交易状态自报：{document.Emotion}");
+            if (fields.Count > 0) selfReports.Add($"#{trade.PositionId} · {string.Join("；", fields.Select(TradePet.Core.Localization.UiText.Translate))}。");
+        }
+        if (selfReports.Count > 0)
+        {
+            selfReports.Insert(0, "来自宠物弹框及已有复盘记录的用户自报；未填写保持未记录，自报不替代自动规则证据。");
+            sections.Add(new("宠物记录与执行自报", selfReports));
+        }
+
+        var opportunities = data.Opportunities.Where(item => item.AccountKey == data.AccountKey && item.ServerDate == date).ToArray();
+        if (opportunities.Length > 0)
+        {
+            var lines = new List<string>
+            {
+                $"当时记录 {opportunities.Count(item => item.Kind == OpportunityRecordKind.ObservedBeforeMove)} 条，主动跳过 {opportunities.Count(item => item.Kind == OpportunityRecordKind.DeliberatelySkipped)} 条，事后发现 {opportunities.Count(item => item.Kind == OpportunityRecordKind.DiscoveredAfterMove)} 条；三类分别统计，不推算未成交盈亏。",
+            };
+            lines.AddRange(opportunities.OrderBy(item => item.RecordedAtUtc).Select(item =>
+                $"{Time(item.RecordedAtUtc)} · {item.Symbol} · {OpportunityKind(item.Kind)} · 原因：{TradePet.Core.Localization.UiText.Translate(item.Reason)}"));
+            sections.Add(new("未交易机会", lines));
+        }
+        var goals = data.Goals.Where(item => item.AccountKey == data.AccountKey && item.StartServerDate <= date &&
+            (item.EndServerDate is null || item.EndServerDate >= date)).ToArray();
+        if (goals.Length > 0)
+        {
+            var progress = new ReviewWorkspaceCalculator().BuildGoalProgress(goals, data.GoalObservations, date, date);
+            sections.Add(new("改进目标观察", progress.Select(item =>
+                $"{item.Goal.Name} · 机会 {item.OpportunityCount} · 通过 {item.PassCount} · 失败 {item.FailCount} · 未知 {item.UnknownObservationCount} · 不适用 {item.NotApplicableObservationCount}；无适用机会不判定达成。").ToArray()));
+        }
+        var protectionChanges = facts.Timeline.Where(item => item.Kind == "持仓变化（采样发现）").ToArray();
+        if (protectionChanges.Length > 0)
+            sections.Add(new("持仓变化记录", protectionChanges.Select(item => $"{Time(item.AtUtc)} · {item.Summary}").ToArray()));
 
         var rows = new List<DailyReportTradeRow>();
         foreach (var trade in completed)
@@ -180,8 +229,8 @@ public static class DailyReportAnalyzer
                 actions.Add($"人工记录 · #{trade.PositionId}：{doc.NextAction.Trim()}");
         if (data.DailyJournals.TryGetValue(date, out var journal) && !string.IsNullOrWhiteSpace(journal.NextAction))
             actions.Add($"当日日记中的下一步行动：{journal.NextAction.Trim()}");
-        var pending = completed.Count(t => data.Documents.GetValueOrDefault(t.PositionId)?.Status != ReviewCompletionStatus.Reviewed);
-        if (pending > 0) actions.Add($"完成 {pending} 笔待复盘交易的入场依据、退出原因与下一步动作，再标记为已复盘。");
+        var pending = completed.Count(t => data.Documents.GetValueOrDefault(t.PositionId)?.HasCompletedReview != true);
+        if (pending > 0) actions.Add($"当日 {pending} 笔尚未复盘，可在宠物快速复盘中保存；保存即计入完成，无需再确认。");
         if (actions.Count == 0) actions.Add("现有记录不足以提出具体纠偏动作；下一交易日前检查风险记录与数据采集状态。");
         sections.Add(new("下一交易日行动清单", actions));
 
@@ -263,6 +312,13 @@ public static class DailyReportAnalyzer
     private static string Present(string? value, string fallback = "未记录") => string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
     private static string Ids(IEnumerable<TradeRecord> trades) => string.Join("、", trades.Select(t => "#" + t.PositionId));
     private static string Cell(string value) => value.Replace("|", "\\|").Replace("\r", "").Replace("\n", "<br>");
+    private static string OpportunityKind(OpportunityRecordKind kind) => kind switch
+    {
+        OpportunityRecordKind.ObservedBeforeMove => "当时记录",
+        OpportunityRecordKind.DeliberatelySkipped => "主动跳过",
+        _ => "事后发现",
+    };
+
     private static string RuleName(BehaviorRuleKind rule) => rule switch
     {
         BehaviorRuleKind.ReentryCount => "重复进场",

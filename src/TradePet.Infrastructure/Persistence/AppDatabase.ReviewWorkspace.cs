@@ -66,6 +66,16 @@ public sealed partial class AppDatabase
         return await LoadReviewVersionAsync(connection, accountKey, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<ImprovementGoal>> LoadActiveImprovementGoalsAsync(
+        string accountKey, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(accountKey);
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        return await LoadJsonListAsync<ImprovementGoal>(connection,
+            "SELECT payload_json FROM improvement_goals WHERE account_key=$account AND status='Active' ORDER BY updated_at_utc DESC;",
+            accountKey, cancellationToken);
+    }
+
     public async Task<ReviewWorkspaceData> LoadWorkspaceAsync(
         string accountKey,
         DateOnly from,
@@ -119,6 +129,7 @@ public sealed partial class AppDatabase
 
             var currency = await LoadCurrencyAsync(connection, accountKey, cancellationToken);
             var documents = await LoadDocumentsAsync(connection, accountKey, positionIds, cancellationToken);
+            var entryReasonNotes = await LoadEntryReasonNotesAsync(connection, accountKey, positionIds, cancellationToken);
             var journals = await LoadDailyJournalsAsync(connection, accountKey, from, to, cancellationToken);
             var playbooks = await LoadJsonListAsync<PlaybookVersion>(connection,
                 "SELECT payload_json FROM playbook_versions WHERE account_key = $account ORDER BY effective_from_utc;",
@@ -152,7 +163,7 @@ public sealed partial class AppDatabase
                 accountKey, currency, trades, deals, metadata, documents, excursions, journals,
                 playbooks, assessments, campaigns, behaviors, goals, observations, opportunities,
                 ranges, dataGapDates, version, periodReviews, savedFilters, timeSegments, opportunityAttachments,
-                dailyStates, equitySamples, cashFlows, tradingSessions);
+                dailyStates, equitySamples, cashFlows, tradingSessions, EntryReasonNotes: entryReasonNotes);
             await ExecuteReadSnapshotCommandAsync(connection, "COMMIT;", cancellationToken);
             return result;
         }
@@ -1955,6 +1966,26 @@ public sealed partial class AppDatabase
         command.Parameters.AddWithValue("$account", key.AccountKey);
         command.Parameters.AddWithValue("$position", key.PositionId);
         return DeserializeOrNull<TradeReviewDocument>(await command.ExecuteScalarAsync(cancellationToken) as string);
+    }
+
+    private static async Task<IReadOnlyDictionary<long, TradeEntryReasonNote>> LoadEntryReasonNotesAsync(
+        SqliteConnection connection, string accountKey, IReadOnlyCollection<long> positionIds,
+        CancellationToken cancellationToken)
+    {
+        var result = new Dictionary<long, TradeEntryReasonNote>();
+        foreach (var batch in positionIds.Distinct().Chunk(900))
+        {
+            await using var command = connection.CreateCommand();
+            var names = batch.Select((_, index) => $"$entry{index}").ToArray();
+            command.CommandText = $"SELECT value_json FROM settings WHERE scope_key=$account AND setting_key IN ({string.Join(",", names)});";
+            command.Parameters.AddWithValue("$account", TradeEntryReasonNote.Scope(accountKey));
+            for (var index = 0; index < batch.Length; index++)
+                command.Parameters.AddWithValue(names[index], TradeEntryReasonNote.SettingKey(batch[index]));
+            foreach (var note in await ReadJsonAsync<TradeEntryReasonNote>(command, cancellationToken))
+                if (note.TradeKey.AccountKey == accountKey && batch.Contains(note.TradeKey.PositionId))
+                    result[note.TradeKey.PositionId] = note;
+        }
+        return result;
     }
 
     private static async Task<IReadOnlyDictionary<long, TradeReviewDocument>> LoadDocumentsAsync(

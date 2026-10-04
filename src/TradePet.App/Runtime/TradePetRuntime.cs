@@ -1670,7 +1670,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         foreach (var evaluation in liveBehavior.Evaluations.Where(item => item.Triggered))
         {
             var relatedGoals = _activeImprovementGoals.Where(item =>
-                    AppliesToGoal(item, evaluation.Rule, evaluation.ServerDate, trade.Symbol))
+                    AppliesToGoal(item, evaluation.Rule, evaluation.ServerDate, trade.Symbol) && trade.OpenedAtUtc >= item.CreatedAtUtc)
                 .Select(item => item.Id).Distinct(StringComparer.Ordinal).ToArray();
             var links = new List<BehaviorTradeLink>
             {
@@ -1684,7 +1684,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
             }
             var occurrence = new BehaviorOccurrence(
                 evaluation.Id, evaluation.AccountKey, evaluation.ServerDate, evaluation.Rule,
-                $"behavior-{_behaviorPolicies?.SelectedPreset ?? BehaviorPreset.Balanced}-v1",
+                BehaviorGoalMeasurement.PolicyVersion(_behaviorPolicies?.Selected ?? BehaviorPolicy.Balanced),
                 evaluation.Value, evaluation.Baseline, evaluation.Threshold, evaluation.Level,
                 ReviewEvidenceSource.LiveObservation, trade.OpenedAtUtc, evaluation.ObservedAtUtc,
                 evaluation.Summary, string.Empty, alertDelivered,
@@ -1694,16 +1694,25 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
                 () => _behaviorReviewService.RecordOccurrenceAsync(occurrence, _cancellation.Token),
                 "保存行为证据关联");
         }
-        foreach (var evaluation in liveBehavior.Evaluations)
+        var goalEvaluations = liveBehavior.Evaluations;
+        if (!goalEvaluations.Any(item => item.Rule == BehaviorRuleKind.ReentryCount) &&
+            _activeImprovementGoals.Any(item => AppliesToGoal(item, BehaviorRuleKind.ReentryCount, _serverDate, trade.Symbol) &&
+                trade.OpenedAtUtc >= item.CreatedAtUtc))
         {
-            foreach (var goal in _activeImprovementGoals.Where(item =>
-                         AppliesToGoal(item, evaluation.Rule, evaluation.ServerDate, trade.Symbol)))
+            var reentry = _behaviorCalculator.EvaluateOpen(
+                trade.AccountKey, _serverDate, trade, _trades.Values.Append(trade).ToArray(),
+                _behaviorPolicies?.Selected ?? BehaviorPolicy.Balanced, observedAtUtc,
+                symbolSpecifications: _symbolSpecifications).Evaluations.Single(item => item.Rule == BehaviorRuleKind.ReentryCount);
+            await TryPersistLiveAsync(() => _database.AddBehaviorEvaluationAsync(reentry, _cancellation.Token), "保存行为评估");
+            goalEvaluations = goalEvaluations.Append(reentry).ToArray();
+        }
+        foreach (var evaluation in goalEvaluations)
+        {
+            foreach (var goal in _activeImprovementGoals.ToArray().Where(item =>
+                         AppliesToGoal(item, evaluation.Rule, evaluation.ServerDate, trade.Symbol) && trade.OpenedAtUtc >= item.CreatedAtUtc))
             {
-                var observation = new GoalObservation(
-                    $"{goal.Id}:{evaluation.Id}", goal.Id, goal.AccountKey, evaluation.ServerDate, 1,
-                    evaluation.Triggered ? 0 : 1, evaluation.Triggered ? 1 : 0,
-                    evaluation.Triggered ? GoalObservationStatus.Failed : GoalObservationStatus.Passed,
-                    evaluation.Id, evaluation.ObservedAtUtc, [evaluation.Id], goal.RuleVersion);
+                var observation = BehaviorGoalMeasurement.Measure(goal, evaluation, trade, _trades.Values.ToArray(),
+                    _behaviorPolicies?.Selected ?? BehaviorPolicy.Balanced);
                 await TryPersistLiveAsync(
                     () => _behaviorReviewService.RecordGoalObservationAsync(observation, _cancellation.Token),
                     "保存改进目标观察");
@@ -1793,6 +1802,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
     private async Task ShowQuickReviewAsync(bool showEmptyMessage, bool automatic = false)
     {
         if (automatic && !_viewModel.QuickReviewPromptEnabled) return;
+        if (_behaviorActionCard is not null) { await OnUiAsync(() => ShowBehaviorActionCard?.Invoke(_behaviorActionCard)); return; }
         if (_entryReasonCard is not null) { await OnUiAsync(() => ShowEntryReasonCard?.Invoke(_entryReasonCard)); return; }
         if (_quickReviewCard is not null)
         {
@@ -1806,6 +1816,23 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
             return;
         }
         var accountKey = _account.Scope.AccountKey;
+        if (!automatic && showEmptyMessage && !_pendingQuickReviews.Values.Any(item => item.AccountKey == accountKey))
+        {
+            var session = _accountSessions.Current;
+            var completed = _trades.Values.Where(item => item.AccountKey == accountKey && item.IsComplete && item.CloseServerDate.HasValue).ToArray();
+            var selectedDate = DateOnly.TryParse(_viewModel.ReviewWorkspace.DailyDate, out var date) &&
+                               completed.Any(item => item.CloseServerDate == date)
+                ? date : completed.Select(item => item.CloseServerDate).Max();
+            if (selectedDate.HasValue && session is not null)
+            {
+                var data = await _reviewRepository.LoadWorkspaceAsync(accountKey, selectedDate.Value, selectedDate.Value, _cancellation.Token);
+                if (!_accountSessions.IsCurrent(accountKey, session.Generation)) return;
+                foreach (var trade in data.Trades.Where(item => item.IsComplete && item.CloseServerDate == selectedDate &&
+                             data.Documents.GetValueOrDefault(item.PositionId)?.HasCompletedReview != true))
+                    QueueQuickReview(trade);
+            }
+        }
+        var sessionGeneration = _accountSessions.Current?.Generation ?? -1;
         foreach (var pending in _pendingQuickReviews
                      .Where(item => item.Value.AccountKey == accountKey)
                      .OrderBy(item => item.Value.ClosedAtUtc))
@@ -1814,18 +1841,18 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
             var pendingKey = pending.Key;
             var detail = await _reviewRepository.LoadTradeDetailAsync(
                 new TradeKey(trade.AccountKey, trade.PositionId), _cancellation.Token);
-            if (detail is null || detail.Document is not null)
+            if (detail is null || detail.Document?.HasCompletedReview == true)
             {
                 _pendingQuickReviews.TryRemove(pendingKey, out _);
                 continue;
             }
             await OnUiAsync(() =>
             {
-                if (_account?.Scope.AccountKey != accountKey || _cancellation.IsCancellationRequested) return;
-                if (_entryReasonCard is not null || automatic && !_viewModel.QuickReviewPromptEnabled) return;
+                if (!_accountSessions.IsCurrent(accountKey, sessionGeneration) || _cancellation.IsCancellationRequested) return;
+                if (_entryReasonCard is not null || _behaviorActionCard is not null || automatic && !_viewModel.QuickReviewPromptEnabled) return;
                 if (_quickReviewCard is not null) { ShowQuickReviewCard?.Invoke(_quickReviewCard); return; }
                 var card = new QuickReviewCard(detail, _serverUtcOffsetSeconds);
-                card.SaveReviewAsync = dialog => SaveQuickReviewAsync(trade, detail.Version, dialog);
+                card.SaveReviewAsync = dialog => SaveQuickReviewAsync(trade, detail.Version, sessionGeneration, dialog);
                 card.ShowSavedReviews = () => _ = ShowSavedReviewsAsync();
                 _quickReviewCard = card;
                 card.Completed += response =>
@@ -1890,18 +1917,22 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         }
     }
 
-    private async Task<string?> SaveQuickReviewAsync(TradeRecord trade, ReviewDataVersion version, QuickReviewCard dialog)
+    private async Task<string?> SaveQuickReviewAsync(TradeRecord trade, ReviewDataVersion version, long generation, QuickReviewCard dialog)
     {
+        await using var lease = await EnterRuntimeOperationAsync(MaintenanceOperationKind.Write, _cancellation.Token);
+        if (!_persistenceAvailable || !_accountSessions.IsCurrent(trade.AccountKey, generation))
+            return "账户已切换或存储不可写，内容仍保留。";
         var key = new TradeKey(trade.AccountKey, trade.PositionId);
         var detail = await _reviewRepository.LoadTradeDetailAsync(key, _cancellation.Token);
+        if (!_accountSessions.IsCurrent(trade.AccountKey, generation)) return "账户已切换或存储不可写，内容仍保留。";
         var existing = detail?.Document;
         var command = new SaveTradeReviewCommand(key, existing?.EntryReason ?? detail?.EntryReasonNote?.Reason ?? string.Empty,
             dialog.ExitReason, existing?.DidWell ?? string.Empty,
             dialog.Improvement, existing is not null && existing.NextAction != existing.ToImprove
                 ? existing.NextAction : dialog.Improvement, dialog.AnalysisSummary,
-            existing?.Emotion ?? string.Empty, existing?.MarketCondition ?? string.Empty,
+            dialog.Emotion, existing?.MarketCondition ?? string.Empty,
             version.SourceVersion.ToString(CultureInfo.InvariantCulture), version.RuleVersion,
-            ReviewCompletionStatus.Reviewed, IsQuickReview: true);
+            ReviewCompletionStatus.Reviewed, IsQuickReview: true, ReportedExecution: dialog.ReportedExecution);
         var result = await _journalService.SaveTradeReviewAsync(command, dialog.DocumentRevision, _cancellation.Token);
         if (!result.IsSaved) return result.Message;
         try
@@ -2475,6 +2506,8 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         _floatingLossPolicy = (storedFloatingLossPolicy
             ?? await LoadFloatingLossFallbackAsync(_account.Scope.AccountKey)
             ?? FloatingLossAlertPolicy.BalancedDefault).Normalize();
+        _activeImprovementGoals.Clear();
+        _activeImprovementGoals.AddRange(await _database.LoadActiveImprovementGoalsAsync(_account.Scope.AccountKey, _cancellation.Token));
         foreach (var plan in await _database.LoadStructuredTradePlansAsync(
                      _account.Scope.AccountKey, _serverDate.AddDays(-30), _serverDate, _cancellation.Token))
         {
@@ -3960,6 +3993,11 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
 
         query.Data.DailyJournals.TryGetValue(date, out var journal);
         var facts = query.Snapshot.DailyFacts?.GetValueOrDefault(date);
+        var samples = await LoadDailyPositionSamplesAsync(query.Data, date, query.Snapshot.Filter.ServerUtcOffsetSeconds);
+        if (_lastWorkspaceQuery != query || _account?.Scope.AccountKey != accountKey) return;
+        facts = _reviewWorkspaceCalculator.BuildDailyFacts(accountKey, date, date, query.Data.Trades, query.Data.Deals,
+            query.Snapshot.Documents, query.Data.Behaviors, query.Data.DailyStates ?? new Dictionary<DateOnly, DailyState>(),
+            query.Snapshot.Filter.ServerUtcOffsetSeconds, samples)[date];
         var staleResult = journal is null
             ? null
             : await _journalService.MarkDailyNeedsReviewIfChangedAsync(
@@ -4126,9 +4164,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
             ? null
             : query.Data.Goals.FirstOrDefault(item => item.Id == identity.EntityId);
         var now = _timeProvider.GetUtcNow();
-        var ruleVersion = query?.Context.ExpectedAccountKey == identity.AccountKey
-            ? query.Data.Version.RuleVersion
-            : string.Empty;
+        var ruleVersion = BehaviorGoalMeasurement.PolicyVersion(_behaviorPolicies?.Selected ?? BehaviorPolicy.Balanced);
         var goal = new ImprovementGoal(
             existing is null ? identity.EntityId : $"goal-{Guid.NewGuid():N}", identity.AccountKey, review.GoalName, rule,
             ruleVersion, _serverDate, null, target, null,
@@ -5954,12 +5990,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         var to = now < dayEnd ? now : dayEnd;
         var relevant = data.Trades.Where(trade => trade.AccountKey == data.AccountKey &&
             trade.OpenedAtUtc < dayEnd && (trade.ClosedAtUtc is null || trade.ClosedAtUtc >= from)).ToArray();
-        var samples = new Dictionary<long, IReadOnlyList<PositionPnlSample>>();
-        foreach (var trade in relevant)
-        {
-            var detail = await _reviewRepository.LoadTradeDetailAsync(new TradeKey(data.AccountKey, trade.PositionId), _cancellation.Token);
-            if (detail is not null) samples[trade.PositionId] = detail.PnlSamples;
-        }
+        var samples = await LoadDailyPositionSamplesAsync(data, date, serverUtcOffsetSeconds);
         var terminal = _terminal;
         var paths = RuntimePaths.Resolve();
         var histories = new List<MarketHistoryResult>();
@@ -6002,6 +6033,21 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
             }
         }
         return data with { DailyMarketData = histories, PositionSamples = samples };
+    }
+
+    private async Task<IReadOnlyDictionary<long, IReadOnlyList<PositionPnlSample>>> LoadDailyPositionSamplesAsync(
+        ReviewWorkspaceData data, DateOnly date, int serverUtcOffsetSeconds)
+    {
+        var start = new DateTimeOffset(date.ToDateTime(TimeOnly.MinValue), TimeSpan.FromSeconds(serverUtcOffsetSeconds)).ToUniversalTime();
+        var end = start.AddDays(1);
+        var samples = new Dictionary<long, IReadOnlyList<PositionPnlSample>>();
+        foreach (var trade in data.Trades.Where(item => item.AccountKey == data.AccountKey &&
+                     item.OpenedAtUtc < end && (item.ClosedAtUtc is null || item.ClosedAtUtc >= start)))
+        {
+            var detail = await _reviewRepository.LoadTradeDetailAsync(new(data.AccountKey, trade.PositionId), _cancellation.Token);
+            if (detail is not null) samples[trade.PositionId] = detail.PnlSamples;
+        }
+        return samples;
     }
 
     private async Task ShowDailyTradingReportAsync(DateOnly date, bool automatic)
@@ -6060,16 +6106,6 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
                 return;
             }
 
-            var facts = _reviewWorkspaceCalculator.BuildDailyFacts(
-                accountKey,
-                date,
-                date,
-                data.Trades,
-                data.Deals,
-                data.Documents,
-                data.Behaviors,
-                data.DailyStates ?? new Dictionary<DateOnly, DailyState>(),
-                reportOffsetSeconds)[date];
             var completed = data.Trades
                 .Where(item => item.AccountKey == accountKey && item.IsComplete && item.CloseServerDate == date)
                 .OrderBy(item => item.ClosedAtUtc)
@@ -6077,6 +6113,11 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
                 .ToArray();
             data = await LoadDailyReportEvidenceAsync(data, date, reportOffsetSeconds);
             if (_account?.Scope.AccountKey != accountKey) return;
+            data = data with { Documents = _reviewWorkspaceCalculator.ProjectReviewStatuses(data.Trades, data.Deals,
+                data.Documents, data.Assessments, data.Excursions, data.Version) };
+            var facts = _reviewWorkspaceCalculator.BuildDailyFacts(accountKey, date, date, data.Trades, data.Deals,
+                data.Documents, data.Behaviors, data.DailyStates ?? new Dictionary<DateOnly, DailyState>(),
+                reportOffsetSeconds, data.PositionSamples)[date];
             var winCount = completed.Count(item => item.NetPnl > 0.01m);
             var lossCount = completed.Count(item => item.NetPnl < -0.01m);
             var breakevenCount = completed.Length - winCount - lossCount;
@@ -6084,7 +6125,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
             var reliableSampleCount = completed.Count(item => data.Excursions.TryGetValue(item.PositionId, out var excursion) && excursion.AccountKey == accountKey && excursion.IsReliable);
             var reviewedCount = completed.Count(item =>
                 data.Documents.TryGetValue(item.PositionId, out var document) &&
-                document.Status == ReviewCompletionStatus.Reviewed);
+                document.HasCompletedReview);
             var behaviorAlerts = data.Behaviors.Count(item =>
                 item.AccountKey == accountKey && item.ServerDate == date && item.Rule != BehaviorRuleKind.PlanDeviationRate &&
                 item.Level is BehaviorRiskLevel.Attention or BehaviorRiskLevel.Critical);
