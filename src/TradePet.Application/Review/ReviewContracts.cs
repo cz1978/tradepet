@@ -272,7 +272,9 @@ public sealed record SaveTradeReviewCommand(
     string RuleVersion,
     ReviewCompletionStatus RequestedStatus,
     bool IsQuickReview = false,
-    PlanExecutionSelfReport? ReportedExecution = null);
+    PlanExecutionSelfReport? ReportedExecution = null,
+    ExitExecutionSelfReport? ReportedExitExecution = null,
+    string? ExitEmotion = null);
 
 public sealed record TradeReviewEditSubmission(
     EditSnapshot<SaveTradeReviewCommand> Snapshot,

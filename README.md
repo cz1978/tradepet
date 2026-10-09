@@ -6,9 +6,9 @@
 
 > Trade alongside you, never on your behalf.
 
-**Current version: 1.0.0-rc.10** · [Download Windows portable release](https://github.com/cz1978/tradepet/releases/tag/v1.0.0-rc.10) · [Installation and upgrades](INSTALL.en.md) · [Changelog](CHANGELOG.en.md) · [MIT License](LICENSE)
+**Current version: 1.0.0-rc.11** · [Download Windows portable release](https://github.com/cz1978/tradepet/releases/tag/v1.0.0-rc.11) · [Installation and upgrades](INSTALL.en.md) · [Changelog](CHANGELOG.en.md) · [MIT License](LICENSE)
 
-`rc.10` keeps behavior input in pet popups: quick entry reasons and reviews include optional execution/emotion choices, alongside skipped-opportunity capture and seven automatically observed improvement goals. It aligns review completion and statistical scope across reports and calendars, highlights the selected exit reason, and groups the pet menu. The Windows package includes .NET, isolated Python, MT4/MT5 read-only plugins and bilingual documentation.
+`rc.11` adds Skip all to entry and exit cards and lets you save a daily summary directly in the report after confirming the generated facts and one next action. Individual trade reviews remain optional. Exit execution and emotional-state reports are stored separately from entry and legacy whole-trade reports, including a No preset exit rules choice. The complete Windows package retains bundled runtimes, read-only MT4/MT5 bridges and bilingual documentation.
 
 TradePet is a local Windows trading desktop pet. It connects to MT5 or MT4 in read-only mode and brings positions, risk, quick notes, reviews, macroeconomic events and daily reports into a desktop assistant.
 
@@ -31,7 +31,7 @@ Select **UI language** in Settings or the initial setup wizard, save, exit and r
 
 - Starts in the lower-right corner; adjust scale, opacity, position lock and mouse passthrough.
 - A floating position card shows live P/L. Collapse or hide it and restore it through the pet menu.
-- New entries and closes show entry-reason and quick-review cards without stealing focus. History sync does not trigger cards. Both prompts default on, can be disabled independently, and remain manually accessible.
+- New entries and closes show entry-reason and quick-review cards without stealing focus. History sync does not trigger cards. Both prompts default on, can be disabled independently, and remain manually accessible. Skip all clears the current account’s queue for that card type; new trades can still prompt, and skipped records do not become completed reviews.
 - Select or write an entry reason. Quick reviews use actual executions and reliable position samples and allow quick records and corrections. Longer handwritten reviews remain optional.
 - Check GitHub updates automatically or manually. A new version is announced once, links to Releases and is never installed automatically.
 
@@ -59,7 +59,7 @@ Complete losing trades become traceable price zones with entry counts, cumulativ
 #### Daily reports
 
 - Schedule reports using the current broker's trading-server time.
-- Summarizes realized net P/L, fees, win rate, best/worst trades, review progress, alerts, timelines and macro events.
+- Summarizes realized net P/L, fees, win rate, best/worst trades, alerts, timelines and macro events. After trading ends, open Fill daily summary, confirm the generated facts and select or write one next action, then save. Daily-summary completion is shown separately from optional individual trade reviews.
 - Actual M5 candles provide symbol context and coverage. Missing data is explained rather than inferred from P/L. Unlinked plans are not violations; missing strategy/setup labels do not create classification conclusions.
 - Overview and actions, Trades and risk, and Full Markdown tabs include symbol/direction/entry-hour/strategy breakdowns, holding times, initial risk, realized R, reliable MAE/MFE/giveback and a checklist linked to specific records.
 - Separates complete-trade from daily cash P/L, and closed-trade cumulative drawdown from account-equity drawdown. Cash-flow effects are checked separately. Missing/unreliable data stays explicit; an alert association is not treated as causation.
@@ -82,11 +82,11 @@ Default archive:
 
 The [illustrated guide](docs/images/tradepet-rc6-install-guide.png) shows extraction, bridge installation and chart attachment. Its screenshots use Chinese; [English instructions](INSTALL.en.md) describe the same actions. Python is bundled; the bridge still needs installation and manual chart attachment.
 
-Download **`TradePet-1.0.0-rc.10-win-x64.zip`**, extract the entire ZIP and run `TradePet.exe`. GitHub **Source code** archives are not application installers. Do not move the EXE alone.
+Download **`TradePet-1.0.0-rc.11-win-x64.zip`**, extract the entire ZIP and run `TradePet.exe`. GitHub **Source code** archives are not application installers. Do not move the EXE alone.
 
 The package includes .NET 8, 64-bit Python 3.13, MetaTrader5/NumPy, read-only MT4/MT5 plugins and documentation. No separate Python or dependency download is needed. `rc.5` and earlier did not bundle Python; upgrading is recommended. MT4 needs no Python. See [installation, upgrades, checksums and troubleshooting](INSTALL.en.md).
 
-#### Platform support (rc.10)
+#### Platform support (rc.11)
 
 | Feature | MT5 | MT4 |
 | --- | --- | --- |
@@ -172,9 +172,9 @@ An evolving personal tool, primarily verified on Windows x64, WeTrade MT5 and he
 
 > 陪你交易，不替你交易。
 
-**当前版本：1.0.0-rc.10** · [下载 Windows 便携版](https://github.com/cz1978/tradepet/releases/tag/v1.0.0-rc.10) · [安装与升级说明](INSTALL.md) · [更新日志](CHANGELOG.md) · [MIT 许可证](LICENSE)
+**当前版本：1.0.0-rc.11** · [下载 Windows 便携版](https://github.com/cz1978/tradepet/releases/tag/v1.0.0-rc.11) · [安装与升级说明](INSTALL.md) · [更新日志](CHANGELOG.md) · [MIT 许可证](LICENSE)
 
-`rc.10` 将交易行为输入集中在宠物弹框：入场原因与快速复盘可点选执行情况和交易时状态，并提供未交易机会记录与七项可自动观察的改进目标。统一复盘完成率与报表、日历统计口径，平仓原因显示选中高亮，宠物菜单按用途收拢。完整便携包内置 .NET、隔离的 Python、MT4/MT5 只读插件和中英说明。
+`rc.11` 在入场与出场弹框增加“全部跳过”；交易日报可直接确认自动生成的事实并选择或填写一条下次行动，保存日总结，逐笔复盘仍为可选。出场执行与平仓状态单独保存，支持“未预设退出规则”，并保留入场及旧版整笔交易自报。完整 Windows 便携包继续内置运行环境、MT4/MT5 只读插件和中英说明。
 
 TradePet 是一款面向 Windows 的本地交易桌宠。它以只读方式连接 MT5 或 MT4，把持仓、风险、快速记录、复盘、宏观事件和每日报告收进桌面助手里。
 
@@ -197,7 +197,7 @@ TradePet 不下单、不平仓、不改单。它关心的是交易者最容易�
 
 - 桌宠默认停在桌面右下角，可调整大小、透明度、固定和鼠标穿透。
 - 浮动持仓卡展示实时盈亏；支持折叠、隐藏，并可从宠物右键菜单恢复。
-- 新入场与平仓后分别在宠物旁提示入场原因、快速复盘，不抢焦点；历史补同步不弹出。两个提示默认开启，可在设置中心分别关闭，也可从宠物菜单手动打开。
+- 新入场与平仓后分别在宠物旁提示入场原因、快速复盘，不抢焦点；历史补同步不弹出。两个提示默认开启，可在设置中心分别关闭，也可从宠物菜单手动打开。“全部跳过”清掉当前账户对应类型的待提示队列，新交易仍可提示，跳过不计为已复盘。
 - 入场原因可点选或补写；快速复盘展示实际成交和可靠持仓采样，支持快捷记录与修正。手写长复盘保留为可选入口。
 - 设置中心可自动或手动检查 GitHub 新版本。同一新版自动提醒一次，下载入口指向项目发布页，不自动安装更新。
 
@@ -225,7 +225,7 @@ TradePet 会把完整亏损交易投影为可追溯的价格区域，记录进�
 #### 每日交易报告
 
 - 可设定每日自动弹出时间，时间基于当前 broker 交易服务器。
-- 汇总已实现净盈亏、费用、胜率、最佳/最差交易、复盘进度、行为提醒、时间线和宏观事件。
+- 汇总已实现净盈亏、费用、胜率、最佳/最差交易、行为提醒、时间线和宏观事件。当日交易结束后，点“填写日总结”，确认自动生成的事实，选择或填写一条下次行动并保存；日总结状态与可选的逐笔复盘分别显示。
 - 按关联品种提供实际 M5 K 线的行情背景与覆盖范围；缺失行情明确说明，不凭交易盈亏推断走势。未绑定计划不当作违规，人工策略/形态缺失不生成分类结论。
 - 日报窗口可直接查看概览与建议、逐笔交易与风险、完整 Markdown；支持品种/方向/入场小时/策略盈亏拆分、持仓时长、初始风险与实际 R、可靠采样下的 MAE/MFE 与回吐，以及关联具体记录的下一交易日行动清单。
 - 区分完整交易盈亏与当日现金盈亏、已平仓累计曲线回撤与账户净值回撤；出入金影响单独校验，缺失或不可靠数据明确标记，不补零、不把提醒关联当作亏损原因。
@@ -248,11 +248,11 @@ TradePet 会把完整亏损交易投影为可追溯的价格区域，记录进�
 
 **[查看图文安装教程（含 Bridge 安装与挂图）](docs/images/tradepet-rc6-install-guide.png)**。Python 已内置，Bridge 仍需点击安装，再手动拖到交易终端的图表上运行。
 
-普通用户请下载发布页中的 **`TradePet-1.0.0-rc.10-win-x64.zip`**，完整解压后运行 `TradePet.exe`。不要下载 GitHub 自动生成的 `Source code` 源码包作为安装包，也不要单独移动 EXE。
+普通用户请下载发布页中的 **`TradePet-1.0.0-rc.11-win-x64.zip`**，完整解压后运行 `TradePet.exe`。不要下载 GitHub 自动生成的 `Source code` 源码包作为安装包，也不要单独移动 EXE。
 
-`rc.10` 便携包已包含 .NET 8、64 位 Python 3.13、MetaTrader5/NumPy 依赖、MT4/MT5 只读插件和安装文档，无需另装 Python 或联网下载依赖。旧版 `rc.5` 及更早版本未包含 Python，建议升级；MT4 无需 Python。首次配置、升级保留数据、校验安装包和排障步骤见 [INSTALL.md](INSTALL.md)。
+`rc.11` 便携包已包含 .NET 8、64 位 Python 3.13、MetaTrader5/NumPy 依赖、MT4/MT5 只读插件和安装文档，无需另装 Python 或联网下载依赖。旧版 `rc.5` 及更早版本未包含 Python，建议升级；MT4 无需 Python。首次配置、升级保留数据、校验安装包和排障步骤见 [INSTALL.md](INSTALL.md)。
 
-#### 平台支持范围（rc.10）
+#### 平台支持范围（rc.11）
 
 | 功能 | MT5 | MT4 |
 | --- | --- | --- |

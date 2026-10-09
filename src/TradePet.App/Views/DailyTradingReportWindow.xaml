@@ -98,8 +98,11 @@
                 <StackPanel Grid.Column="1">
                     <TextBlock Text="{l:Text Key=S2008cc4a68121fa0}" Style="{StaticResource MutedText}" />
                     <TextBlock x:Name="ProcessText" Foreground="#F2F5F4" TextWrapping="Wrap" Margin="0,5,0,12" />
-                    <TextBlock Text="{l:Text Key=S4323a476f9f145ac}" Style="{StaticResource MutedText}" />
-                    <TextBlock x:Name="ReviewText" Foreground="#F2F5F4" TextWrapping="Wrap" Margin="0,5,0,12" />
+                    <TextBlock Text="{l:Text Key=DailyReportReviewTitle}" Style="{StaticResource MutedText}" />
+                    <TextBlock x:Name="ReviewText" Foreground="#F2F5F4" TextWrapping="Wrap" Margin="0,5,0,4" />
+                    <TextBlock x:Name="TradeReviewText" Style="{StaticResource MutedText}" TextWrapping="Wrap" />
+                    <Button x:Name="BeginDailyReviewButton" Content="{l:Text Key=DailyReportBeginReview}" Click="BeginDailyReview_Click"
+                            HorizontalAlignment="Left" Padding="12,6" Margin="0,7,0,12" />
                     <TextBlock Text="{l:Text Key=Sf9e3f6e326c7582a}" Style="{StaticResource MutedText}" />
                     <TextBlock x:Name="BehaviorText" Foreground="#F2F5F4" TextWrapping="Wrap" Margin="0,5,0,0" />
                 </StackPanel>
@@ -175,6 +178,25 @@
                     </DataGrid.Columns>
                 </DataGrid>
             </Grid>
+        </TabItem>
+        <TabItem x:Name="DailyReviewTab" Header="{l:Text Key=DailyReportReviewTitle}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel x:Name="DailyReviewForm" Margin="0,10,10,0">
+                    <Border Style="{StaticResource SectionCard}">
+                        <StackPanel>
+                            <TextBlock Text="{l:Text Key=DailyReportReviewGuide}" Foreground="#C4D0DA" TextWrapping="Wrap" />
+                            <TextBlock x:Name="DailyReviewStatusText" Foreground="#65D9BE" Margin="0,8,0,0" />
+                        </StackPanel>
+                    </Border>
+                    <TextBlock Text="{l:Text Key=DailyReportSummaryLabel}" Style="{StaticResource MutedText}" Margin="0,0,0,6" />
+                    <TextBox x:Name="DailySummaryBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="110" MaxHeight="220" VerticalScrollBarVisibility="Auto" />
+                    <TextBlock Text="{l:Text Key=DailyReportActionLabel}" Style="{StaticResource MutedText}" Margin="0,14,0,6" />
+                    <ComboBox x:Name="DailyActionChoices" SelectionChanged="DailyActionChoices_SelectionChanged" Margin="0,0,0,6" />
+                    <TextBox x:Name="DailyActionBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="70" />
+                    <Button x:Name="SaveDailyReviewButton" Content="{l:Text Key=DailyReportSaveReview}" Click="SaveDailyReview_Click"
+                            HorizontalAlignment="Left" Padding="14,7" Margin="0,12,0,0" />
+                </StackPanel>
+            </ScrollViewer>
         </TabItem>
         <TabItem Header="{l:Text Key=S627b311098aa0522}">
             <TextBox x:Name="FullReportText" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"

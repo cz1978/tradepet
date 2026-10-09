@@ -157,6 +157,14 @@ public enum PlanExecutionSelfReport
     Unsure,
 }
 
+public enum ExitExecutionSelfReport
+{
+    Followed,
+    Deviated,
+    NoPreset,
+    Unsure,
+}
+
 public sealed record TradeReviewDocument(
     TradeKey TradeKey,
     ReviewCompletionStatus Status,
@@ -178,7 +186,10 @@ public sealed record TradeReviewDocument(
     DateTimeOffset? ReviewedAtUtc = null,
     bool IsQuickReview = false,
     PlanExecutionSelfReport? ReportedExecution = null,
-    DateTimeOffset? ReportedExecutionRecordedAtUtc = null)
+    DateTimeOffset? ReportedExecutionRecordedAtUtc = null,
+    ExitExecutionSelfReport? ReportedExitExecution = null,
+    DateTimeOffset? ReportedExitExecutionRecordedAtUtc = null,
+    string ExitEmotion = "")
 {
     [JsonIgnore]
     public bool HasCompletedReview => Status == ReviewCompletionStatus.Reviewed ||
@@ -197,6 +208,7 @@ public sealed record TradeReviewDocument(
         NextAction = NextAction.Trim(),
         Summary = Summary.Trim(),
         Emotion = Emotion.Trim(),
+        ExitEmotion = ExitEmotion.Trim(),
         MarketCondition = MarketCondition.Trim(),
     };
 }

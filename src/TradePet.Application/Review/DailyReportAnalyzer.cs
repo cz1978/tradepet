@@ -164,6 +164,9 @@ public static class DailyReportAnalyzer
             if (document?.ReportedExecution is { } reviewExecution)
                 fields.Add($"复盘执行自报：{QuickReviewAnalyzer.DescribeReportedExecution(reviewExecution)}");
             if (!string.IsNullOrWhiteSpace(document?.Emotion)) fields.Add($"交易状态自报：{document.Emotion}");
+            if (document?.ReportedExitExecution is { } exitExecution)
+                fields.Add($"退出执行自报：{QuickReviewAnalyzer.DescribeReportedExitExecution(exitExecution)}");
+            if (!string.IsNullOrWhiteSpace(document?.ExitEmotion)) fields.Add($"平仓状态自报：{document.ExitEmotion}");
             if (fields.Count > 0) selfReports.Add($"#{trade.PositionId} · {string.Join("；", fields.Select(TradePet.Core.Localization.UiText.Translate))}。");
         }
         if (selfReports.Count > 0)
@@ -229,8 +232,6 @@ public static class DailyReportAnalyzer
                 actions.Add($"人工记录 · #{trade.PositionId}：{doc.NextAction.Trim()}");
         if (data.DailyJournals.TryGetValue(date, out var journal) && !string.IsNullOrWhiteSpace(journal.NextAction))
             actions.Add($"当日日记中的下一步行动：{journal.NextAction.Trim()}");
-        var pending = completed.Count(t => data.Documents.GetValueOrDefault(t.PositionId)?.HasCompletedReview != true);
-        if (pending > 0) actions.Add($"当日 {pending} 笔尚未复盘，可在宠物快速复盘中保存；保存即计入完成，无需再确认。");
         if (actions.Count == 0) actions.Add("现有记录不足以提出具体纠偏动作；下一交易日前检查风险记录与数据采集状态。");
         sections.Add(new("下一交易日行动清单", actions));
 

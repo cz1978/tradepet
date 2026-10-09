@@ -255,8 +255,9 @@ public sealed class PetWindowTests
                 new ReviewDataVersion("Broker|1", 1, 1, 1, "rule-1", "time-1", now));
             var quick = new QuickReviewCard(detail);
             Assert.DoesNotContain("亏损", quick.ExitReason);
-            Assert.Null(quick.ReportedExecution);
-            Assert.Empty(quick.Emotion);
+            Assert.Null(quick.ReportedExitExecution);
+            Assert.Empty(quick.ExitEmotion);
+            Assert.False(((Expander)quick.FindName("ExitEmotionExpander")).IsExpanded);
             var original = new TradeReviewDocument(new("Broker|1", 1), ReviewCompletionStatus.Reviewed,
                 "入场原文", "保存设置", "", "我的改进原文", "下一步", "保存设置", "担心错过", "",
                 3, "source", "rule", "source", "rule", now, now, now, IsQuickReview: true,
@@ -265,8 +266,25 @@ public sealed class PetWindowTests
             Assert.Equal(original.ExitReason, reopened.ExitReason);
             Assert.Equal(original.ToImprove, reopened.Improvement);
             Assert.Equal(original.Summary, reopened.AnalysisSummary);
-            Assert.Equal(original.ReportedExecution, reopened.ReportedExecution);
-            Assert.Equal(original.Emotion, reopened.Emotion);
+            Assert.Null(reopened.ReportedExitExecution);
+            Assert.Empty(reopened.ExitEmotion);
+            Assert.Contains(original.Emotion, ((TextBlock)reopened.FindName("LegacySelfReportText")).Text);
+            var exitChoices = ((WrapPanel)reopened.FindName("ExecutionChoices")).Children.OfType<RadioButton>().ToArray();
+            Assert.Equal(4, exitChoices.Length);
+            Assert.DoesNotContain(exitChoices, choice => choice.IsChecked == true);
+            exitChoices.Single(choice => (string)choice.Tag == "NoPreset").IsChecked = true;
+            Assert.Equal(ExitExecutionSelfReport.NoPreset, reopened.ReportedExitExecution);
+            var savedExit = new QuickReviewCard(detail with
+            {
+                Document = original with { ReportedExitExecution = ExitExecutionSelfReport.NoPreset, ExitEmotion = "怕利润回吐" },
+            });
+            Assert.Equal(ExitExecutionSelfReport.NoPreset, savedExit.ReportedExitExecution);
+            Assert.Equal("怕利润回吐", savedExit.ExitEmotion);
+            Assert.False(((Expander)savedExit.FindName("ExitEmotionExpander")).IsExpanded);
+            var emotions = ((WrapPanel)savedExit.FindName("EmotionChoices")).Children.OfType<RadioButton>().ToArray();
+            Assert.DoesNotContain(emotions, choice => (string)choice.Tag == "担心错过" || (string)choice.Tag == "想扳回");
+            emotions.Single(choice => (string)choice.Tag == "").IsChecked = true;
+            Assert.Empty(savedExit.ExitEmotion);
             var quickSaved = false;
             reopened.SaveReviewAsync = card => { Assert.Equal(original.Summary, card.AnalysisSummary); quickSaved = true; return Task.FromResult<string?>(null); };
             ((Button)reopened.FindName("QuickSaveButton")).RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
@@ -551,7 +569,12 @@ public sealed class PetWindowTests
             var attempts = 0;
             var completed = 0;
             review.Completed += _ => completed++;
-            review.SaveReviewAsync = _ => Task.FromResult(++attempts == 1 ? "存储失败，请重试" : (string?)null);
+            review.SaveReviewAsync = card =>
+            {
+                Assert.Null(card.ReportedExitExecution);
+                Assert.Empty(card.ExitEmotion);
+                return Task.FromResult(++attempts == 1 ? "存储失败，请重试" : (string?)null);
+            };
             var saveButton = (Button)review.FindName("QuickSaveButton");
             saveButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
             Assert.False(review.SaveRequested);
@@ -563,6 +586,8 @@ public sealed class PetWindowTests
             Assert.False(popup.IsOpen);
             Assert.True(review.IsCompleted);
             Assert.Equal(1, completed);
+            ((Button)review.FindName("SkipAllButton")).RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            Assert.False(review.SkipAllRequested);
             Assert.False(string.IsNullOrWhiteSpace(review.Improvement));
             ((TextBox)review.FindName("ExitReasonBox")).Text = "主动退出";
             ((TextBox)review.FindName("ImproveBox")).Text = "我的修正";
@@ -571,6 +596,27 @@ public sealed class PetWindowTests
             Assert.Contains("回吐 25", review.AnalysisSummary);
         }
         finally { review.Dismiss(); }
+
+        var skipped = new QuickReviewCard(detail);
+        var skippedCount = 0;
+        skipped.Completed += _ => skippedCount++;
+        skipped.SaveReviewAsync = _ => throw new InvalidOperationException("Skipping must not save a review.");
+        pet.ShowQuickReviewCard(skipped);
+        skipped.UpdateLayout();
+        var skipAll = (Button)skipped.FindName("SkipAllButton");
+        Assert.True(skipAll.ActualWidth > 0);
+        var corner = skipAll.TransformToAncestor(skipped).Transform(new Point(skipAll.ActualWidth, skipAll.ActualHeight));
+        Assert.InRange(corner.X, 0, skipped.ActualWidth);
+        Assert.InRange(corner.Y, 0, skipped.ActualHeight);
+        skipAll.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        skipAll.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        skipped.Dismiss();
+        Assert.True(skipped.SkipAllRequested);
+        Assert.True(skipped.IsCompleted);
+        Assert.False(skipped.SaveRequested);
+        Assert.False(skipped.RemindLater);
+        Assert.Equal(1, skippedCount);
+        Assert.False(((Popup)pet.FindName("ReviewCardPopup")).IsOpen);
     }
 
     private static void VerifyEntryReason(PetWindow pet)
@@ -609,7 +655,28 @@ public sealed class PetWindowTests
         Assert.Same(next, ((ContentControl)pet.FindName("ReviewCardHost")).Content);
         save.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
         Assert.Equal(2, attempts);
+        ((Button)card.FindName("SkipAllButton")).RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        Assert.False(card.SkipAllRequested);
         next.Dismiss();
+        Assert.False(popup.IsOpen);
+
+        var skipped = new EntryReasonCard(trade, 0);
+        var skippedCount = 0;
+        skipped.Completed += _ => skippedCount++;
+        skipped.SaveReasonAsync = _ => throw new InvalidOperationException("Skipping must not save an entry reason.");
+        pet.ShowEntryReasonCard(skipped);
+        skipped.UpdateLayout();
+        var skipAll = (Button)skipped.FindName("SkipAllButton");
+        Assert.True(skipAll.ActualWidth > 0);
+        var corner = skipAll.TransformToAncestor(skipped).Transform(new Point(skipAll.ActualWidth, skipAll.ActualHeight));
+        Assert.InRange(corner.X, 0, skipped.ActualWidth);
+        Assert.InRange(corner.Y, 0, skipped.ActualHeight);
+        skipAll.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        skipAll.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        skipped.Dismiss();
+        Assert.True(skipped.SkipAllRequested);
+        Assert.True(skipped.IsCompleted);
+        Assert.Equal(1, skippedCount);
         Assert.False(popup.IsOpen);
     }
 
@@ -685,7 +752,7 @@ public sealed class PetWindowTests
                 "100% · 可靠", "开仓时 SL 95 / TP 110", "按记录中的退出条件平仓", "结合走势核对退出")], "## 风险分析\n\n完整事实。\n");
         var report = new DailyTradingReport("测试账户", "USD", new(2026, 9, 25), true,
             12, -2, 1, 1, 0, 0, 100, null, null, 1, 0, 0, 1, 19, 5,
-            "# 2026-09-25 交易日报\n\n" + analysis.Markdown, Analysis: analysis);
+            "# 2026-09-25 交易日报\n\n" + analysis.Markdown, Analysis: analysis, DailySourceVersion: "daily-1");
         var window = new DailyTradingReportWindow(report);
         try
         {
@@ -701,6 +768,33 @@ public sealed class PetWindowTests
             Assert.Equal(report.Markdown, ((TextBox)window.FindName("FullReportText")).Text);
             Assert.Null(window.FindName("PlanText"));
             Assert.Contains("全程采样可靠", ((TextBlock)window.FindName("ProcessText")).Text);
+            Assert.Equal("已自动分析 1 笔 · 日总结未保存", ((TextBlock)window.FindName("ReviewText")).Text);
+            Assert.Contains("可选", ((TextBlock)window.FindName("TradeReviewText")).Text);
+            Assert.DoesNotContain("待复盘", ((TextBlock)window.FindName("SummaryText")).Text);
+            ((Button)window.FindName("BeginDailyReviewButton")).RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            Assert.Same(window.FindName("DailyReviewTab"), ((TabControl)window.FindName("ReportTabs")).SelectedItem);
+            Assert.Contains("当日盈利", ((TextBox)window.FindName("DailySummaryBox")).Text);
+            ((ComboBox)window.FindName("DailyActionChoices")).SelectedIndex = 0;
+            Assert.Equal("补齐 #42 的入场风险与退出原因。", ((TextBox)window.FindName("DailyActionBox")).Text);
+            var saveCalls = 0;
+            var journal = new DailyJournal(report.AccountKey, report.ServerDate, "", "", "当日事实", "", "", "下次行动",
+                ReviewCompletionStatus.Reviewed, 1, "daily-1", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow,
+                ReviewedSourceVersion: "daily-1");
+            window.SaveDailyReviewAsync = (summary, action) =>
+            {
+                Assert.Contains("当日盈利", summary);
+                Assert.Equal("补齐 #42 的入场风险与退出原因。", action);
+                saveCalls++;
+                return Task.FromResult(ReviewSaveResult<DailyJournal>.Saved(journal));
+            };
+            ((Button)window.FindName("SaveDailyReviewButton")).RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            Assert.Equal(1, saveCalls);
+            Assert.Equal("日总结已完成", ((TextBlock)window.FindName("DailyReviewStatusText")).Text);
+            Assert.Equal(0, window.Report.ReviewedCount);
+            Assert.Contains("日总结已完成", ((TextBlock)window.FindName("ReviewText")).Text);
+            window.ApplyReport(report with { Journal = journal, DailySourceVersion = "daily-2" });
+            Assert.Contains("需重审", ((TextBlock)window.FindName("ReviewText")).Text);
+            Assert.Equal(journal.PostMarketSummary, ((TextBox)window.FindName("DailySummaryBox")).Text);
             Assert.Equal("19 条风险提醒，其中冷静期触发 5 条（不含正常检查）",
                 ((TextBlock)window.FindName("BehaviorText")).Text);
             var tabs = (TabControl)window.FindName("ReportTabs");

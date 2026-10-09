@@ -9,6 +9,46 @@ public sealed class ReviewServicesTests
 {
     private static readonly DateTimeOffset Now = new(2026, 9, 6, 4, 0, 0, TimeSpan.Zero);
 
+    [Theory]
+    [InlineData(ExitExecutionSelfReport.Followed)]
+    [InlineData(ExitExecutionSelfReport.Deviated)]
+    [InlineData(ExitExecutionSelfReport.NoPreset)]
+    [InlineData(ExitExecutionSelfReport.Unsure)]
+    public async Task ExitSelfReport_StaysSeparateFromLegacyTradeReportAndSurvivesGeneralEdits(ExitExecutionSelfReport execution)
+    {
+        var repository = FakeRepository.Create();
+        var service = new JournalService(repository, new FixedTimeProvider(Now));
+        var legacy = new SaveTradeReviewCommand(new("Broker|1", 1), "入场记录", "主动平仓", "", "", "",
+            "交易过程", "担心错过", "", "source-1", "rule-1", ReviewCompletionStatus.Reviewed,
+            IsQuickReview: true, ReportedExecution: PlanExecutionSelfReport.Deviated);
+        Assert.True((await service.SaveTradeReviewAsync(legacy, 0)).IsSaved);
+        var exit = legacy with { ReportedExecution = null, ReportedExitExecution = execution, ExitEmotion = " 怕利润回吐 " };
+        var saved = await service.SaveTradeReviewAsync(exit, 1);
+        Assert.True(saved.IsSaved);
+        Assert.True(saved.Value!.HasCompletedReview);
+        Assert.Equal(execution, saved.Value.ReportedExitExecution);
+        Assert.Equal(Now, saved.Value.ReportedExitExecutionRecordedAtUtc);
+        Assert.Equal("怕利润回吐", saved.Value.ExitEmotion);
+        Assert.Equal(PlanExecutionSelfReport.Deviated, saved.Value.ReportedExecution);
+        Assert.Equal("担心错过", saved.Value.Emotion);
+        Assert.Empty(repository.Assessments);
+
+        var edited = await service.SaveTradeReviewAsync(exit with
+        {
+            IsQuickReview = false, Summary = "事后补充", ReportedExitExecution = null, ExitEmotion = null,
+        }, 2);
+        Assert.True(edited.IsSaved);
+        Assert.True(edited.Value!.HasCompletedReview);
+        Assert.Equal(execution, edited.Value.ReportedExitExecution);
+        Assert.Equal(Now, edited.Value.ReportedExitExecutionRecordedAtUtc);
+        Assert.Equal("怕利润回吐", edited.Value.ExitEmotion);
+        var cleared = await service.SaveTradeReviewAsync(exit with { ExitEmotion = "" }, 3);
+        Assert.True(cleared.IsSaved);
+        Assert.Empty(cleared.Value!.ExitEmotion);
+        Assert.Equal("担心错过", cleared.Value.Emotion);
+        Assert.Empty(repository.Assessments);
+    }
+
     [Fact]
     public async Task PetSelfReport_IsSavedWithoutCreatingRuleAssessmentsAndSurvivesGeneralEdits()
     {
@@ -48,6 +88,8 @@ public sealed class ReviewServicesTests
         Assert.True(result.IsSaved);
         var document = result.Value!;
         Assert.True(document.IsQuickReview);
+        Assert.Null(document.ReportedExitExecution);
+        Assert.Empty(document.ExitEmotion);
         Assert.Equal(ReviewCompletionStatus.Reviewed, document.Status);
         Assert.Equal(Now, document.ReviewedAtUtc);
         Assert.StartsWith("trade-v1:", document.ReviewedSourceVersion);
@@ -165,6 +207,27 @@ public sealed class ReviewServicesTests
         Assert.Equal(ReviewCompletionStatus.NeedsReview, result.Value!.Status);
         Assert.Equal("旧结论", result.Value.Summary);
         Assert.Equal("source-1", result.Value.ReviewedSourceVersion);
+    }
+
+    [Fact]
+    public async Task DailyJournal_CompletesWithSummaryAndOneActionWithoutRequiringExtraForms()
+    {
+        var repository = FakeRepository.Create();
+        var service = new JournalService(repository, new FixedTimeProvider(Now));
+        var journal = new DailyJournal("Broker|1", new(2026, 9, 6), "", "", "自动生成的当日事实",
+            "", "", "下一次检查触发", ReviewCompletionStatus.Draft, 0, "0", default, default);
+
+        var missingAction = await service.CompleteDailyJournalAsync(journal with { NextAction = " " }, 0, "daily-1");
+        var missingSummary = await service.CompleteDailyJournalAsync(journal with { PostMarketSummary = " " }, 0, "daily-1");
+        Assert.False(missingAction.IsSaved);
+        Assert.False(missingSummary.IsSaved);
+        var result = await service.CompleteDailyJournalAsync(journal, 0, "daily-1");
+
+        Assert.True(result.IsSaved);
+        Assert.Equal(ReviewCompletionStatus.Reviewed, result.Value!.Status);
+        Assert.Equal("", result.Value.DidWell);
+        Assert.Equal("", result.Value.ToImprove);
+        Assert.Equal("daily-1", result.Value.ReviewedSourceVersion);
     }
 
     [Fact]

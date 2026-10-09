@@ -8,6 +8,25 @@ namespace TradePet.Application.Tests;
 public sealed class DailyReportAnalyzerTests
 {
     [Fact]
+    public void ExitSelfReport_DistinguishesNoPresetFromDeviationAndKeepsLegacyStateSeparate()
+    {
+        var document = new TradeReviewDocument(new(Account, 1), ReviewCompletionStatus.Reviewed,
+            "", "手动退出", "", "", "", "总结", "担心错过", "",
+            1, "source", "rule", "source", "rule", At, At,
+            ReportedExitExecution: ExitExecutionSelfReport.NoPreset, ExitEmotion: "难以承受亏损");
+        var data = Data(Trade(1, -5)) with
+        {
+            Documents = new Dictionary<long, TradeReviewDocument> { [1] = document },
+        };
+        var report = Analyze(data);
+        var section = Assert.Single(report.Sections, s => s.Title == "宠物记录与执行自报");
+        Assert.Contains(section.Lines, line => line.Contains("退出执行自报：未预设退出规则") &&
+            line.Contains("平仓状态自报：难以承受亏损") && line.Contains("交易状态自报：担心错过"));
+        Assert.DoesNotContain(section.Lines, line => line.Contains("退出执行自报：偏离退出规则"));
+        Assert.Empty(data.Assessments);
+    }
+
+    [Fact]
     public void PetEntryChoices_AppearInDailyReportWithoutAReviewDocumentAndKeepAccountsIsolated()
     {
         var data = Data(Trade(1, -5), Trade(2, 5)) with
@@ -202,6 +221,7 @@ public sealed class DailyReportAnalyzerTests
         Assert.DoesNotContain("未分类", report.Markdown);
         Assert.Contains("SL/TP：缺少持仓采样", report.Markdown);
         Assert.DoesNotContain("1 笔待复盘", report.Markdown);
+        Assert.DoesNotContain("尚未复盘", report.Markdown);
     }
 
     [Fact]

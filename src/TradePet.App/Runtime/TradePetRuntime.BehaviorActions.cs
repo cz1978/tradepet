@@ -115,7 +115,10 @@ public sealed partial class TradePetRuntime
             summary.AppendLine(UiText.Translate($"完整平仓 {trades.Length} 笔 · 净盈亏 {trades.Sum(item => item.NetPnl):+0.##;-0.##;0} {data.Currency}"));
             summary.AppendLine(UiText.Translate($"已复盘 {trades.Count(item => documents.GetValueOrDefault(item.PositionId)?.HasCompletedReview == true)} / {trades.Length} 笔；快速复盘保存即完成。"));
             var reported = trades.Select(item => documents.GetValueOrDefault(item.PositionId)).Where(item => item?.ReportedExecution is not null).ToArray();
-            summary.AppendLine(UiText.Translate($"执行自报 {reported.Length} 笔，其中按计划 {reported.Count(item => item!.ReportedExecution == PlanExecutionSelfReport.Followed)} 笔；未自报不推断。"));
+            var exits = trades.Select(item => documents.GetValueOrDefault(item.PositionId)?.ReportedExitExecution).ToArray();
+            summary.AppendLine(UiText.Translate($"退出自报：按规则 {exits.Count(item => item == ExitExecutionSelfReport.Followed)} 笔 · 偏离 {exits.Count(item => item == ExitExecutionSelfReport.Deviated)} 笔 · 未预设 {exits.Count(item => item == ExitExecutionSelfReport.NoPreset)} 笔 · 不确定 {exits.Count(item => item == ExitExecutionSelfReport.Unsure)} 笔；未填写不推断。"));
+            if (reported.Length > 0)
+                summary.AppendLine(UiText.Translate($"整笔执行自报 {reported.Length} 笔，其中按计划 {reported.Count(item => item!.ReportedExecution == PlanExecutionSelfReport.Followed)} 笔；未自报不推断。"));
             var tradeLookup = trades.ToDictionary(item => new TradeKey(item.AccountKey, item.PositionId));
             foreach (var group in behaviors.GroupBy(item => item.Rule).OrderByDescending(item => item.Count()).Take(3))
             {

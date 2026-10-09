@@ -6,6 +6,15 @@ public sealed record QuickReviewAnalysis(string ExitReason, string Explanation, 
 
 public static class QuickReviewAnalyzer
 {
+    public static string DescribeReportedExitExecution(ExitExecutionSelfReport? report) => report switch
+    {
+        ExitExecutionSelfReport.Followed => "按退出规则",
+        ExitExecutionSelfReport.Deviated => "偏离退出规则",
+        ExitExecutionSelfReport.NoPreset => "未预设退出规则",
+        ExitExecutionSelfReport.Unsure => "不确定",
+        _ => "未记录",
+    };
+
     public static string DescribeReportedExecution(PlanExecutionSelfReport? report) => report switch
     {
         PlanExecutionSelfReport.Followed => "按计划",

@@ -77,6 +77,9 @@ public sealed partial class TradePetRuntime
                 _entryReasonCard = card;
                 card.Completed += response =>
                 {
+                    if (response.SkipAllRequested)
+                        foreach (var item in _pendingEntryReasons.Where(item => item.Value.AccountKey == key.AccountKey))
+                            _pendingEntryReasons.TryRemove(item.Key, out _);
                     _pendingEntryReasons.TryRemove(pending.Key, out _);
                     _entryReasonCard = null;
                     _ = TryShowAutomaticPromptAsync();

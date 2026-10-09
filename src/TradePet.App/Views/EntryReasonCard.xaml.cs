@@ -9,6 +9,7 @@ public partial class EntryReasonCard : System.Windows.Controls.UserControl
 {
     private bool _saving;
     public bool IsCompleted { get; private set; }
+    public bool SkipAllRequested { get; private set; }
     public string Reason => ReasonBox.Text.Trim();
     public PlanExecutionSelfReport? ReportedExecution => Enum.TryParse<PlanExecutionSelfReport>(
         ExecutionChoices.Children.OfType<RadioButton>().FirstOrDefault(item => item.IsChecked == true)?.Tag as string,
@@ -47,6 +48,12 @@ public partial class EntryReasonCard : System.Windows.Controls.UserControl
         Dismiss();
     }
     private void Skip_Click(object sender, RoutedEventArgs e) => Dismiss();
+    private void SkipAll_Click(object sender, RoutedEventArgs e)
+    {
+        if (_saving || IsCompleted) return;
+        SkipAllRequested = true;
+        Dismiss();
+    }
     public void Dismiss()
     {
         if (_saving || IsCompleted) return;

@@ -33,5 +33,13 @@ public sealed class UiTextTests
         Assert.Equal(note, UiText.Translate(note, "en-US"));
         Assert.Equal("EURUSD.s 1.23 -33.82", UiText.Translate("EURUSD.s 1.23 -33.82", "en-US"));
         Assert.Equal("zh-CN", UiText.NormalizeLanguage("unsupported"));
+        Assert.Equal("66 trades analyzed automatically · Daily summary completed",
+            UiText.Translate("已自动分析 66 笔 · 日总结已完成", "en-US"));
+        Assert.Equal("Individual reviews (optional): 0/66 saved",
+            UiText.Translate("逐笔复盘（可选）：已保存 0/66 笔", "en-US"));
+        Assert.Equal("Exit execution report: No preset exit rules; exit state report: Feared giving back profit",
+            UiText.Translate("退出执行自报：未预设退出规则；平仓状态自报：怕利润回吐", "en-US"));
+        Assert.Equal("Exit reports: followed rules 1 · deviated 2 · no preset 3 · unsure 4; missing reports are not inferred.",
+            UiText.Translate("退出自报：按规则 1 笔 · 偏离 2 笔 · 未预设 3 笔 · 不确定 4 笔；未填写不推断。", "en-US"));
     }
 }

@@ -556,8 +556,8 @@
   },
   {
     "key": "PetReviewExecution",
-    "source": "本笔是否按计划（选填，自报）",
-    "english": "Trade followed your plan? (optional, self-reported)",
+    "source": "这次退出是否按原定规则？（选填，自报）",
+    "english": "Did this exit follow your original rules? (optional, self-reported)",
     "template": false,
     "preserve": []
   },
@@ -570,8 +570,8 @@
   },
   {
     "key": "PetReviewEmotion",
-    "source": "交易时状态（选填）",
-    "english": "State during the trade (optional)",
+    "source": "平仓时状态（选填）",
+    "english": "State at exit (optional)",
     "template": false,
     "preserve": []
   },
@@ -621,6 +621,111 @@
     "key": "PetEmotionRecover",
     "source": "想扳回",
     "english": "Want to recover losses",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetExitFollowed",
+    "source": "按退出规则",
+    "english": "Followed exit rules",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetExitDeviated",
+    "source": "偏离退出规则",
+    "english": "Deviated from exit rules",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetExitNoPreset",
+    "source": "未预设退出规则",
+    "english": "No preset exit rules",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetExitEmotionGiveback",
+    "source": "怕利润回吐",
+    "english": "Feared giving back profit",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetExitEmotionLoss",
+    "source": "难以承受亏损",
+    "english": "Found the loss hard to bear",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetExitEmotionHurry",
+    "source": "急于结束",
+    "english": "Eager to end the trade",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetExitEmotionUnrecorded",
+    "source": "不记录状态",
+    "english": "Leave state unrecorded",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetExitLegacySelfReport",
+    "source": "此前整笔交易自报：执行 {0}；状态 {1}。保留原记录，不代表平仓状态。",
+    "english": "Earlier whole-trade report: execution {0}; state {1}. Retained as recorded; it does not describe the exit state.",
+    "template": true,
+    "preserve": [1]
+  },
+  {
+    "key": "PetExitSummary",
+    "source": "退出自报：按规则 {0} 笔 · 偏离 {1} 笔 · 未预设 {2} 笔 · 不确定 {3} 笔；未填写不推断。",
+    "english": "Exit reports: followed rules {0} · deviated {1} · no preset {2} · unsure {3}; missing reports are not inferred.",
+    "template": true,
+    "preserve": []
+  },
+  {
+    "key": "PetWholeTradeSummary",
+    "source": "整笔执行自报 {0} 笔，其中按计划 {1} 笔；未自报不推断。",
+    "english": "Whole-trade execution reported for {0} trades, {1} followed the plan; missing reports are not inferred.",
+    "template": true,
+    "preserve": []
+  },
+  {
+    "key": "PetExitDetailFacts",
+    "source": "退出执行自报：{0}；平仓状态自报：{1}",
+    "english": "Exit execution report: {0}; exit state report: {1}",
+    "template": true,
+    "preserve": []
+  },
+  {
+    "key": "PetExitExecutionFact",
+    "source": "退出执行自报：{0}",
+    "english": "Exit execution report: {0}",
+    "template": true,
+    "preserve": []
+  },
+  {
+    "key": "PetExitEmotionFact",
+    "source": "平仓状态自报：{0}",
+    "english": "Exit state report: {0}",
+    "template": true,
+    "preserve": []
+  },
+  {
+    "key": "PetExitExecutionExportLabel",
+    "source": "退出执行（自报）",
+    "english": "Exit execution (self-reported)",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetExitEmotionExportLabel",
+    "source": "平仓状态（自报）",
+    "english": "Exit state (self-reported)",
     "template": false,
     "preserve": []
   },
@@ -18272,6 +18377,146 @@
     "key": "S9f880d1e19d8ffd8",
     "source": "记录退出依据",
     "english": "Record exit evidence",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "DailyReportReviewTitle",
+    "source": "日总结",
+    "english": "Daily summary",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "DailyReportResultSummary",
+    "source": "{0}；{1} 胜、{2} 负、{3} 平。",
+    "english": "{0}; {1} wins, {2} losses, {3} breakeven.",
+    "template": true,
+    "preserve": []
+  },
+  {
+    "key": "DailyReportOptionalTradeReviewMarkdown",
+    "source": "- 逐笔复盘（可选）：已保存 {0}/{1} 笔",
+    "english": "- Individual reviews (optional): {0}/{1} saved",
+    "template": true,
+    "preserve": []
+  },
+  {
+    "key": "DailyReportBeginReview",
+    "source": "填写日总结",
+    "english": "Write daily summary",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "DailyReportReviewGuide",
+    "source": "什么时候：当天停止交易后。目的：找出重复的执行问题，确定一条下次行动。操作：先看自动分析中的亏损、浮盈回吐和规则提醒，确认下面的总结，再选择或填写一条行动并保存。普通交易不用逐笔填表；交易原因只在需要时补充。",
+    "english": "When: after you stop trading for the day. Goal: identify recurring execution problems and choose one next action. Review losses, profit giveback and rule alerts in the automatic analysis, confirm the summary below, then select or write one action and save. Routine trades need no individual forms; add trade reasons when useful.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "DailyReportSummaryLabel",
+    "source": "当日总结（自动带入，可补充原因）",
+    "english": "Daily summary (prefilled; add context if useful)",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "DailyReportActionLabel",
+    "source": "下次行动：从建议中选一条，或自己填写",
+    "english": "Next action: select a suggestion or write your own",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "DailyReportSaveReview",
+    "source": "保存并完成日总结",
+    "english": "Save and complete daily summary",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "DailyReportAutoReviewStatus",
+    "source": "已自动分析 {0} 笔 · {1}",
+    "english": "{0} trades analyzed automatically · {1}",
+    "template": true,
+    "preserve": []
+  },
+  {
+    "key": "DailyReportOptionalTradeReview",
+    "source": "逐笔复盘（可选）：已保存 {0}/{1} 笔",
+    "english": "Individual reviews (optional): {0}/{1} saved",
+    "template": true,
+    "preserve": []
+  },
+  {
+    "key": "DailyReportReviewUnsaved",
+    "source": "日总结未保存",
+    "english": "Daily summary not saved",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "DailyReportReviewCompleted",
+    "source": "日总结已完成",
+    "english": "Daily summary completed",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "DailyReportReviewStale",
+    "source": "日数据更新，日总结需重审",
+    "english": "Daily data changed; reassess the summary",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "DailyReportReviewDraft",
+    "source": "日总结草稿",
+    "english": "Daily summary draft",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "DailyReportReviewUnavailable",
+    "source": "日总结保存暂不可用，请等待账户和本地复盘库就绪。",
+    "english": "Saving the summary is unavailable. Wait for the account and local review storage to be ready.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "DailyReportReviewSaveFailed",
+    "source": "日总结保存失败，内容仍保留，请重试。",
+    "english": "The summary could not be saved. Your text is retained; try again.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "DailyReportReviewRequired",
+    "source": "确认当日总结，并选择或填写一条下次行动，即可完成；做对的动作与待改进行为可选填。",
+    "english": "Confirm the daily summary and select or write one next action to complete it. What went well and what to improve are optional.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "SkipAllPrompts",
+    "source": "全部跳过",
+    "english": "Skip all",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "SkipAllEntryReasonsHint",
+    "source": "跳过当前账户所有待提示的入场记录。新发生的交易仍会提示。",
+    "english": "Skip all queued entry records for this account. New trades will still prompt.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "SkipAllQuickReviewsHint",
+    "source": "跳过当前账户所有待提示的出场复盘。新发生的交易仍会提示。",
+    "english": "Skip all queued exit reviews for this account. New trades will still prompt.",
     "template": false,
     "preserve": []
   }

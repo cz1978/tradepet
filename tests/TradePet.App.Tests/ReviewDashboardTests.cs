@@ -57,13 +57,20 @@ public sealed class ReviewDashboardTests
 
         var at = trade.ClosedAtUtc!.Value;
         documents[1] = new TradeReviewDocument(new("Broker|1", 1), ReviewCompletionStatus.Reviewed,
-            "", "确认平仓", "", "", "", "快速复盘", "", "", 1, "source", "rule", "source", "rule", at, at, at, true);
+            "", "确认平仓", "", "", "", "快速复盘", "", "", 1, "source", "rule", "source", "rule", at, at, at, true,
+            ReportedExitExecution: ExitExecutionSelfReport.NoPreset, ExitEmotion: "怕利润回吐");
         var updatedFacts = calculator.BuildDailyFacts("Broker|1", date, date, [trade], fixture.Data.Deals,
             documents, [], new Dictionary<DateOnly, DailyState>(), 0);
         var updated = fixture.Snapshot with { DailyFacts = updatedFacts, Documents = documents };
         var data = fixture.Data with { Documents = documents };
         viewModel.Apply(updated, data, 1);
         Assert.Equal("100%", viewModel.DailyFacts.Single(item => item.Title == "复盘完成率").Value);
+        var detail = new TradeDetailData(trade, [], null, documents[1], null, [], null, null, [], [], [], null, data.Version);
+        viewModel.ApplyDetail(detail, 1);
+        Assert.Contains("退出执行自报：未预设退出规则", viewModel.ExitSelfReportFacts);
+        Assert.Contains("平仓状态自报：怕利润回吐", viewModel.ExitSelfReportFacts);
+        viewModel.ApplyDetail(detail with { Document = null }, 1);
+        Assert.Empty(viewModel.ExitSelfReportFacts);
         viewModel.MarkDataUnavailable("查询失败");
         viewModel.Apply(updated, data, 1);
         Assert.Equal("100%", viewModel.DailyFacts.Single(item => item.Title == "复盘完成率").Value);

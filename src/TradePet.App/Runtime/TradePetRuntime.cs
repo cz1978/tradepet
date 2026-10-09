@@ -1857,6 +1857,9 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
                 _quickReviewCard = card;
                 card.Completed += response =>
                 {
+                    if (response.SkipAllRequested)
+                        foreach (var item in _pendingQuickReviews.Where(item => item.Value.AccountKey == trade.AccountKey))
+                            _pendingQuickReviews.TryRemove(item.Key, out _);
                     _pendingQuickReviews.TryRemove(pendingKey, out _);
                     if (response.RemindLater) _ = RemindQuickReviewLaterAsync(trade);
                     _quickReviewCard = null;
@@ -1930,9 +1933,10 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
             dialog.ExitReason, existing?.DidWell ?? string.Empty,
             dialog.Improvement, existing is not null && existing.NextAction != existing.ToImprove
                 ? existing.NextAction : dialog.Improvement, dialog.AnalysisSummary,
-            dialog.Emotion, existing?.MarketCondition ?? string.Empty,
+            existing?.Emotion ?? string.Empty, existing?.MarketCondition ?? string.Empty,
             version.SourceVersion.ToString(CultureInfo.InvariantCulture), version.RuleVersion,
-            ReviewCompletionStatus.Reviewed, IsQuickReview: true, ReportedExecution: dialog.ReportedExecution);
+            ReviewCompletionStatus.Reviewed, IsQuickReview: true,
+            ReportedExitExecution: dialog.ReportedExitExecution, ExitEmotion: dialog.ExitEmotion);
         var result = await _journalService.SaveTradeReviewAsync(command, dialog.DocumentRevision, _cancellation.Token);
         if (!result.IsSaved) return result.Message;
         try
@@ -6050,7 +6054,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         return samples;
     }
 
-    private async Task ShowDailyTradingReportAsync(DateOnly date, bool automatic)
+    private async Task ShowDailyTradingReportAsync(DateOnly date, bool automatic, DailyTradingReportWindow? refreshWindow = null)
     {
         if (_activePlatform == TradingPlatform.Mt4 && (!_mt4HistoryAvailable || !_mt4HistoryReady || !_hasInitialDeals))
         {
@@ -6067,6 +6071,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         try
         {
             var accountKey = _account.Scope.AccountKey;
+            if (refreshWindow is not null && refreshWindow.Report.AccountKey != accountKey) return;
             var runKey = $"{accountKey}|{date:yyyy-MM-dd}";
             if (automatic && _dailyReportsShownThisRun.Contains(runKey))
             {
@@ -6149,13 +6154,20 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
                 completed.Length - reviewedCount,
                 behaviorAlerts,
                 facts.CooldownViolationCount,
-                string.Empty);
+                string.Empty,
+                Journal: data.DailyJournals.GetValueOrDefault(date),
+                DailySourceVersion: facts.SourceVersion);
             report = report with { Analysis = DailyReportAnalyzer.Analyze(data with { Currency = report.Currency }, facts, report.IsLive) };
             var markdown = BuildDailyReportMarkdown(data, facts, report);
             var archivePath = await ArchiveDailyReportAsync(report, markdown);
             report = report with { Markdown = markdown, ArchivePath = archivePath };
 
-            await OnUiAsync(() => ShowDailyReportWindow(report, activate: !automatic));
+            await OnUiAsync(() =>
+            {
+                if (refreshWindow is null) ShowDailyReportWindow(report, activate: !automatic);
+                else if (ReferenceEquals(_dailyReportWindow, refreshWindow) && refreshWindow.Report.AccountKey == report.AccountKey)
+                    refreshWindow.ApplyReport(report);
+            });
             _dailyReportsShownThisRun.Add(runKey);
             if (automatic && _persistenceAvailable)
             {
@@ -6190,6 +6202,8 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         previous?.Close();
 
         var window = new DailyTradingReportWindow(report);
+        var generation = _accountSessions.Current?.Generation ?? -1;
+        window.SaveDailyReviewAsync = (summary, action) => SaveDailyReportReviewAsync(window, generation, summary, action);
         _dailyReportWindow = window;
         window.Closed += (_, _) =>
         {
@@ -6201,6 +6215,39 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         window.OpenReviewRequested += (_, _) => _ = OpenDailyReportReviewAsync(report.ServerDate);
         window.Show();
         if (activate) window.Activate();
+    }
+
+    private async Task<ReviewSaveResult<DailyJournal>> SaveDailyReportReviewAsync(
+        DailyTradingReportWindow window, long generation, string summary, string action)
+    {
+        await using var lease = await EnterRuntimeOperationAsync(MaintenanceOperationKind.Write, _cancellation.Token);
+        var report = window.Report;
+        if (!_persistenceAvailable || !_accountSessions.IsCurrent(report.AccountKey, generation))
+            return ReviewSaveResult<DailyJournal>.Validation("账户已切换或存储不可写，内容仍保留。");
+        var existing = report.Journal;
+        var now = _timeProvider.GetUtcNow();
+        var journal = new DailyJournal(report.AccountKey, report.ServerDate,
+            existing?.PreMarketPlan ?? string.Empty, existing?.IntradayNotes ?? string.Empty,
+            summary, existing?.DidWell ?? string.Empty, existing?.ToImprove ?? string.Empty, action,
+            ReviewCompletionStatus.Reviewed, existing?.Revision ?? 0, report.DailySourceVersion,
+            existing?.CreatedAtUtc ?? now, now, existing?.ReviewedAtUtc,
+            existing?.PreMarketRecordedAtUtc, existing?.IntradayRecordedAtUtc, existing?.PostMarketRecordedAtUtc ?? now);
+        var result = await _journalService.CompleteDailyJournalAsync(
+            journal, journal.Revision, report.DailySourceVersion, _cancellation.Token);
+        if (result.IsSaved && _accountSessions.IsCurrent(report.AccountKey, generation))
+        {
+            try
+            {
+                await RefreshReviewAsync();
+                if (_accountSessions.IsCurrent(report.AccountKey, generation))
+                    await ShowDailyTradingReportAsync(report.ServerDate, automatic: false, refreshWindow: window);
+            }
+            catch (Exception exception)
+            {
+                AppLog.Write($"Daily summary was saved, but refreshing its display failed: {exception}");
+            }
+        }
+        return result;
     }
 
     private async Task OpenDailyReportReviewAsync(DateOnly date)
@@ -6313,7 +6360,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         builder.AppendLine(TradePet.Core.Localization.UiText.Translate("## 二、持仓采样与风险状态"));
         builder.AppendLine();
         builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"- 有持仓采样：{report.SampledTradeCount}/{report.TradeCount} 笔；全程采样可靠：{report.ReliableSampleCount}/{report.TradeCount} 笔"));
-        builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"- 已复盘：{report.ReviewedCount} 笔；待复盘：{report.PendingReviewCount} 笔"));
+        builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"- 逐笔复盘（可选）：已保存 {report.ReviewedCount}/{report.TradeCount} 笔"));
         builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"- 达标时刻：{(facts.TargetReachedAtUtc is null ? "未记录" : FormatServerTime(facts.TargetReachedAtUtc.Value, offset))}"));
         builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"- 达标金额：{(facts.TargetAmount is null ? "未记录" : FormatReportMoney(facts.TargetAmount.Value, report.Currency))}"));
         builder.AppendLine(TradePet.Core.Localization.UiText.Translate($"- 达标后新交易净盈亏：{(facts.AfterTargetNewTradeNetPnl is null ? "未记录" : FormatReportMoney(facts.AfterTargetNewTradeNetPnl.Value, report.Currency))}"));

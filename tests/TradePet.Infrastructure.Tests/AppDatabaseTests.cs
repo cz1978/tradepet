@@ -624,8 +624,17 @@ public sealed class AppDatabaseTests : IAsyncLifetime
     public async Task ReviewWorkspaceMigration_UsesAccountScopedOptimisticRevisions()
     {
         var now = new DateTimeOffset(2026, 9, 7, 1, 0, 0, TimeSpan.Zero);
-        var first = ReviewDocument("Broker|1", 77, now);
-        var second = ReviewDocument("Broker|2", 77, now);
+        var first = ReviewDocument("Broker|1", 77, now) with
+        {
+            ReportedExitExecution = ExitExecutionSelfReport.NoPreset,
+            ReportedExitExecutionRecordedAtUtc = now,
+            ExitEmotion = "怕利润回吐",
+        };
+        var second = ReviewDocument("Broker|2", 77, now) with
+        {
+            ReportedExecution = PlanExecutionSelfReport.Deviated,
+            Emotion = "担心错过",
+        };
         await SeedCompletedTradeAsync("Broker|1", 77, now);
         await SeedCompletedTradeAsync("Broker|2", 77, now);
 
@@ -637,8 +646,23 @@ public sealed class AppDatabaseTests : IAsyncLifetime
         Assert.Equal(1, savedFirst.Value!.Revision);
         Assert.Equal(ReviewSaveStatus.Conflict, conflict.Status);
         Assert.True(savedSecond.IsSaved);
-        Assert.Equal("交易复盘", (await _database.LoadTradeReviewDocumentAsync(new TradeKey("Broker|1", 77)))!.Summary);
-        Assert.Equal("交易复盘", (await _database.LoadTradeReviewDocumentAsync(new TradeKey("Broker|2", 77)))!.Summary);
+        var loadedFirst = (await _database.LoadTradeReviewDocumentAsync(new TradeKey("Broker|1", 77)))!;
+        Assert.Equal("交易复盘", loadedFirst.Summary);
+        Assert.Equal(ExitExecutionSelfReport.NoPreset, loadedFirst.ReportedExitExecution);
+        Assert.Equal(now, loadedFirst.ReportedExitExecutionRecordedAtUtc);
+        Assert.Equal("怕利润回吐", loadedFirst.ExitEmotion);
+        await using (var legacyConnection = await _database.OpenConnectionAsync())
+        await using (var legacyPayload = legacyConnection.CreateCommand())
+        {
+            legacyPayload.CommandText = "UPDATE trade_review_documents SET payload_json=json_remove(payload_json,'$.reportedExitExecution','$.reportedExitExecutionRecordedAtUtc','$.exitEmotion') WHERE account_key='Broker|2' AND position_id=77;";
+            Assert.Equal(1, await legacyPayload.ExecuteNonQueryAsync());
+        }
+        var loadedSecond = (await _database.LoadTradeReviewDocumentAsync(new TradeKey("Broker|2", 77)))!;
+        Assert.Equal("交易复盘", loadedSecond.Summary);
+        Assert.Null(loadedSecond.ReportedExitExecution);
+        Assert.Empty(loadedSecond.ExitEmotion);
+        Assert.Equal(PlanExecutionSelfReport.Deviated, loadedSecond.ReportedExecution);
+        Assert.Equal("担心错过", loadedSecond.Emotion);
 
         await using var connection = await _database.OpenConnectionAsync();
         await using var migration = connection.CreateCommand();

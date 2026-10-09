@@ -2,6 +2,16 @@
 
 English | [简体中文](CHANGELOG.md)
 
+## 1.0.0-rc.11 — 2026-10-09
+
+- Entry-reason and exit quick-review cards add Skip all. It clears the current account’s queue for that card type, without saving a review or marking it completed. New trades can still prompt.
+- Daily reports add Fill daily summary: after trading ends, confirm the generated facts and select or write one next action, then save. Daily-summary status is separate from optional individual trade reviews; unfilled trade records no longer become mandatory catch-up tasks.
+- Failed daily-summary saves retain input. Successful saves refresh the report and workspace, with draft, completed and reassessment states while preserving existing pre-session and intraday notes.
+- Exit execution and emotional state are stored separately from entry and legacy whole-trade reports, with a No preset exit rules choice. Missing reports are not inferred. Trade archives, daily reports, behavior summaries and exports show the corresponding reports while retaining legacy text and revisions.
+- The complete Windows x64 package retains .NET 8, isolated Python, MetaTrader5/NumPy, read-only MT4/MT5 bridges and bilingual documentation. Database schema remains 11.
+
+Validation: 417 .NET tests and 26 Python tests passed, covering daily summaries, popup skipping, exit reports, legacy-record compatibility and backup recovery. Portable-package verification results appear in this version’s release notes.
+
 ## 1.0.0-rc.10 — 2026-10-05
 
 - Pet popups now capture execution, emotional state, skipped opportunities and trading summaries alongside quick entry reasons/reviews.

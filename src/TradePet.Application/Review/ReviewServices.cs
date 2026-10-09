@@ -283,7 +283,12 @@ public sealed class JournalService
             command.ReportedExecution ?? existing?.ReportedExecution,
             command.ReportedExecution.HasValue &&
                 (command.ReportedExecution != existing?.ReportedExecution || existing?.ReportedExecutionRecordedAtUtc is null)
-                ? now : existing?.ReportedExecutionRecordedAtUtc).Normalize();
+                ? now : existing?.ReportedExecutionRecordedAtUtc,
+            command.ReportedExitExecution ?? existing?.ReportedExitExecution,
+            command.ReportedExitExecution.HasValue &&
+                (command.ReportedExitExecution != existing?.ReportedExitExecution || existing?.ReportedExitExecutionRecordedAtUtc is null)
+                ? now : existing?.ReportedExitExecutionRecordedAtUtc,
+            command.ExitEmotion ?? existing?.ExitEmotion ?? string.Empty).Normalize();
         return await _repository.SaveTradeReviewDocumentAsync(document, expectedRevision, cancellationToken);
     }
 
@@ -387,12 +392,10 @@ public sealed class JournalService
     {
         if (journal.ServerDate == default ||
             string.IsNullOrWhiteSpace(journal.PostMarketSummary) ||
-            string.IsNullOrWhiteSpace(journal.DidWell) ||
-            string.IsNullOrWhiteSpace(journal.ToImprove) ||
             string.IsNullOrWhiteSpace(journal.NextAction))
         {
             return ReviewSaveResult<DailyJournal>.Validation(
-                "完成日总结需要填写执行事实、做对的动作、待改进行为和下一次检查事项。");
+                "确认当日总结，并选择或填写一条下次行动，即可完成；做对的动作与待改进行为可选填。");
         }
         if (string.IsNullOrWhiteSpace(dailySourceVersion))
         {
@@ -1484,6 +1487,9 @@ public sealed class ReviewExportService
                     detail.Document.NextAction,
                     detail.Document.Summary,
                     detail.Document.Emotion,
+                    reportedExitExecution = detail.Document.ReportedExitExecution?.ToString(),
+                    detail.Document.ReportedExitExecutionRecordedAtUtc,
+                    detail.Document.ExitEmotion,
                     detail.Document.MarketCondition,
                     detail.Document.Revision,
                     detail.Document.SourceVersion,
@@ -1657,6 +1663,9 @@ public sealed class ReviewExportService
                 Field("情绪", document.Emotion); Field("市场状态", document.MarketCondition);
                 if (document.ReportedExecution.HasValue)
                     Field("执行情况（自报）", QuickReviewAnalyzer.DescribeReportedExecution(document.ReportedExecution));
+                if (document.ReportedExitExecution.HasValue)
+                    Field("退出执行（自报）", QuickReviewAnalyzer.DescribeReportedExitExecution(document.ReportedExitExecution));
+                Field("平仓状态（自报）", document.ExitEmotion);
             }
             if (detail.Document is null) Field("入场原因", detail.RecordedEntryReason);
             if (detail.Deals.Count == 0)

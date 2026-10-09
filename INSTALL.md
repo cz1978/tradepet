@@ -2,11 +2,11 @@
 
 [English](INSTALL.en.md) | 简体中文
 
-适用于 **1.0.0-rc.10 / Windows 10、11 x64**。支持 MT5 与 MT4；MT4 支持订单存档、有证据的部分平仓归集及实际报价回放。TradePet 不执行下单、平仓或改单。
+适用于 **1.0.0-rc.11 / Windows 10、11 x64**。支持 MT5 与 MT4；MT4 支持订单存档、有证据的部分平仓归集及实际报价回放。TradePet 不执行下单、平仓或改单。
 
-`rc.10` 将交易行为输入集中在宠物弹框：入场原因与快速复盘可点选执行情况和交易时状态，并提供未交易机会记录与七项可自动观察的改进目标。统一复盘完成率与报表、日历统计口径，平仓原因显示选中高亮，宠物菜单按用途收拢。完整便携包内置 .NET、隔离的 Python、MT4/MT5 只读插件和中英说明。
+`rc.11` 在入场与出场弹框增加“全部跳过”；交易日报可直接确认自动生成的事实并选择或填写一条下次行动，保存日总结，逐笔复盘仍为可选。出场执行与平仓状态单独保存，支持“未预设退出规则”，并保留入场及旧版整笔交易自报。完整 Windows 便携包继续内置运行环境、MT4/MT5 只读插件和中英说明。
 
-旧版 `rc.5` 及更早版本仍需手动配置 Python；建议下载 `rc.10` 完整便携包。
+旧版 `rc.5` 及更早版本仍需手动配置 Python；建议下载 `rc.11` 完整便携包。
 
 ## 图文快速安装
 
@@ -18,9 +18,9 @@
 
 ## 下载并启动
 
-1. 打开 [GitHub 发布页](https://github.com/cz1978/tradepet/releases/tag/v1.0.0-rc.10)。
-2. 在 Assets 中下载 `TradePet-1.0.0-rc.10-win-x64.zip`。`Source code` 是开发用源码，不是可运行安装包。
-3. 将 ZIP **完整解压**到自己的应用目录，例如 `D:\Apps\TradePet-1.0.0-rc.10`。
+1. 打开 [GitHub 发布页](https://github.com/cz1978/tradepet/releases/tag/v1.0.0-rc.11)。
+2. 在 Assets 中下载 `TradePet-1.0.0-rc.11-win-x64.zip`。`Source code` 是开发用源码，不是可运行安装包。
+3. 将 ZIP **完整解压**到自己的应用目录，例如 `D:\Apps\TradePet-1.0.0-rc.11`。
 4. 运行解压目录内的 `TradePet.exe`，跟随四步设置向导完成配置。不要在压缩包内直接运行，也不要只复制 EXE。
 
 需要直接打开复盘分析时，可运行 `TradePet.exe --review`；先从托盘退出已运行的旧版助手。
@@ -30,7 +30,7 @@
 发布页还提供 `SHA256SUMS.txt`。需要核对下载完整性时，在 ZIP 所在目录执行并与该文件比较：
 
 ```powershell
-Get-FileHash .\TradePet-1.0.0-rc.10-win-x64.zip -Algorithm SHA256
+Get-FileHash .\TradePet-1.0.0-rc.11-win-x64.zip -Algorithm SHA256
 ```
 
 该校验用于确认文件一致性，不代替数字签名。当前包未做代码签名；遇到 Windows 提示时先核对来源及哈希，不要关闭系统防护。
@@ -42,7 +42,7 @@ Get-FileHash .\TradePet-1.0.0-rc.10-win-x64.zip -Algorithm SHA256
 ### 1. 准备终端和 Python
 
 - 安装并启动自己的 MetaTrader 5，登录要监控的账户。
-- `rc.10` 便携包已内置 **64 位 Python 3.13** 和依赖，无需另装。旧版 `rc.5` 及更早发布包需自行安装 64 位 Python 3.13。
+- `rc.11` 便携包已内置 **64 位 Python 3.13** 和依赖，无需另装。旧版 `rc.5` 及更早发布包需自行安装 64 位 Python 3.13。
 - 向导中选择“MT5”，选中对应 `terminal64.exe`。未自动发现时点击“浏览终端”。
 
 每次只连接一个终端。需要完整交易复盘时，请使用 MT5 对冲账户；净额和交易所账户提供持仓及账户级风险监控。

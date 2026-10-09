@@ -10,7 +10,7 @@ public partial class QuickReviewCard : System.Windows.Controls.UserControl
 {
     private bool _completed;
     private bool _saving;
-    private readonly string _recordedEmotion;
+    private readonly string _recordedExitEmotion;
     public QuickReviewCard(TradeDetailData detail, int serverUtcOffsetSeconds = 0)
     {
         InitializeComponent();
@@ -21,17 +21,28 @@ public partial class QuickReviewCard : System.Windows.Controls.UserControl
         ExitReasonBox.Text = detail.Document?.ExitReason ?? TradePet.Core.Localization.UiText.Translate(analysis.ExitReason);
         AnalysisText.Text = detail.Document?.Summary ?? TradePet.Core.Localization.UiText.Translate(analysis.Explanation);
         ImproveBox.Text = detail.Document?.ToImprove ?? TradePet.Core.Localization.UiText.Translate(analysis.Improvement);
-        _recordedEmotion = detail.Document?.Emotion ?? string.Empty;
+        _recordedExitEmotion = detail.Document?.ExitEmotion ?? string.Empty;
         foreach (var choice in ExecutionChoices.Children.OfType<RadioButton>())
-            choice.IsChecked = detail.Document?.ReportedExecution is { } reported && (string)choice.Tag == reported.ToString();
+            choice.IsChecked = detail.Document?.ReportedExitExecution is { } reported && (string)choice.Tag == reported.ToString();
         foreach (var choice in EmotionChoices.Children.OfType<RadioButton>())
-            choice.IsChecked = (string)choice.Tag == _recordedEmotion ||
-                TradePet.Core.Localization.UiText.Translate((string)choice.Tag) == _recordedEmotion;
+            choice.IsChecked = !string.IsNullOrWhiteSpace(_recordedExitEmotion) &&
+                ((string)choice.Tag == _recordedExitEmotion ||
+                 TradePet.Core.Localization.UiText.Translate((string)choice.Tag, "en-US") == _recordedExitEmotion);
+        if (detail.Document is { } document &&
+            (document.ReportedExecution.HasValue || !string.IsNullOrWhiteSpace(document.Emotion)))
+        {
+            var execution = TradePet.Core.Localization.UiText.Translate(QuickReviewAnalyzer.DescribeReportedExecution(document.ReportedExecution));
+            var emotion = string.IsNullOrWhiteSpace(document.Emotion)
+                ? TradePet.Core.Localization.UiText.Translate("未记录") : document.Emotion;
+            LegacySelfReportText.Text = TradePet.Core.Localization.UiText.Translate($"此前整笔交易自报：执行 {execution}；状态 {emotion}。保留原记录，不代表平仓状态。");
+            LegacySelfReportText.Visibility = Visibility.Visible;
+        }
     }
 
     public bool SaveRequested { get; private set; }
     public int DocumentRevision { get; }
     public bool RemindLater { get; private set; }
+    public bool SkipAllRequested { get; private set; }
     public bool IsCompleted => _completed;
     public event Action<QuickReviewCard>? Completed;
     public Func<QuickReviewCard, Task<string?>>? SaveReviewAsync { get; set; }
@@ -39,11 +50,11 @@ public partial class QuickReviewCard : System.Windows.Controls.UserControl
     public string ExitReason => ExitReasonBox.Text.Trim();
     public string Improvement => ImproveBox.Text.Trim();
     public string AnalysisSummary => AnalysisText.Text;
-    public PlanExecutionSelfReport? ReportedExecution => Enum.TryParse<PlanExecutionSelfReport>(
+    public ExitExecutionSelfReport? ReportedExitExecution => Enum.TryParse<ExitExecutionSelfReport>(
         ExecutionChoices.Children.OfType<RadioButton>().FirstOrDefault(item => item.IsChecked == true)?.Tag as string,
         out var value) ? value : null;
-    public string Emotion => EmotionChoices.Children.OfType<RadioButton>()
-        .FirstOrDefault(item => item.IsChecked == true)?.Tag as string ?? _recordedEmotion;
+    public string ExitEmotion => EmotionChoices.Children.OfType<RadioButton>()
+        .FirstOrDefault(item => item.IsChecked == true)?.Tag as string ?? _recordedExitEmotion;
 
     private void ReasonPreset_Click(object sender, RoutedEventArgs e)
     {
@@ -100,6 +111,12 @@ public partial class QuickReviewCard : System.Windows.Controls.UserControl
     public void Dismiss() => Finish();
     private void Later_Click(object sender, RoutedEventArgs e) { RemindLater = true; Finish(); }
     private void Skip_Click(object sender, RoutedEventArgs e) => Finish();
+    private void SkipAll_Click(object sender, RoutedEventArgs e)
+    {
+        if (_saving || _completed) return;
+        SkipAllRequested = true;
+        Finish();
+    }
     private void Finish()
     {
         if (_completed || _saving) return;

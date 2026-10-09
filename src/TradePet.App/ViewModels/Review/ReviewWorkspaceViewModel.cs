@@ -41,6 +41,7 @@ public sealed partial class ReviewWorkspaceViewModel : ObservableObject
     private string _selectedTradeTitle = "请选择一笔交易";
     private string _tradeFacts = "成交、费用和时间均来自 MT5，只读展示。";
     private string _tradeIdentity = "尚未选择交易";
+    private string _exitSelfReportFacts = string.Empty;
     private string _planFacts = "没有绑定计划。";
     private string _riskFacts = "初始风险与持仓采样未知。";
     private string _entryReason = string.Empty;
@@ -365,6 +366,7 @@ public sealed partial class ReviewWorkspaceViewModel : ObservableObject
     public string SelectedTradeTitle { get => _selectedTradeTitle; set => SetProperty(ref _selectedTradeTitle, value); }
     public string TradeFacts { get => _tradeFacts; set => SetProperty(ref _tradeFacts, value); }
     public string TradeIdentity { get => _tradeIdentity; set => SetProperty(ref _tradeIdentity, value); }
+    public string ExitSelfReportFacts { get => _exitSelfReportFacts; private set => SetProperty(ref _exitSelfReportFacts, value); }
     public string PlanFacts { get => _planFacts; set => SetProperty(ref _planFacts, value); }
     public string RiskFacts { get => _riskFacts; set => SetProperty(ref _riskFacts, value); }
     public string AttachmentTitle { get => _attachmentTitle; set => SetProperty(ref _attachmentTitle, value); }
@@ -944,6 +946,10 @@ public sealed partial class ReviewWorkspaceViewModel : ObservableObject
                 : $"{planTiming} · {plan.Strategy}/{plan.Setup} · 入场区 {plan.EntryLow?.ToString() ?? "?"}–{plan.EntryHigh?.ToString() ?? "?"} · 止损 {plan.StopPrice?.ToString() ?? "?"} · 目标 {plan.TargetPrice?.ToString() ?? "?"} · 策略版本 {detail.Playbook?.Name ?? "未绑定"}";
             RiskFacts = FormatRiskFacts(detail.Excursion, detail.Trade.NetPnl);
             var document = detail.Document;
+            ExitSelfReportFacts = document is null ||
+                (document.ReportedExitExecution is null && string.IsNullOrWhiteSpace(document.ExitEmotion))
+                ? string.Empty
+                : $"退出执行自报：{QuickReviewAnalyzer.DescribeReportedExitExecution(document.ReportedExitExecution)}；平仓状态自报：{(string.IsNullOrWhiteSpace(document.ExitEmotion) ? "未记录" : document.ExitEmotion)}";
             EntryReason = pendingDraft?.EntryReason ??
                           (string.IsNullOrWhiteSpace(document?.EntryReason) ? detail.EntryReasonNote?.Reason : document.EntryReason) ?? string.Empty;
             ExitReason = pendingDraft?.ExitReason ?? document?.ExitReason ?? string.Empty;
@@ -1140,6 +1146,7 @@ public sealed partial class ReviewWorkspaceViewModel : ObservableObject
             SelectedPositionId = null;
             SelectedTradeTitle = "请选择一笔交易";
             TradeIdentity = "尚未选择交易";
+            ExitSelfReportFacts = string.Empty;
             TradeFacts = "成交、费用和时间均来自 MT5，只读展示。";
             PlanFacts = "没有绑定计划。";
             RiskFacts = "初始风险与持仓采样未知。";

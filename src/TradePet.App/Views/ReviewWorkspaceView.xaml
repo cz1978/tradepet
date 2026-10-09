@@ -401,6 +401,13 @@
                         <Grid><TextBlock Text="{Binding SelectedTradeTitle, Converter={StaticResource UiTranslation}}" Style="{StaticResource SectionTitleStyle}"/><TextBlock Text="{Binding DocumentStatus, Converter={StaticResource UiTranslation}}" HorizontalAlignment="Right" Foreground="{StaticResource AccentBrush}"/></Grid>
                         <TextBlock Text="{Binding TradeIdentity, Converter={StaticResource UiTranslation}}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,3,0,0"/>
                         <TextBlock Text="{Binding TradeFacts, Converter={StaticResource UiTranslation}}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,4,0,8"/>
+                        <TextBlock Text="{Binding ExitSelfReportFacts, Converter={StaticResource UiTranslation}}" TextWrapping="Wrap" Margin="0,0,0,8">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource MutedTextStyle}">
+                                    <Style.Triggers><DataTrigger Binding="{Binding ExitSelfReportFacts}" Value=""><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
                         <TextBlock Text="{l:Text Key=S37c0608d1f748837}" Style="{StaticResource EditorLabel}"/><TextBlock Text="{Binding EntryReason}" TextWrapping="Wrap" />
                         <TextBlock Text="{l:Text Key=Sf0849eecd0bf645e}" Style="{StaticResource SectionTitleStyle}" Margin="0,8,0,6" />
                         <TextBlock Text="{l:Text Key=S4ab695c9a9e057bf}" TextWrapping="Wrap">
