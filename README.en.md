@@ -4,9 +4,9 @@ English | [简体中文](README.md#简体中文)
 
 > Trade alongside you, never on your behalf.
 
-**Current version: 1.0.0-rc.11** · [Download Windows portable release](https://github.com/cz1978/tradepet/releases/tag/v1.0.0-rc.11) · [Installation and upgrades](INSTALL.en.md) · [Changelog](CHANGELOG.en.md) · [MIT License](LICENSE)
+**Current version: 1.0.0-rc.12** · [Download Windows portable release](https://github.com/cz1978/tradepet/releases/tag/v1.0.0-rc.12) · [Installation and upgrades](INSTALL.en.md) · [Changelog](CHANGELOG.en.md) · [MIT License](LICENSE)
 
-`rc.11` adds Skip all to entry and exit cards and lets you save a daily summary directly in the report after confirming the generated facts and one next action. Individual trade reviews remain optional. Exit execution and emotional-state reports are stored separately from entry and legacy whole-trade reports, including a No preset exit rules choice. The complete Windows package retains bundled runtimes, read-only MT4/MT5 bridges and bilingual documentation.
+`rc.12` improves runtime calculations, review pagination and position refreshes, with background report generation and fewer redundant database writes. It fixes history retries, maintenance deadlocks and cross-day partial-close P/L calculations. Daily reports now support date navigation and retain unsaved summaries when switching days. The complete Windows package includes bundled runtimes, read-only MT4/MT5 bridges and bilingual documentation.
 
 TradePet is a local Windows trading desktop pet. It connects to MT5 or MT4 in read-only mode and brings positions, risk, quick notes, reviews, macroeconomic events and daily reports into a desktop assistant.
 
@@ -80,11 +80,11 @@ Default archive:
 
 The [illustrated guide](docs/images/tradepet-rc6-install-guide.png) shows extraction, bridge installation and chart attachment. Its screenshots use Chinese; [English instructions](INSTALL.en.md) describe the same actions. Python is bundled; the bridge still needs installation and manual chart attachment.
 
-Download **`TradePet-1.0.0-rc.11-win-x64.zip`**, extract the entire ZIP and run `TradePet.exe`. GitHub **Source code** archives are not application installers. Do not move the EXE alone.
+Download **`TradePet-1.0.0-rc.12-win-x64.zip`**, extract the entire ZIP and run `TradePet.exe`. GitHub **Source code** archives are not application installers. Do not move the EXE alone.
 
 The package includes .NET 8, 64-bit Python 3.13, MetaTrader5/NumPy, read-only MT4/MT5 plugins and documentation. No separate Python or dependency download is needed. `rc.5` and earlier did not bundle Python; upgrading is recommended. MT4 needs no Python. See [installation, upgrades, checksums and troubleshooting](INSTALL.en.md).
 
-### Platform support (rc.11)
+### Platform support (rc.12)
 
 | Feature | MT5 | MT4 |
 | --- | --- | --- |

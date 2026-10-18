@@ -2,6 +2,17 @@
 
 English | [简体中文](CHANGELOG.md)
 
+## 1.0.0-rc.12 — 2026-10-18
+
+- Optimize behavior analytics with chronological scans and sliding windows, using the most recent 20 trading days consistently. Cache daily deals, trades and behavior results with invalidation for account, date, offset, history and record changes.
+- Correct daily high-water P/L for positions partially closed across days, preventing false giveback alerts. Fix a deadlock between nested runtime tasks and maintenance operations.
+- Resend required deals during history retries and continue retrying a failed final month, avoiding missed records after persistence failures or premature completion.
+- Run review and daily-report calculations in the background and reuse aggregate results across pages. Daily reports support previous/next day, today and date selection, retain unsaved summaries by date, and reject stale account results.
+- Reuse position rows and notify only changed fields. Reuse commands for batch ingestion, skip identical deal/trade/cash-flow updates and batch trade reprojection into one transaction.
+- Repair and verify desktop, Start Menu and existing taskbar shortcuts on every local update. The complete Windows x64 package includes .NET 8, isolated Python, MetaTrader5/NumPy, read-only MT4/MT5 bridges and bilingual documentation. Database schema remains 11.
+
+Validation: 408 relevant .NET tests and 25 Python tests passed, covering concurrency, cache invalidation, cross-day P/L, history retries, repeated ingestion and review pagination; no window automation was run. Synthetic benchmarks reduced behavior analytics for 100,000 historical trades from about 32.9 ms to 3.65 ms and pagination over 5,000 review trades from 33–36 ms to 0.05–0.17 ms. Actual timings depend on data and hardware.
+
 ## 1.0.0-rc.11 — 2026-10-09
 
 - Entry-reason and exit quick-review cards add Skip all. It clears the current account’s queue for that card type, without saving a review or marking it completed. New trades can still prompt.

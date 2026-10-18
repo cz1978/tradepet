@@ -18,17 +18,44 @@ public static class FinancialPalette
         value > 0.01m ? ProfitBackground : value < -0.01m ? LossBackground : NeutralBackground;
 }
 
-public sealed class PositionRowViewModel(PositionSnapshot position, bool showDuration = true)
+public sealed class PositionRowViewModel : ObservableObject
 {
-    public long Ticket { get; } = position.Ticket;
-    public string Symbol { get; } = position.Symbol;
-    public string Side { get; } = position.Side == TradeSide.Buy ? "买入" : "卖出";
-    public string Volume { get; } = position.Volume.ToString("0.##");
-    public string EntryPrice { get; } = position.EntryPrice.ToString("0.#####");
-    public string Profit { get; } = $"{(position.Profit >= 0m ? "+" : string.Empty)}{position.Profit:0.##}";
-    public string ProfitColor { get; } = FinancialPalette.For(position.Profit);
-    public string Duration { get; } = showDuration ? FormatDuration(DateTimeOffset.UtcNow - position.OpenedAtUtc) : "—";
-    public string StopLossStatus { get; } = position.StopLoss > 0m ? $"止损 {position.StopLoss:0.#####}" : "未设止损";
+    private PositionSnapshot _position;
+    private string _duration = string.Empty;
+
+    public PositionRowViewModel(PositionSnapshot position, bool showDuration = true)
+    {
+        _position = position;
+        Update(position, showDuration);
+    }
+
+    public long Ticket => _position.Ticket;
+    public string Symbol => _position.Symbol;
+    public string Side => _position.Side == TradeSide.Buy ? "买入" : "卖出";
+    public string Volume => _position.Volume.ToString("0.##");
+    public string EntryPrice => _position.EntryPrice.ToString("0.#####");
+    public string Profit => $"{(_position.Profit >= 0m ? "+" : string.Empty)}{_position.Profit:0.##}";
+    public string ProfitColor => FinancialPalette.For(_position.Profit);
+    public string Duration => _duration;
+    public string StopLossStatus => _position.StopLoss > 0m ? $"止损 {_position.StopLoss:0.#####}" : "未设止损";
+
+    public void Update(PositionSnapshot position, bool showDuration = true)
+    {
+        if (position.Ticket != Ticket) throw new ArgumentException("Position ticket cannot change.", nameof(position));
+        var previous = _position;
+        _position = position;
+        if (previous.Symbol != position.Symbol) RaisePropertyChanged(nameof(Symbol));
+        if (previous.Side != position.Side) RaisePropertyChanged(nameof(Side));
+        if (previous.Volume != position.Volume) RaisePropertyChanged(nameof(Volume));
+        if (previous.EntryPrice != position.EntryPrice) RaisePropertyChanged(nameof(EntryPrice));
+        if (previous.Profit != position.Profit)
+        {
+            RaisePropertyChanged(nameof(Profit));
+            if (FinancialPalette.For(previous.Profit) != ProfitColor) RaisePropertyChanged(nameof(ProfitColor));
+        }
+        if (previous.StopLoss != position.StopLoss) RaisePropertyChanged(nameof(StopLossStatus));
+        SetProperty(ref _duration, showDuration ? FormatDuration(DateTimeOffset.UtcNow - position.OpenedAtUtc) : "—", nameof(Duration));
+    }
 
     private static string FormatDuration(TimeSpan duration) => duration.TotalHours >= 1
         ? $"{(int)duration.TotalHours:00}:{duration.Minutes:00}:{duration.Seconds:00}"

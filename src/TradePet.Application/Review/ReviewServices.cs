@@ -21,7 +21,14 @@ public sealed class ReviewQueryService
     public ReviewQueryService(IReviewWorkspaceRepository repository) =>
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
 
-    public async Task<ReviewQueryResult> QueryAsync(
+    public Task<ReviewQueryResult> QueryAsync(
+        ReviewQueryContext context,
+        ReviewWorkspaceFilter filter,
+        Func<long> currentSessionGeneration,
+        CancellationToken cancellationToken = default) =>
+        Task.Run(() => QueryCoreAsync(context, filter, currentSessionGeneration, cancellationToken), cancellationToken);
+
+    private async Task<ReviewQueryResult> QueryCoreAsync(
         ReviewQueryContext context,
         ReviewWorkspaceFilter filter,
         Func<long> currentSessionGeneration,
@@ -48,11 +55,12 @@ public sealed class ReviewQueryService
             lock (_cacheGate)
             {
                 _workspaceCache = new WorkspaceCacheEntry(
-                    filter.AccountKey, filter.FromServerDate, filter.ToServerDate, data.Version.Token, data, []);
+                    filter.AccountKey, filter.FromServerDate, filter.ToServerDate, data.Version.Token, data, [], []);
             }
         }
         cancellationToken.ThrowIfCancellationRequested();
         var filterCacheKey = JsonSerializer.Serialize(filter);
+        var aggregateCacheKey = JsonSerializer.Serialize(filter with { Page = 1, PageSize = 100 });
         ReviewWorkspaceSnapshot? cachedSnapshot;
         lock (_cacheGate)
         {
@@ -61,6 +69,19 @@ public sealed class ReviewQueryService
                              cache.Snapshots.TryGetValue(filterCacheKey, out var found)
                 ? found
                 : null;
+            if (cachedSnapshot is null && _workspaceCache is { } aggregateCache &&
+                ReferenceEquals(aggregateCache.Data, data) &&
+                aggregateCache.Aggregates.TryGetValue(aggregateCacheKey, out var aggregate))
+            {
+                var requestedPage = Math.Max(1, filter.Page);
+                var requestedSize = Math.Clamp(filter.PageSize, 1, 100);
+                cachedSnapshot = aggregate with
+                {
+                    Filter = filter, Page = requestedPage, PageSize = requestedSize,
+                    Trades = aggregate.AllFilteredTrades!.Skip((requestedPage - 1) * requestedSize).Take(requestedSize).ToArray(),
+                };
+                CacheSnapshot(aggregateCache.Snapshots, filterCacheKey, cachedSnapshot);
+            }
         }
         if (cachedSnapshot is not null)
         {
@@ -148,11 +169,8 @@ public sealed class ReviewQueryService
         {
             if (_workspaceCache is { Data: var cachedData } cache && ReferenceEquals(cachedData, data))
             {
-                if (!cache.Snapshots.ContainsKey(filterCacheKey) && cache.Snapshots.Count >= 32)
-                {
-                    cache.Snapshots.Remove(cache.Snapshots.Keys.First());
-                }
-                cache.Snapshots[filterCacheKey] = snapshot;
+                CacheSnapshot(cache.Snapshots, filterCacheKey, snapshot);
+                CacheSnapshot(cache.Aggregates, aggregateCacheKey, snapshot);
             }
         }
         var isCurrent = currentSessionGeneration() == context.SessionGeneration &&
@@ -174,13 +192,21 @@ public sealed class ReviewQueryService
         }
     }
 
+    private static void CacheSnapshot(Dictionary<string, ReviewWorkspaceSnapshot> cache,
+        string key, ReviewWorkspaceSnapshot snapshot)
+    {
+        if (!cache.ContainsKey(key) && cache.Count >= 32) cache.Remove(cache.Keys.First());
+        cache[key] = snapshot;
+    }
+
     private sealed record WorkspaceCacheEntry(
         string AccountKey,
         DateOnly FromServerDate,
         DateOnly ToServerDate,
         string VersionToken,
         ReviewWorkspaceData Data,
-        Dictionary<string, ReviewWorkspaceSnapshot> Snapshots);
+        Dictionary<string, ReviewWorkspaceSnapshot> Snapshots,
+        Dictionary<string, ReviewWorkspaceSnapshot> Aggregates);
 }
 
 public sealed class JournalService

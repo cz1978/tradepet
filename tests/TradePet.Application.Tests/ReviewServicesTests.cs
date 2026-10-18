@@ -296,6 +296,9 @@ public sealed class ReviewServicesTests
         Assert.Equal(251, last.Snapshot.AllFilteredTrades!.Count);
         Assert.Equal(251, first.Snapshot.AllFilteredTrades.Select(item => item.PositionId).Distinct().Count());
         Assert.NotSame(first.Snapshot, last.Snapshot);
+        Assert.Same(first.Snapshot.Analytics, last.Snapshot.Analytics);
+        Assert.Same(first.Snapshot.DailyFacts, last.Snapshot.DailyFacts);
+        Assert.Same(first.Snapshot.Calendar, last.Snapshot.Calendar);
         Assert.Same(last.Snapshot, repeated.Snapshot);
         Assert.Equal(1, repository.WorkspaceLoadCount);
     }

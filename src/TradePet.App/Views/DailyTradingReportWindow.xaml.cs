@@ -43,11 +43,18 @@ public partial class DailyTradingReportWindow : Window
     private static readonly WpfBrush FlatBrush = new SolidColorBrush(WpfColor.FromRgb(242, 245, 244));
     private DailyTradingReport _report;
     private bool _savingDailyReview;
+    private bool _changingReportDate;
+    private bool _applyingReport = true;
+    private DateOnly _currentServerDate;
+    private string _loadedDailySummary = string.Empty;
+    private string _loadedDailyAction = string.Empty;
+    private readonly Dictionary<DateOnly, (string Summary, string Action)> _dailyReviewDrafts = [];
 
-    public DailyTradingReportWindow(DailyTradingReport report)
+    public DailyTradingReportWindow(DailyTradingReport report, DateOnly? currentServerDate = null)
     {
         InitializeComponent();
         _report = report;
+        SetCurrentServerDate(currentServerDate ?? report.ServerDate);
         ApplyReport(report);
     }
 
@@ -89,12 +96,98 @@ public partial class DailyTradingReportWindow : Window
         TradeDetailHint.Text = TradePet.Core.Localization.UiText.Translate(report.Analysis?.Trades.Count > 0
             ? $"共 {report.Analysis.Trades.Count} 笔完整平仓交易；横向滚动可查看费用、风险和退出原因。金额单位：{report.Currency}。"
             : "没有完整平仓交易；当日成交和未结交易请查看完整日报。");
+        _loadedDailySummary = DailySummaryBox.Text;
+        _loadedDailyAction = DailyActionBox.Text;
+        if (_dailyReviewDrafts.TryGetValue(report.ServerDate, out var draft))
+        {
+            DailySummaryBox.Text = draft.Summary;
+            DailyActionBox.Text = draft.Action;
+        }
+        ResetDateNavigation();
     }
 
     public DateOnly ServerDate => _report.ServerDate;
     public DailyTradingReport Report => _report;
+    public Func<DateOnly, Task>? LoadReportDateAsync { get; set; }
     public Func<string, string, Task<ReviewSaveResult<DailyJournal>>>? SaveDailyReviewAsync { get; set; }
     public event EventHandler? OpenReviewRequested;
+
+    public void SetCurrentServerDate(DateOnly date)
+    {
+        _currentServerDate = date;
+        ReportDatePicker.DisplayDateEnd = date.ToDateTime(TimeOnly.MinValue);
+        NextDayButton.IsEnabled = _report.ServerDate < date;
+    }
+
+    private void ResetDateNavigation()
+    {
+        _applyingReport = true;
+        ReportDatePicker.SelectedDate = _report.ServerDate.ToDateTime(TimeOnly.MinValue);
+        ReportDatePicker.DisplayDate = ReportDatePicker.SelectedDate.Value;
+        PreviousDayButton.IsEnabled = _report.ServerDate > DateOnly.MinValue;
+        NextDayButton.IsEnabled = _report.ServerDate < _currentServerDate;
+        _applyingReport = false;
+    }
+
+    private void PreviousDay_Click(object sender, RoutedEventArgs e)
+    {
+        if (_report.ServerDate > DateOnly.MinValue)
+            ReportDatePicker.SelectedDate = _report.ServerDate.AddDays(-1).ToDateTime(TimeOnly.MinValue);
+    }
+
+    private void NextDay_Click(object sender, RoutedEventArgs e)
+    {
+        if (_report.ServerDate < _currentServerDate)
+            ReportDatePicker.SelectedDate = _report.ServerDate.AddDays(1).ToDateTime(TimeOnly.MinValue);
+    }
+
+    private void Today_Click(object sender, RoutedEventArgs e) =>
+        ReportDatePicker.SelectedDate = _currentServerDate.ToDateTime(TimeOnly.MinValue);
+
+    private async void ReportDatePicker_SelectedDateChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (_applyingReport) return;
+        if (_changingReportDate || _savingDailyReview || LoadReportDateAsync is null ||
+            ReportDatePicker.SelectedDate is not { } selectedDate)
+        {
+            ResetDateNavigation();
+            return;
+        }
+        var date = DateOnly.FromDateTime(selectedDate);
+        if (date == _report.ServerDate) return;
+        if (date > _currentServerDate)
+        {
+            ResetDateNavigation();
+            return;
+        }
+        if (DailySummaryBox.Text != _loadedDailySummary || DailyActionBox.Text != _loadedDailyAction)
+            _dailyReviewDrafts[_report.ServerDate] = (DailySummaryBox.Text, DailyActionBox.Text);
+        else _dailyReviewDrafts.Remove(_report.ServerDate);
+        _changingReportDate = true;
+        DateNavigation.IsEnabled = false;
+        ReportTabs.IsEnabled = false;
+        ReportActions.IsEnabled = false;
+        StatusText.Text = TradePet.Core.Localization.UiText.Get("DailyReportLoading");
+        try
+        {
+            await LoadReportDateAsync(date);
+        }
+        catch (Exception exception)
+        {
+            AppLog.Write($"Daily report date change failed: {exception}");
+        }
+        finally
+        {
+            _changingReportDate = false;
+            DateNavigation.IsEnabled = true;
+            ReportTabs.IsEnabled = true;
+            ReportActions.IsEnabled = true;
+            ResetDateNavigation();
+            StatusText.Text = TradePet.Core.Localization.UiText.Translate(_report.IsLive ? "今日实时" : "已结束");
+            if (_report.ServerDate != date)
+                ArchivePathText.Text = TradePet.Core.Localization.UiText.Get("DailyReportDateLoadFailed");
+        }
+    }
 
     private static string DailyReviewStatus(DailyTradingReport report) => report.Journal switch
     {
@@ -192,19 +285,24 @@ public partial class DailyTradingReportWindow : Window
 
     private async void SaveDailyReview_Click(object sender, RoutedEventArgs e)
     {
-        if (_savingDailyReview) return;
+        if (_savingDailyReview || _changingReportDate) return;
         if (SaveDailyReviewAsync is null)
         {
             DailyReviewStatusText.Text = TradePet.Core.Localization.UiText.Translate("日总结保存暂不可用，请等待账户和本地复盘库就绪。");
             return;
         }
         _savingDailyReview = true;
+        DateNavigation.IsEnabled = false;
         DailyReviewForm.IsEnabled = false;
         try
         {
+            _dailyReviewDrafts.Remove(_report.ServerDate);
             var result = await SaveDailyReviewAsync(DailySummaryBox.Text.Trim(), DailyActionBox.Text.Trim());
             if (result.IsSaved)
             {
+                _dailyReviewDrafts.Remove(_report.ServerDate);
+                _loadedDailySummary = DailySummaryBox.Text;
+                _loadedDailyAction = DailyActionBox.Text;
                 _report = _report with { Journal = result.Value! };
                 ReviewText.Text = TradePet.Core.Localization.UiText.Translate($"已自动分析 {_report.TradeCount} 笔 · {DailyReviewStatus(_report)}");
                 DailyReviewStatusText.Text = TradePet.Core.Localization.UiText.Translate(DailyReviewStatus(_report));
@@ -219,6 +317,7 @@ public partial class DailyTradingReportWindow : Window
         finally
         {
             _savingDailyReview = false;
+            DateNavigation.IsEnabled = true;
             DailyReviewForm.IsEnabled = true;
         }
     }

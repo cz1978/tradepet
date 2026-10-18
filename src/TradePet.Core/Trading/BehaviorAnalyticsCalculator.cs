@@ -46,10 +46,12 @@ public sealed class BehaviorAnalyticsCalculator
             .Where(attempt => allowedZoneIds.Contains(attempt.ZoneId) &&
                               (filter.Side is null || attempt.Side == filter.Side))
             .ToArray();
-        var daily = activeDates.Select(date => Evaluate(
+        var tradesByDate = trades.GroupBy(trade => trade.OpenServerDate).ToDictionary(group => group.Key, group => group.ToArray());
+        var daily = activeDates.Select((date, index) => Evaluate(
                 filter.AccountKey,
                 date,
-                trades,
+                activeDates.Skip(Math.Max(0, index - 20)).Take(Math.Min(index, 20) + 1)
+                    .SelectMany(day => tradesByDate[day]).ToArray(),
                 scopedZones,
                 scopedAttempts,
                 metadata,
@@ -95,6 +97,8 @@ public sealed class BehaviorAnalyticsCalculator
             .Where(attempt => scopedZones.Any(zone => zone.Id == attempt.ZoneId))
             .ToArray();
         var completed = scoped.Where(trade => trade.IsComplete && trade.ClosedAtUtc is not null).ToArray();
+        var history = RecentHistory(trades, accountKey, serverDate);
+        var sequence = CalculateSequenceMetrics(scoped, policy);
         var evaluations = new List<BehaviorEvaluation>();
         Add(evaluations, accountKey, serverDate, null, BehaviorRuleKind.ReentryCount,
             CalculateReentryCount(scoped, scopedAttempts, symbolSpecifications), null, policy.ReentryThreshold, policy.EnabledRules.ReentryCount, now,
@@ -103,12 +107,11 @@ public sealed class BehaviorAnalyticsCalculator
             CalculateLossZonePersistence(scopedAttempts), null, policy.LossZonePersistenceThreshold, policy.EnabledRules.LossZonePersistence, now,
             baselineEnabled: policy.BaselineEnabled, hardLimitEnabled: policy.HardLimitEnabled);
 
-        var revenge = CalculateRevengeScore(scoped, policy.RapidReentrySeconds, policy.LotEscalationMultiplier);
         Add(evaluations, accountKey, serverDate, LatestPositionId(scoped), BehaviorRuleKind.RevengeScore,
-            revenge.Value, revenge.Baseline, policy.RevengeScoreThreshold, policy.EnabledRules.RevengeScore, now,
+            sequence.Revenge, null, policy.RevengeScoreThreshold, policy.EnabledRules.RevengeScore, now,
             baselineEnabled: policy.BaselineEnabled, hardLimitEnabled: policy.HardLimitEnabled);
 
-        var overtrade = CalculateOvertradeBurst(scoped, trades, serverDate, policy.OvertradeWindowMinutes);
+        var overtrade = CalculateOvertradeBurst(scoped, history, serverDate, policy.OvertradeWindowMinutes);
         Add(evaluations, accountKey, serverDate, null, BehaviorRuleKind.OvertradeBurst,
             overtrade.Value, overtrade.Baseline, policy.OvertradeBaselineMultiplier, policy.EnabledRules.OvertradeBurst,
             now, hardThreshold: policy.OvertradeAbsoluteCount, sampleCount: overtrade.SampleCount,
@@ -132,24 +135,39 @@ public sealed class BehaviorAnalyticsCalculator
             givebackPercentage, null, policy.ProfitGivebackThreshold, policy.EnabledRules.ProfitGiveback, now,
             baselineEnabled: policy.BaselineEnabled, hardLimitEnabled: policy.HardLimitEnabled);
 
-        var escalation = CalculateSizeEscalation(scoped);
         Add(evaluations, accountKey, serverDate, LatestPositionId(scoped), BehaviorRuleKind.SizeEscalationAfterLoss,
-            escalation, null, policy.LotEscalationMultiplier, policy.EnabledRules.SizeEscalationAfterLoss, now,
+            sequence.Escalation, null, policy.LotEscalationMultiplier, policy.EnabledRules.SizeEscalationAfterLoss, now,
             baselineEnabled: policy.BaselineEnabled, hardLimitEnabled: policy.HardLimitEnabled);
 
-        var cooldown = CalculateCooldownViolations(scoped, policy.ConsecutiveLossThreshold, policy.CooldownSeconds);
         Add(evaluations, accountKey, serverDate, LatestPositionId(scoped), BehaviorRuleKind.CooldownViolation,
-            cooldown, null, 1m, policy.EnabledRules.CooldownViolation, now,
+            sequence.Cooldown, null, 1m, policy.EnabledRules.CooldownViolation, now,
             baselineEnabled: policy.BaselineEnabled, hardLimitEnabled: policy.HardLimitEnabled);
 
-        var fixation = CalculatePriceFixation(scoped, trades, serverDate, symbolSpecifications);
+        var fixation = CalculatePriceFixation(scoped, history, serverDate, symbolSpecifications);
         Add(evaluations, accountKey, serverDate, null, BehaviorRuleKind.PriceFixationScore,
             fixation.Value, fixation.Baseline, policy.PriceFixationScoreThreshold,
             policy.EnabledRules.PriceFixationScore, now, sampleCount: scoped.Length,
             minimumSamples: policy.PriceFixationMinimumTrades,
             baselineEnabled: policy.BaselineEnabled, hardLimitEnabled: policy.HardLimitEnabled);
 
-        return BuildSummary(evaluations, trades, serverDate, policy);
+        return BuildSummary(evaluations, history, serverDate, policy);
+    }
+
+    public BehaviorSummary UpdateDailyState(
+        BehaviorSummary summary, string accountKey, DateOnly serverDate, BehaviorPolicy policy,
+        DailyState dailyState, DateTimeOffset observedAtUtc)
+    {
+        var percentage = dailyState.HighWaterPnl > 0m ? dailyState.Giveback * 100m / dailyState.HighWaterPnl : 0m;
+        var updated = new List<BehaviorEvaluation>(1);
+        Add(updated, accountKey, serverDate, null, BehaviorRuleKind.ProfitGiveback,
+            percentage, null, policy.ProfitGivebackThreshold, policy.EnabledRules.ProfitGiveback, observedAtUtc,
+            baselineEnabled: policy.BaselineEnabled, hardLimitEnabled: policy.HardLimitEnabled);
+        var evaluations = summary.Evaluations.Select(item => item.Rule == BehaviorRuleKind.ProfitGiveback ? updated[0] : item).ToArray();
+        var level = evaluations.Any(item => item.Level == BehaviorRiskLevel.Critical)
+            ? BehaviorRiskLevel.Critical
+            : evaluations.Any(item => item.Triggered) ? BehaviorRiskLevel.Attention
+            : summary.BaselineReady ? BehaviorRiskLevel.Normal : BehaviorRiskLevel.Observing;
+        return summary with { Evaluations = evaluations, RiskLevel = level };
     }
 
     private static BehaviorEvaluation AggregateRule(
@@ -225,6 +243,7 @@ public sealed class BehaviorAnalyticsCalculator
         }
 
         var priorCompleted = CompletedBefore(scoped, openingTrade);
+        var history = RecentHistory(trades, accountKey, serverDate);
         var previousClosed = priorCompleted.LastOrDefault();
         var revenge = previousClosed is null
             ? 0m
@@ -233,7 +252,7 @@ public sealed class BehaviorAnalyticsCalculator
             revenge, null, policy.RevengeScoreThreshold, policy.EnabledRules.RevengeScore, now,
             baselineEnabled: policy.BaselineEnabled, hardLimitEnabled: policy.HardLimitEnabled);
 
-        var overtrade = CalculateOvertradeBurst(scoped, trades, serverDate, policy.OvertradeWindowMinutes);
+        var overtrade = CalculateOvertradeBurst(scoped, history, serverDate, policy.OvertradeWindowMinutes);
         Add(evaluations, accountKey, serverDate, openingTrade.PositionId, BehaviorRuleKind.OvertradeBurst,
             overtrade.Value, overtrade.Baseline, policy.OvertradeBaselineMultiplier, policy.EnabledRules.OvertradeBurst,
             now, hardThreshold: policy.OvertradeAbsoluteCount, sampleCount: overtrade.SampleCount,
@@ -248,7 +267,7 @@ public sealed class BehaviorAnalyticsCalculator
 
         AddCooldownEvaluation(evaluations, accountKey, serverDate, openingTrade, priorCompleted, policy, now);
 
-        var fixation = CalculatePriceFixation(scoped, trades, serverDate, symbolSpecifications);
+        var fixation = CalculatePriceFixation(scoped, history, serverDate, symbolSpecifications);
         var currentBucketCount = scoped.Count(trade =>
             string.Equals(trade.Symbol, openingTrade.Symbol, StringComparison.OrdinalIgnoreCase) &&
             Bucket(trade, symbolSpecifications) == Bucket(openingTrade, symbolSpecifications));
@@ -258,8 +277,13 @@ public sealed class BehaviorAnalyticsCalculator
             minimumSamples: policy.PriceFixationMinimumTrades,
             baselineEnabled: policy.BaselineEnabled, hardLimitEnabled: policy.HardLimitEnabled);
 
-        return BuildSummary(evaluations, trades, serverDate, policy);
+        return BuildSummary(evaluations, history, serverDate, policy);
     }
+
+    private static TradeRecord[] RecentHistory(IEnumerable<TradeRecord> trades, string accountKey, DateOnly serverDate) =>
+        trades.Where(trade => trade.AccountKey == accountKey && trade.OpenServerDate < serverDate)
+            .GroupBy(trade => trade.OpenServerDate).OrderBy(group => group.Key).TakeLast(20)
+            .SelectMany(group => group).ToArray();
 
     private static BehaviorSummary BuildSummary(
         IReadOnlyCollection<BehaviorEvaluation> evaluations,
@@ -394,24 +418,41 @@ public sealed class BehaviorAnalyticsCalculator
             .DefaultIfEmpty(0)
             .Max();
 
-    private static (decimal Value, decimal? Baseline) CalculateRevengeScore(
-        IReadOnlyList<TradeRecord> trades,
-        int rapidSeconds,
-        decimal lotMultiplier)
+    private static (decimal Revenge, decimal Escalation, int Cooldown) CalculateSequenceMetrics(
+        IReadOnlyList<TradeRecord> trades, BehaviorPolicy policy)
     {
-        decimal maximum = 0m;
+        var completed = trades.Where(trade => trade.IsComplete && trade.ClosedAtUtc is not null)
+            .OrderBy(trade => trade.ClosedAtUtc).ToArray();
+        var cursor = 0;
+        var trailingLosses = 0;
+        decimal revenge = 0m;
+        decimal escalation = 1m;
+        var cooldown = 0;
         foreach (var current in trades)
         {
-            var previous = MostRecentCompletedBefore(trades, current);
-            if (previous is null)
+            while (cursor < completed.Length && completed[cursor].ClosedAtUtc <= current.OpenedAtUtc)
             {
-                continue;
+                trailingLosses = completed[cursor++].NetPnl < -0.01m ? trailingLosses + 1 : 0;
             }
-
-            maximum = Math.Max(maximum, CalculateRevengeScore(previous, current, rapidSeconds, lotMultiplier));
+            var previous = cursor == 0 ? null : completed[cursor - 1];
+            var losses = trailingLosses;
+            // Zero-duration records must not count themselves as a previous trade.
+            if (current.IsComplete && current.ClosedAtUtc <= current.OpenedAtUtc)
+            {
+                var prior = CompletedBefore(trades, current);
+                previous = prior.LastOrDefault();
+                losses = CountTrailingLosses(prior);
+            }
+            if (previous is null) continue;
+            revenge = Math.Max(revenge, CalculateRevengeScore(previous, current,
+                policy.RapidReentrySeconds, policy.LotEscalationMultiplier));
+            if (previous.NetPnl < -0.01m && previous.OpeningVolume > 0m)
+                escalation = Math.Max(escalation, current.OpeningVolume / previous.OpeningVolume);
+            var elapsed = current.OpenedAtUtc - previous.ClosedAtUtc!.Value;
+            if (losses >= policy.ConsecutiveLossThreshold && elapsed >= TimeSpan.Zero &&
+                elapsed < TimeSpan.FromSeconds(policy.CooldownSeconds)) cooldown++;
         }
-
-        return (maximum, null);
+        return (revenge, escalation, cooldown);
     }
 
     private static decimal CalculateRevengeScore(
@@ -456,46 +497,6 @@ public sealed class BehaviorAnalyticsCalculator
         return (current, baseline, currentDay.Count);
     }
 
-    private static decimal CalculateSizeEscalation(IReadOnlyList<TradeRecord> trades)
-    {
-        var maximum = 1m;
-        foreach (var current in trades)
-        {
-            var previous = MostRecentCompletedBefore(trades, current);
-            if (previous is { NetPnl: < -0.01m, OpeningVolume: > 0m })
-            {
-                maximum = Math.Max(maximum, current.OpeningVolume / previous.OpeningVolume);
-            }
-        }
-
-        return maximum;
-    }
-
-    private static int CalculateCooldownViolations(
-        IReadOnlyList<TradeRecord> trades,
-        int lossThreshold,
-        int cooldownSeconds)
-    {
-        var violations = 0;
-        foreach (var current in trades)
-        {
-            var priorCompleted = CompletedBefore(trades, current);
-            if (CountTrailingLosses(priorCompleted) < lossThreshold)
-            {
-                continue;
-            }
-
-            var previousClosedAt = priorCompleted[^1].ClosedAtUtc!.Value;
-            var elapsed = current.OpenedAtUtc - previousClosedAt;
-            if (elapsed >= TimeSpan.Zero && elapsed < TimeSpan.FromSeconds(cooldownSeconds))
-            {
-                violations++;
-            }
-        }
-
-        return violations;
-    }
-
     private static IReadOnlyList<TradeRecord> CompletedBefore(
         IReadOnlyList<TradeRecord> trades,
         TradeRecord openingTrade) =>
@@ -507,10 +508,6 @@ public sealed class BehaviorAnalyticsCalculator
                 trade.ClosedAtUtc.Value <= openingTrade.OpenedAtUtc)
             .OrderBy(trade => trade.ClosedAtUtc)
             .ToArray();
-
-    private static TradeRecord? MostRecentCompletedBefore(
-        IReadOnlyList<TradeRecord> trades,
-        TradeRecord openingTrade) => CompletedBefore(trades, openingTrade).LastOrDefault();
 
     private static int CountTrailingLosses(IReadOnlyList<TradeRecord> completedByCloseTime)
     {
@@ -568,10 +565,12 @@ public sealed class BehaviorAnalyticsCalculator
     private static int MaxRollingCount(IReadOnlyList<DateTimeOffset> times, int windowMinutes)
     {
         var maximum = 0;
+        var right = 0;
+        var window = TimeSpan.FromMinutes(windowMinutes);
         for (var left = 0; left < times.Count; left++)
         {
-            var right = left;
-            while (right < times.Count && times[right] - times[left] <= TimeSpan.FromMinutes(windowMinutes)) right++;
+            right = Math.Max(right, left);
+            while (right < times.Count && times[right] - times[left] <= window) right++;
             maximum = Math.Max(maximum, right - left);
         }
 
@@ -579,7 +578,7 @@ public sealed class BehaviorAnalyticsCalculator
     }
 
     private static long? LatestPositionId(IReadOnlyList<TradeRecord> trades) =>
-        trades.OrderByDescending(item => item.OpenedAtUtc).Select(item => (long?)item.PositionId).FirstOrDefault();
+        trades.MaxBy(item => item.OpenedAtUtc)?.PositionId;
 
     private static decimal Bucket(
         TradeRecord trade,

@@ -6,6 +6,31 @@ namespace TradePet.Core.Tests;
 
 public sealed class BehaviorAnalyticsTests
 {
+    [Theory]
+    [InlineData(0, true)]
+    [InlineData(10, true)]
+    [InlineData(10, false)]
+    public void CachedSummary_TracksChangingGivebackLikeFullEvaluation(int historyDays, bool enabled)
+    {
+        var date = new DateOnly(2026, 8, 30);
+        var now = new DateTimeOffset(2026, 8, 30, 12, 0, 0, TimeSpan.Zero);
+        var trades = Enumerable.Range(1, historyDays).Select(index =>
+            Trade(index, 1m, 0.01m, now.AddDays(-index), now.AddDays(-index).AddMinutes(1)) with
+            { OpenServerDate = date.AddDays(-index), CloseServerDate = date.AddDays(-index) }).ToArray();
+        var policy = BehaviorPolicy.Balanced with { HardLimitEnabled = enabled };
+        var calculator = new BehaviorAnalyticsCalculator();
+        var state = new DailyState("Broker|1", date, 100m, 0m, 100m, 0m, 0, 0, 0, 0, 0m, false, false, false);
+        var cached = calculator.Evaluate("Broker|1", date, trades, [], [], null, policy, state, now);
+        foreach (var giveback in new[] { 80m, 0m })
+        {
+            state = state with { Giveback = giveback };
+            cached = calculator.UpdateDailyState(cached, "Broker|1", date, policy, state, now);
+            var expected = calculator.Evaluate("Broker|1", date, trades, [], [], null, policy, state, now);
+            Assert.Equal(expected.RiskLevel, cached.RiskLevel);
+            Assert.Equal(expected.Evaluations, cached.Evaluations);
+        }
+    }
+
     [Fact]
     public void Evaluator_ComputesRevengeAndCooldownAfterConsecutiveLosses()
     {
@@ -277,6 +302,51 @@ public sealed class BehaviorAnalyticsTests
             item => item.Rule == BehaviorRuleKind.PriceFixationScore);
         Assert.Equal(0m, fixation.Value);
         Assert.False(fixation.Triggered);
+    }
+
+    [Fact]
+    public void SequenceMetrics_RespectOverlappingTradesCloseOrderAndZeroDuration()
+    {
+        var start = new DateTimeOffset(2026, 10, 18, 0, 0, 0, TimeSpan.Zero);
+        var trades = new[]
+        {
+            Trade(1, -1m, 1m, start, start.AddSeconds(60)),
+            Trade(2, -1m, 2m, start.AddSeconds(10), start.AddSeconds(20)),
+            Trade(3, 1m, 4m, start.AddSeconds(20), start.AddSeconds(30)),
+            Trade(4, -1m, 2m, start.AddSeconds(60), start.AddSeconds(60)),
+            Trade(5, -1m, 4m, start.AddSeconds(60), start.AddSeconds(70)),
+        };
+        var summary = new BehaviorAnalyticsCalculator().Evaluate("Broker|1", new(2026, 10, 18),
+            trades.Select(trade => trade with { OpenServerDate = new(2026, 10, 18), CloseServerDate = new(2026, 10, 18) }).ToArray(),
+            [], [], null, BehaviorPolicy.Balanced);
+        Assert.Equal(100m, summary.Evaluations.Single(item => item.Rule == BehaviorRuleKind.RevengeScore).Value);
+        Assert.Equal(2m, summary.Evaluations.Single(item => item.Rule == BehaviorRuleKind.SizeEscalationAfterLoss).Value);
+        Assert.Equal(1m, summary.Evaluations.Single(item => item.Rule == BehaviorRuleKind.CooldownViolation).Value);
+    }
+
+    [Fact]
+    public void Baseline_UsesMostRecentTwentyTradingDaysRegardlessOfInputOrder()
+    {
+        var now = new DateTimeOffset(2026, 10, 18, 0, 0, 0, TimeSpan.Zero);
+        var trades = new List<TradeRecord>();
+        for (var day = 1; day <= 40; day++)
+            for (var index = 0; index < (day <= 20 ? 1 : 10); index++)
+            {
+                var opened = now.AddDays(-day).AddMinutes(index);
+                trades.Add(Trade(trades.Count + 1, 1m, 1m, opened, opened.AddSeconds(30)) with
+                { OpenServerDate = DateOnly.FromDateTime(opened.UtcDateTime), CloseServerDate = DateOnly.FromDateTime(opened.UtcDateTime) });
+            }
+        var calculator = new BehaviorAnalyticsCalculator();
+        foreach (var input in new[] { trades.ToArray(), trades.AsEnumerable().Reverse().ToArray() })
+        {
+            var result = calculator.Evaluate("Broker|1", new(2026, 10, 18), input, [], [], null, BehaviorPolicy.Balanced);
+            Assert.Equal(20, result.BaselineDayCount);
+            Assert.Equal(1m, result.Evaluations.Single(item => item.Rule == BehaviorRuleKind.OvertradeBurst).Baseline);
+            var opening = OpenTrade(1000, 1m, 3352m, now) with { OpenServerDate = new(2026, 10, 18) };
+            var live = calculator.EvaluateOpen("Broker|1", new(2026, 10, 18), opening, input, BehaviorPolicy.Balanced);
+            Assert.Equal(20, live.BaselineDayCount);
+            Assert.Equal(1m, live.Evaluations.Single(item => item.Rule == BehaviorRuleKind.OvertradeBurst).Baseline);
+        }
     }
 
     private static TradeRecord Trade(long id, decimal pnl, decimal volume, DateTimeOffset opened, DateTimeOffset closed) =>

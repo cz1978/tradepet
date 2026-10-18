@@ -322,7 +322,7 @@ class TradePetMt5Worker:
                 next_deals = now + 0.5
             if command is not None and command.kind == "refresh":
                 self._emit_server_day(command.payload.get("serverDate"))
-            if self._connected and not self._pending_history_years.empty():
+            if self._connected and (self._history_retry is not None or not self._pending_history_years.empty()):
                 self._emit_next_history_year()
             time.sleep(0.02)
 
@@ -450,6 +450,7 @@ class TradePetMt5Worker:
                 "rangeFromUtc": iso_utc(self._from_mt5_time(start)),
                 "rangeToUtc": iso_utc(self._from_mt5_time(end)),
             },
+            include_seen=True,
         )
         if is_complete:
             self._history_year_source_counts.pop(year, None)

@@ -16,9 +16,8 @@ public sealed partial class AppDatabase
 
         await using var connection = await OpenConnectionAsync(cancellationToken);
         await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken);
-        foreach (var trade in trades)
+        await using (var command = connection.CreateCommand())
         {
-            await using var command = connection.CreateCommand();
             command.Transaction = transaction;
             command.CommandText = """
                 INSERT INTO trades(
@@ -42,24 +41,48 @@ public sealed partial class AppDatabase
                     maximum_volume = excluded.maximum_volume,
                     remaining_volume = excluded.remaining_volume,
                     net_pnl = excluded.net_pnl,
-                    is_complete = excluded.is_complete;
+                    is_complete = excluded.is_complete
+                WHERE (trades.symbol, trades.side, trades.opened_at_utc, trades.closed_at_utc,
+                    trades.open_server_date, trades.close_server_date, trades.entry_price, trades.exit_price,
+                    trades.opening_volume, trades.maximum_volume, trades.remaining_volume, trades.net_pnl, trades.is_complete)
+                    IS NOT (excluded.symbol, excluded.side, excluded.opened_at_utc, excluded.closed_at_utc,
+                    excluded.open_server_date, excluded.close_server_date, excluded.entry_price, excluded.exit_price,
+                    excluded.opening_volume, excluded.maximum_volume, excluded.remaining_volume, excluded.net_pnl, excluded.is_complete);
                 """;
-            command.Parameters.AddWithValue("$account", trade.AccountKey);
-            command.Parameters.AddWithValue("$position", trade.PositionId);
-            command.Parameters.AddWithValue("$symbol", trade.Symbol);
-            command.Parameters.AddWithValue("$side", trade.Side.ToString());
-            command.Parameters.AddWithValue("$opened", Format(trade.OpenedAtUtc));
-            command.Parameters.AddWithValue("$closed", DbValue(trade.ClosedAtUtc is null ? null : Format(trade.ClosedAtUtc.Value)));
-            command.Parameters.AddWithValue("$openDate", Format(trade.OpenServerDate));
-            command.Parameters.AddWithValue("$closeDate", DbValue(trade.CloseServerDate is null ? null : Format(trade.CloseServerDate.Value)));
-            command.Parameters.AddWithValue("$entry", trade.EntryPrice);
-            command.Parameters.AddWithValue("$exit", DbValue(trade.ExitPrice));
-            command.Parameters.AddWithValue("$openingVolume", trade.OpeningVolume);
-            command.Parameters.AddWithValue("$maximumVolume", trade.MaximumVolume);
-            command.Parameters.AddWithValue("$remainingVolume", trade.RemainingVolume);
-            command.Parameters.AddWithValue("$netPnl", trade.NetPnl);
-            command.Parameters.AddWithValue("$complete", trade.IsComplete ? 1 : 0);
-            await command.ExecuteNonQueryAsync(cancellationToken);
+            command.Parameters.AddWithValue("$account", DBNull.Value);
+            command.Parameters.AddWithValue("$position", DBNull.Value);
+            command.Parameters.AddWithValue("$symbol", DBNull.Value);
+            command.Parameters.AddWithValue("$side", DBNull.Value);
+            command.Parameters.AddWithValue("$opened", DBNull.Value);
+            command.Parameters.AddWithValue("$closed", DBNull.Value);
+            command.Parameters.AddWithValue("$openDate", DBNull.Value);
+            command.Parameters.AddWithValue("$closeDate", DBNull.Value);
+            command.Parameters.AddWithValue("$entry", DBNull.Value);
+            command.Parameters.AddWithValue("$exit", DBNull.Value);
+            command.Parameters.AddWithValue("$openingVolume", DBNull.Value);
+            command.Parameters.AddWithValue("$maximumVolume", DBNull.Value);
+            command.Parameters.AddWithValue("$remainingVolume", DBNull.Value);
+            command.Parameters.AddWithValue("$netPnl", DBNull.Value);
+            command.Parameters.AddWithValue("$complete", DBNull.Value);
+            foreach (var trade in trades)
+            {
+                command.Parameters["$account"].Value = trade.AccountKey;
+                command.Parameters["$position"].Value = trade.PositionId;
+                command.Parameters["$symbol"].Value = trade.Symbol;
+                command.Parameters["$side"].Value = trade.Side.ToString();
+                command.Parameters["$opened"].Value = Format(trade.OpenedAtUtc);
+                command.Parameters["$closed"].Value = DbValue(trade.ClosedAtUtc is null ? null : Format(trade.ClosedAtUtc.Value));
+                command.Parameters["$openDate"].Value = Format(trade.OpenServerDate);
+                command.Parameters["$closeDate"].Value = DbValue(trade.CloseServerDate is null ? null : Format(trade.CloseServerDate.Value));
+                command.Parameters["$entry"].Value = trade.EntryPrice;
+                command.Parameters["$exit"].Value = DbValue(trade.ExitPrice);
+                command.Parameters["$openingVolume"].Value = trade.OpeningVolume;
+                command.Parameters["$maximumVolume"].Value = trade.MaximumVolume;
+                command.Parameters["$remainingVolume"].Value = trade.RemainingVolume;
+                command.Parameters["$netPnl"].Value = trade.NetPnl;
+                command.Parameters["$complete"].Value = trade.IsComplete ? 1 : 0;
+                await command.ExecuteNonQueryAsync(cancellationToken);
+            }
         }
         await transaction.CommitAsync(cancellationToken);
     }
@@ -85,9 +108,8 @@ public sealed partial class AppDatabase
         if (mt4PositionAliases is { Count: > 0 })
             await ReconcileMt4PositionsAsync(connection, transaction, accountKey, mt4PositionAliases, deals, cancellationToken);
 
-        foreach (var deal in deals)
+        await using (var command = connection.CreateCommand())
         {
-            await using var command = connection.CreateCommand();
             command.Transaction = transaction;
             command.CommandText = """
                 INSERT INTO deals(
@@ -108,28 +130,48 @@ public sealed partial class AppDatabase
                     commission = excluded.commission,
                     swap = excluded.swap,
                     fee = excluded.fee,
-                    occurred_at_utc = excluded.occurred_at_utc;
+                    occurred_at_utc = excluded.occurred_at_utc
+                WHERE (deals.order_ticket, deals.position_id, deals.symbol, deals.side, deals.entry_kind,
+                    deals.volume, deals.price, deals.profit, deals.commission, deals.swap, deals.fee, deals.occurred_at_utc)
+                    IS NOT (excluded.order_ticket, excluded.position_id, excluded.symbol, excluded.side, excluded.entry_kind,
+                    excluded.volume, excluded.price, excluded.profit, excluded.commission, excluded.swap, excluded.fee, excluded.occurred_at_utc);
                 """;
-            command.Parameters.AddWithValue("$account", accountKey);
-            command.Parameters.AddWithValue("$ticket", deal.Ticket);
-            command.Parameters.AddWithValue("$order", deal.OrderTicket);
-            command.Parameters.AddWithValue("$position", deal.PositionId);
-            command.Parameters.AddWithValue("$symbol", deal.Symbol);
-            command.Parameters.AddWithValue("$side", deal.Side.ToString());
-            command.Parameters.AddWithValue("$entry", deal.EntryKind.ToString());
-            command.Parameters.AddWithValue("$volume", deal.Volume);
-            command.Parameters.AddWithValue("$price", deal.Price);
-            command.Parameters.AddWithValue("$profit", deal.Profit);
-            command.Parameters.AddWithValue("$commission", deal.Commission);
-            command.Parameters.AddWithValue("$swap", deal.Swap);
-            command.Parameters.AddWithValue("$fee", deal.Fee);
-            command.Parameters.AddWithValue("$occurred", Format(deal.OccurredAtUtc));
-            await command.ExecuteNonQueryAsync(cancellationToken);
+            command.Parameters.AddWithValue("$account", DBNull.Value);
+            command.Parameters.AddWithValue("$ticket", DBNull.Value);
+            command.Parameters.AddWithValue("$order", DBNull.Value);
+            command.Parameters.AddWithValue("$position", DBNull.Value);
+            command.Parameters.AddWithValue("$symbol", DBNull.Value);
+            command.Parameters.AddWithValue("$side", DBNull.Value);
+            command.Parameters.AddWithValue("$entry", DBNull.Value);
+            command.Parameters.AddWithValue("$volume", DBNull.Value);
+            command.Parameters.AddWithValue("$price", DBNull.Value);
+            command.Parameters.AddWithValue("$profit", DBNull.Value);
+            command.Parameters.AddWithValue("$commission", DBNull.Value);
+            command.Parameters.AddWithValue("$swap", DBNull.Value);
+            command.Parameters.AddWithValue("$fee", DBNull.Value);
+            command.Parameters.AddWithValue("$occurred", DBNull.Value);
+            foreach (var deal in deals)
+            {
+                command.Parameters["$account"].Value = accountKey;
+                command.Parameters["$ticket"].Value = deal.Ticket;
+                command.Parameters["$order"].Value = deal.OrderTicket;
+                command.Parameters["$position"].Value = deal.PositionId;
+                command.Parameters["$symbol"].Value = deal.Symbol;
+                command.Parameters["$side"].Value = deal.Side.ToString();
+                command.Parameters["$entry"].Value = deal.EntryKind.ToString();
+                command.Parameters["$volume"].Value = deal.Volume;
+                command.Parameters["$price"].Value = deal.Price;
+                command.Parameters["$profit"].Value = deal.Profit;
+                command.Parameters["$commission"].Value = deal.Commission;
+                command.Parameters["$swap"].Value = deal.Swap;
+                command.Parameters["$fee"].Value = deal.Fee;
+                command.Parameters["$occurred"].Value = Format(deal.OccurredAtUtc);
+                await command.ExecuteNonQueryAsync(cancellationToken);
+            }
         }
 
-        foreach (var cashFlow in cashFlows)
+        await using (var command = connection.CreateCommand())
         {
-            await using var command = connection.CreateCommand();
             command.Transaction = transaction;
             command.CommandText = """
                 INSERT INTO account_cash_flows(account_key, ticket, type, amount, occurred_at_utc)
@@ -137,14 +179,24 @@ public sealed partial class AppDatabase
                 ON CONFLICT(account_key, ticket) DO UPDATE SET
                     type = excluded.type,
                     amount = excluded.amount,
-                    occurred_at_utc = excluded.occurred_at_utc;
+                    occurred_at_utc = excluded.occurred_at_utc
+                WHERE (account_cash_flows.type, account_cash_flows.amount, account_cash_flows.occurred_at_utc)
+                    IS NOT (excluded.type, excluded.amount, excluded.occurred_at_utc);
                 """;
-            command.Parameters.AddWithValue("$account", accountKey);
-            command.Parameters.AddWithValue("$ticket", cashFlow.Ticket);
-            command.Parameters.AddWithValue("$type", cashFlow.Type);
-            command.Parameters.AddWithValue("$amount", cashFlow.Amount);
-            command.Parameters.AddWithValue("$occurred", Format(cashFlow.OccurredAtUtc));
-            await command.ExecuteNonQueryAsync(cancellationToken);
+            command.Parameters.AddWithValue("$account", DBNull.Value);
+            command.Parameters.AddWithValue("$ticket", DBNull.Value);
+            command.Parameters.AddWithValue("$type", DBNull.Value);
+            command.Parameters.AddWithValue("$amount", DBNull.Value);
+            command.Parameters.AddWithValue("$occurred", DBNull.Value);
+            foreach (var cashFlow in cashFlows)
+            {
+                command.Parameters["$account"].Value = accountKey;
+                command.Parameters["$ticket"].Value = cashFlow.Ticket;
+                command.Parameters["$type"].Value = cashFlow.Type;
+                command.Parameters["$amount"].Value = cashFlow.Amount;
+                command.Parameters["$occurred"].Value = Format(cashFlow.OccurredAtUtc);
+                await command.ExecuteNonQueryAsync(cancellationToken);
+            }
         }
 
         if (historyState is not null)

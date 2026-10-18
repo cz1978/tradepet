@@ -590,6 +590,33 @@ public sealed class AppDatabaseTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task RepeatedIngestion_PreservesVersionsAndAppliesCorrections()
+    {
+        const string account = "Broker|1";
+        var at = new DateTimeOffset(2026, 10, 18, 1, 0, 0, TimeSpan.Zero);
+        var deals = new[]
+        {
+            new DealRecord(1, 1, 10, "TEST", TradeSide.Buy, DealEntryKind.In, 1m, 100m, 0m, -0.1m, 0m, 0m, at),
+            new DealRecord(2, 2, 10, "TEST", TradeSide.Sell, DealEntryKind.Out, 1m, 110m, 10m, 0m, 0m, 0m, at.AddMinutes(1)),
+        };
+        var projector = new TradePet.Core.Trading.TradeProjector();
+        var trades = projector.Project(account, deals, time => DateOnly.FromDateTime(time.UtcDateTime));
+        await _database.SaveDealBatchAsync(account, deals, []);
+        await _database.SaveTradesAsync(trades);
+        var version = await _database.LoadReviewDataVersionAsync(account);
+        await _database.SaveDealBatchAsync(account, deals, [], new HistorySyncState(account, 2026, true, 2, at));
+        await _database.SaveTradesAsync(trades);
+        Assert.Equal(version.Token, (await _database.LoadReviewDataVersionAsync(account)).Token);
+        Assert.Equal(deals, await _database.LoadDealsAsync(account));
+        deals[1] = deals[1] with { Commission = -1m };
+        await _database.SaveDealBatchAsync(account, deals, []);
+        await _database.SaveTradesAsync(projector.Project(account, deals, time => DateOnly.FromDateTime(time.UtcDateTime)));
+        Assert.NotEqual(version.Token, (await _database.LoadReviewDataVersionAsync(account)).Token);
+        Assert.Equal(-1m, (await _database.LoadDealsAsync(account)).Single(deal => deal.Ticket == 2).Commission);
+        Assert.Equal(8.9m, Assert.Single(await _database.LoadTradesAsync(account, new(2026, 10, 18), new(2026, 10, 18))).NetPnl);
+    }
+
+    [Fact]
     public async Task DealBatch_CommitsSourceDataAndHistoryCheckpointTogether()
     {
         const string account = "Broker|1";

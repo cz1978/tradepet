@@ -495,22 +495,29 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         await operation();
     }
 
-    private async ValueTask<IAsyncDisposable> EnterRuntimeOperationAsync(
+    private ValueTask<IAsyncDisposable> EnterRuntimeOperationAsync(
         MaintenanceOperationKind kind, CancellationToken cancellationToken)
     {
         if (_runtimeOperation.Value is { Active: true })
         {
-            return NoopRuntimeLease.Instance;
+            return ValueTask.FromResult<IAsyncDisposable>(NoopRuntimeLease.Instance);
         }
-        var lease = await _maintenance.EnterOperationAsync(kind, cancellationToken);
+        // Establish the holder in the caller's execution context before the first await.
         var marker = new RuntimeOperationMarker();
         _runtimeOperation.Value = marker;
-        return new RuntimeOperationLease(this, marker, lease);
+        return AcquireAsync();
+
+        async ValueTask<IAsyncDisposable> AcquireAsync()
+        {
+            var lease = await _maintenance.EnterOperationAsync(kind, cancellationToken).ConfigureAwait(false);
+            marker.Active = true;
+            return new RuntimeOperationLease(this, marker, lease);
+        }
     }
 
     private sealed class RuntimeOperationMarker
     {
-        public bool Active { get; set; } = true;
+        public bool Active { get; set; }
     }
 
     private sealed class RuntimeOperationLease(
@@ -1244,6 +1251,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
             _workerSessionPhase != WorkerSessionPhase.Live;
         if (accountChanged)
         {
+            InvalidateAnalytics();
             _mt4HistoryReady = false;
             _chartObjects.Clear();
             _hostChartId = null;
@@ -1396,6 +1404,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
             return;
         }
 
+        InvalidateAnalytics();
         await UpdateSymbolSpecificationsAsync(_account.Scope.AccountKey, batch.SymbolSpecifications);
 
         var recovery = batch.IsRecovery || _workerSessionPhase != WorkerSessionPhase.Live || !_hasInitialDeals ||
@@ -1561,6 +1570,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
 
     private async Task HandlePositionChangeAsync(TradeDomainEvent change)
     {
+        InvalidateAnalytics();
         if (_account is null)
         {
             return;
@@ -1978,7 +1988,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         var result = _dailyCalculator.Calculate(
             _account.Scope.AccountKey,
             _serverDate,
-            _trades.Values.ToArray(),
+            AnalyticsDailyTrades(),
             _positions.Values.ToArray(),
             EffectiveAlertSettings(),
             _dailyState,
@@ -2026,17 +2036,25 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
             return;
         }
 
-        var summary = _behaviorCalculator.Evaluate(
-            _account.Scope.AccountKey,
-            _serverDate,
-            _trades.Values.ToArray(),
-            _lossZones,
-            _lossZoneAttempts,
-            _reviewMetadata,
-            _behaviorPolicies.Selected,
-            _dailyState,
-            _timeProvider.GetUtcNow(),
-            _symbolSpecifications);
+        EnsureAnalyticsContext();
+        var policy = _behaviorPolicies.Selected;
+        if (_analyticsBehavior is null || _analyticsBehaviorPolicy != policy)
+        {
+            _analyticsBehavior = _behaviorCalculator.Evaluate(
+                _account.Scope.AccountKey,
+                _serverDate,
+                AnalyticsTrades(),
+                _lossZones,
+                _lossZoneAttempts,
+                _reviewMetadata,
+                policy,
+                _dailyState,
+                _timeProvider.GetUtcNow(),
+                _symbolSpecifications);
+            _analyticsBehaviorPolicy = policy;
+        }
+        var summary = _behaviorCalculator.UpdateDailyState(_analyticsBehavior,
+            _account.Scope.AccountKey, _serverDate, policy, _dailyState, _timeProvider.GetUtcNow());
         await OnUiAsync(() => _viewModel.ApplyTodayBehavior(summary));
     }
 
@@ -2237,6 +2255,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         _hostChartId = heartbeat.HostChartId;
         if (timeContextChanged)
         {
+            InvalidateAnalytics();
             await PersistServerTimeSegmentAsync(ReviewTimeBasis.BrokerServer, "mt5-bridge-heartbeat-v1");
         }
         if (dateChanged)
@@ -2250,10 +2269,10 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
                 foreach (var trade in projected)
                 {
                     _trades[trade.PositionId] = trade;
-                    await TryPersistLiveAsync(
-                        () => _database.UpsertTradeAsync(trade, _cancellation.Token),
-                        "保存完整交易");
                 }
+                InvalidateAnalytics();
+                await TryPersistLiveAsync(
+                    () => _database.SaveTradesAsync(projected, _cancellation.Token), "保存完整交易批次");
                 await RecalculateDailyAsync(isRecovery: true);
             }
         }
@@ -2440,6 +2459,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         }
 
         _loadedScope = scope;
+        InvalidateAnalytics();
         _missingStopLossAlerted.Clear();
         if (!_persistenceAvailable)
         {
@@ -2611,6 +2631,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
 
     private async Task ResetScopeToLiveDataAsync()
     {
+        InvalidateAnalytics();
         if (_account is null)
         {
             return;
@@ -2740,6 +2761,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
                 _structuredPlans.Values,
                 _timeProvider.GetUtcNow());
             _reviewMetadata[trade.PositionId] = metadata;
+            InvalidateAnalytics();
             await TryPersistLiveAsync(
                 () => _database.UpsertTradeReviewMetadataAsync(metadata, _cancellation.Token),
                 "保存计划匹配");
@@ -3009,9 +3031,9 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         await ShowSpeechAsync("计划已载入。", "修改后保存会建立新版本，旧交易仍绑定原计划。", TimeSpan.FromSeconds(6));
     }
 
-    public Task RefreshReviewAsync() => WithMaintenanceOperationAsync(
+    public Task RefreshReviewAsync() => Task.Run(() => WithMaintenanceOperationAsync(
         MaintenanceOperationKind.Read,
-        () => WithStateGateOnlyAsync(() => RefreshReviewUiAsync(force: true)));
+        () => WithStateGateOnlyAsync(() => RefreshReviewUiAsync(force: true))), _cancellation.Token);
 
     private Task RefreshReviewDuringMaintenanceAsync() =>
         WithStateGateOnlyAsync(() => RefreshReviewUiAsync(force: true));
@@ -3027,6 +3049,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         }
 
         _reviewMetadata[metadata.PositionId] = metadata;
+        InvalidateAnalytics();
         await TryPersistLiveAsync(
             () => _database.UpsertTradeReviewMetadataAsync(metadata, _cancellation.Token),
             "保存人工复盘归类");
@@ -3715,6 +3738,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         if (metadata.TryGetValue(key.PositionId, out var saved))
         {
             _reviewMetadata[key.PositionId] = saved;
+            InvalidateAnalytics();
         }
         await OpenTradeReviewAsync(key.PositionId);
         await RefreshReviewAsync();
@@ -4400,6 +4424,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
                         foreach (var item in metadata)
                         {
                             _reviewMetadata[item.Key] = item.Value;
+                            InvalidateAnalytics();
                         }
                     }
                 }
@@ -5302,12 +5327,14 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
 
     private void UpsertZoneInMemory(LossZoneState zone)
     {
+        InvalidateAnalytics();
         var index = _lossZones.FindIndex(item => item.Id == zone.Id);
         if (index >= 0) _lossZones[index] = zone; else _lossZones.Add(zone);
     }
 
     private void UpsertAttemptInMemory(LossZoneAttempt attempt)
     {
+        InvalidateAnalytics();
         _lossZoneAttempts.RemoveAll(item => item.PositionId == attempt.PositionId && item.Id != attempt.Id);
         var index = _lossZoneAttempts.FindIndex(item => item.Id == attempt.Id);
         if (index >= 0) _lossZoneAttempts[index] = attempt; else _lossZoneAttempts.Add(attempt);
@@ -5365,6 +5392,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         var changed = !ProjectionMatches(projection);
         _lossZones.Clear();
         _lossZones.AddRange(projection.Zones);
+        InvalidateAnalytics();
         _lossZoneAttempts.Clear();
         _lossZoneAttempts.AddRange(projection.Attempts);
         if (changed)
@@ -5415,15 +5443,26 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
     {
         await OnUiAsync(() =>
         {
-            _viewModel.Positions.Clear();
-            foreach (var position in positions.OrderBy(item => item.OpenedAtUtc))
+            var ordered = positions.OrderBy(item => item.OpenedAtUtc).ToArray();
+            var tickets = ordered.Select(item => item.Ticket).ToHashSet();
+            var rows = _viewModel.Positions;
+            for (var index = rows.Count - 1; index >= 0; index--)
+                if (!tickets.Contains(rows[index].Ticket)) rows.RemoveAt(index);
+            var existing = rows.ToDictionary(row => row.Ticket);
+            for (var index = 0; index < ordered.Length; index++)
             {
-                _viewModel.Positions.Add(new PositionRowViewModel(position, showDuration: _serverDateAuthoritative));
+                var position = ordered[index];
+                if (existing.TryGetValue(position.Ticket, out var row))
+                {
+                    if (!ReferenceEquals(rows[index], row)) rows.Move(rows.IndexOf(row), index);
+                    row.Update(position, showDuration: _serverDateAuthoritative);
+                }
+                else rows.Insert(index, new PositionRowViewModel(position, showDuration: _serverDateAuthoritative));
             }
             _viewModel.HasPositions = positions.Count > 0;
             _viewModel.OpenPositionCount = positions.Count;
             _viewModel.CurrentExposure = positions.Sum(position => position.Volume);
-            var firstPosition = positions.OrderBy(position => position.OpenedAtUtc).FirstOrDefault();
+            var firstPosition = ordered.FirstOrDefault();
             _viewModel.PositionCard = firstPosition is null
                 ? "当前无持仓"
                 : $"{firstPosition.Symbol} {FormatSide(firstPosition.Side)} {firstPosition.Volume:0.##} 手  " +
@@ -5592,6 +5631,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
             _equitySamples.Add(sample);
         }
         _lastEquitySampleAtUtc = account.CapturedAtUtc;
+        _analyticsHistoricalHigh = null;
         if (force)
         {
             await TryPersistLiveAsync(
@@ -6056,6 +6096,11 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
 
     private async Task ShowDailyTradingReportAsync(DateOnly date, bool automatic, DailyTradingReportWindow? refreshWindow = null)
     {
+        await Task.Run(() => BuildDailyTradingReportAsync(date, automatic, refreshWindow), _cancellation.Token);
+    }
+
+    private async Task BuildDailyTradingReportAsync(DateOnly date, bool automatic, DailyTradingReportWindow? refreshWindow)
+    {
         if (_activePlatform == TradingPlatform.Mt4 && (!_mt4HistoryAvailable || !_mt4HistoryReady || !_hasInitialDeals))
         {
             if (!automatic) await ShowSpeechAsync("MT4 日报正在等待历史数据。", "请更新桥接插件并选择全部账户历史；首次运行需等待报价校时。", TimeSpan.FromSeconds(7));
@@ -6070,7 +6115,10 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         await _dailyReportGate.WaitAsync(_cancellation.Token);
         try
         {
-            var accountKey = _account.Scope.AccountKey;
+            var session = _accountSessions.Current;
+            var account = _account;
+            if (session is null || account is null || session.AccountKey != account.Scope.AccountKey) return;
+            var accountKey = account.Scope.AccountKey;
             if (refreshWindow is not null && refreshWindow.Report.AccountKey != accountKey) return;
             var runKey = $"{accountKey}|{date:yyyy-MM-dd}";
             if (automatic && _dailyReportsShownThisRun.Contains(runKey))
@@ -6106,7 +6154,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
                 date == DateOnly.MaxValue ? date : date.AddDays(1),
                 _cancellation.Token);
             data = DailyReportAnalyzer.NormalizeServerDates(data, reportOffsetSeconds);
-            if (_account?.Scope.AccountKey != accountKey)
+            if (!_accountSessions.IsCurrent(accountKey, session.Generation))
             {
                 return;
             }
@@ -6117,7 +6165,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
                 .ThenBy(item => item.PositionId)
                 .ToArray();
             data = await LoadDailyReportEvidenceAsync(data, date, reportOffsetSeconds);
-            if (_account?.Scope.AccountKey != accountKey) return;
+            if (!_accountSessions.IsCurrent(accountKey, session.Generation)) return;
             data = data with { Documents = _reviewWorkspaceCalculator.ProjectReviewStatuses(data.Trades, data.Deals,
                 data.Documents, data.Assessments, data.Excursions, data.Version) };
             var facts = _reviewWorkspaceCalculator.BuildDailyFacts(accountKey, date, date, data.Trades, data.Deals,
@@ -6136,7 +6184,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
                 item.Level is BehaviorRiskLevel.Attention or BehaviorRiskLevel.Critical);
             var report = new DailyTradingReport(
                 accountKey,
-                string.IsNullOrWhiteSpace(data.Currency) ? _account.Currency : data.Currency,
+                string.IsNullOrWhiteSpace(data.Currency) ? account.Currency : data.Currency,
                 date,
                 date >= _serverDate,
                 facts.RealizedCashPnl,
@@ -6162,12 +6210,22 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
             var archivePath = await ArchiveDailyReportAsync(report, markdown);
             report = report with { Markdown = markdown, ArchivePath = archivePath };
 
+            var displayed = false;
             await OnUiAsync(() =>
             {
-                if (refreshWindow is null) ShowDailyReportWindow(report, activate: !automatic);
+                if (!_accountSessions.IsCurrent(accountKey, session.Generation)) return;
+                if (refreshWindow is null)
+                {
+                    ShowDailyReportWindow(report, activate: !automatic);
+                    displayed = true;
+                }
                 else if (ReferenceEquals(_dailyReportWindow, refreshWindow) && refreshWindow.Report.AccountKey == report.AccountKey)
+                {
                     refreshWindow.ApplyReport(report);
+                    displayed = true;
+                }
             });
+            if (!displayed) return;
             _dailyReportsShownThisRun.Add(runKey);
             if (automatic && _persistenceAvailable)
             {
@@ -6201,8 +6259,14 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         _dailyReportWindow = null;
         previous?.Close();
 
-        var window = new DailyTradingReportWindow(report);
+        var window = new DailyTradingReportWindow(report, _serverDate);
         var generation = _accountSessions.Current?.Generation ?? -1;
+        window.LoadReportDateAsync = async date =>
+        {
+            window.SetCurrentServerDate(_serverDate);
+            if (date > _serverDate || !_accountSessions.IsCurrent(window.Report.AccountKey, generation)) return;
+            await ShowDailyTradingReportAsync(date, automatic: false, refreshWindow: window);
+        };
         window.SaveDailyReviewAsync = (summary, action) => SaveDailyReportReviewAsync(window, generation, summary, action);
         _dailyReportWindow = window;
         window.Closed += (_, _) =>
@@ -6212,7 +6276,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
                 _dailyReportWindow = null;
             }
         };
-        window.OpenReviewRequested += (_, _) => _ = OpenDailyReportReviewAsync(report.ServerDate);
+        window.OpenReviewRequested += (_, _) => _ = OpenDailyReportReviewAsync(window.ServerDate);
         window.Show();
         if (activate) window.Activate();
     }
@@ -6889,23 +6953,20 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
 
     private decimal CalculateObservedHighWater()
     {
-        var currentCombined = _trades.Values
-            .Where(trade => trade.IsComplete && trade.CloseServerDate == _serverDate)
-            .Sum(trade => trade.NetPnl) +
+        var currentCombined = CalculateDailyRealizedPnl() +
             _positions.Values.Sum(position => position.Profit + position.Swap);
         if (!_hasInitialDeals)
         {
             return Math.Max(0m, currentCombined);
         }
 
-        var dailyDeals = _deals.Values
-            .Where(deal => ResolveServerDate(deal.OccurredAtUtc) == _serverDate)
-            .ToArray();
-        return _dailyHighWaterCalculator.Calculate(
+        var dailyDeals = AnalyticsDailyDeals();
+        _analyticsHistoricalHigh ??= _dailyHighWaterCalculator.Calculate(
             dailyDeals,
             _equitySamples,
             _cashFlows.Values.ToArray(),
-            currentCombined);
+            0m);
+        return Math.Max(_analyticsHistoricalHigh.Value, currentCombined);
     }
 
     private IReadOnlyList<TradeRecord> ProjectTrades() =>
@@ -6917,9 +6978,11 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
                 : trade)
             .ToArray();
 
-    private decimal CalculateDailyRealizedPnl() => _deals.Values
-        .Where(deal => ResolveServerDate(deal.OccurredAtUtc) == _serverDate)
-        .Sum(deal => deal.NetPnl);
+    private decimal CalculateDailyRealizedPnl()
+    {
+        var deals = AnalyticsDailyDeals();
+        return _analyticsRealizedPnl ??= deals.Sum(deal => deal.NetPnl);
+    }
 
     private bool SupportsCompleteTradeProjection => _account is not null &&
         (_account.MarginMode == 2 || (_activePlatform == TradingPlatform.Mt4 && _mt4HistoryAvailable));
@@ -6951,6 +7014,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         {
             return;
         }
+        InvalidateAnalytics();
         foreach (var specification in changed)
         {
             _symbolSpecifications[specification.Symbol] = specification;

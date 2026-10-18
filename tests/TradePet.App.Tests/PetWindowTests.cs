@@ -756,6 +756,46 @@ public sealed class PetWindowTests
         var window = new DailyTradingReportWindow(report);
         try
         {
+            var picker = (DatePicker)window.FindName("ReportDatePicker");
+            VerifyDailyReportCalendar(picker);
+            var nextDay = (Button)window.FindName("NextDayButton");
+            Assert.Equal(report.ServerDate.ToDateTime(TimeOnly.MinValue), picker.SelectedDate);
+            Assert.Equal(picker.SelectedDate, picker.DisplayDateEnd);
+            Assert.False(nextDay.IsEnabled);
+            var loadCalls = 0;
+            var previousReport = report with { ServerDate = report.ServerDate.AddDays(-1), IsLive = false,
+                TradeCount = 0, RealizedCashPnl = -25, Markdown = "# 前一天的日报", Analysis = null };
+            window.LoadReportDateAsync = date =>
+            {
+                loadCalls++;
+                window.ApplyReport(date == report.ServerDate ? report : previousReport);
+                return Task.CompletedTask;
+            };
+            var summaryBox = (TextBox)window.FindName("DailySummaryBox");
+            var originalSummary = summaryBox.Text;
+            summaryBox.Text = "当前交易日的未保存小结";
+            ((Button)window.FindName("PreviousDayButton")).RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            Assert.Equal(previousReport.ServerDate, window.ServerDate);
+            Assert.Equal(previousReport.Markdown, ((TextBox)window.FindName("FullReportText")).Text);
+            Assert.Contains("-25", ((TextBlock)window.FindName("NetPnlText")).Text);
+            Assert.Equal("已结束", ((TextBlock)window.FindName("StatusText")).Text);
+            Assert.True(nextDay.IsEnabled);
+            ((Button)window.FindName("TodayButton")).RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            Assert.Equal(report.ServerDate, window.ServerDate);
+            Assert.Equal("当前交易日的未保存小结", summaryBox.Text);
+            Assert.False(nextDay.IsEnabled);
+            picker.SelectedDate = previousReport.ServerDate.ToDateTime(TimeOnly.MinValue);
+            nextDay.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            Assert.Equal(report.ServerDate, window.ServerDate);
+            Assert.Equal(4, loadCalls);
+            window.LoadReportDateAsync = _ => Task.CompletedTask;
+            picker.SelectedDate = previousReport.ServerDate.ToDateTime(TimeOnly.MinValue);
+            Assert.Equal(report.ServerDate, window.ServerDate);
+            Assert.Equal(report.ServerDate.ToDateTime(TimeOnly.MinValue), picker.SelectedDate);
+            Assert.Equal(report.Markdown, ((TextBox)window.FindName("FullReportText")).Text);
+            Assert.Equal("当前交易日的未保存小结", summaryBox.Text);
+            Assert.Contains("未能加载", ((TextBlock)window.FindName("ArchivePathText")).Text);
+            summaryBox.Text = originalSummary;
             Assert.False(window.Topmost);
             Assert.False(window.ShowActivated);
             Assert.Equal(ResizeMode.CanResize, window.ResizeMode);
@@ -821,6 +861,56 @@ public sealed class PetWindowTests
             Assert.True(tabs.ActualHeight > 200);
         }
         finally { window.Close(); }
+    }
+
+    internal static void VerifyDailyReportCalendar(DatePicker picker)
+    {
+        picker.ApplyTemplate();
+        var popup = Assert.IsType<Popup>(picker.Template.FindName("PART_Popup", picker));
+        var calendar = Assert.IsType<Calendar>(popup.Child);
+        var originalDate = calendar.DisplayDate;
+        foreach (var mode in new[] { CalendarMode.Month, CalendarMode.Year, CalendarMode.Decade })
+        {
+            calendar.DisplayMode = mode;
+            calendar.Measure(new Size(270, 260));
+            calendar.Arrange(new Rect(0, 0, 270, 260));
+            calendar.UpdateLayout();
+            var item = Assert.Single(Descendants(calendar).OfType<CalendarItem>());
+            var monthView = (Grid)item.Template.FindName("PART_MonthView", item);
+            var yearView = (Grid)item.Template.FindName("PART_YearView", item);
+            Assert.Equal(mode == CalendarMode.Month ? Visibility.Visible : Visibility.Collapsed, monthView.Visibility);
+            Assert.Equal(mode == CalendarMode.Month ? Visibility.Collapsed : Visibility.Visible, yearView.Visibility);
+            var labels = Descendants(calendar).OfType<TextBlock>().Where(text => !string.IsNullOrEmpty(text.Text)).ToArray();
+            Assert.True(labels.Length > 20);
+            foreach (var label in labels)
+            {
+                var color = Assert.IsType<System.Windows.Media.SolidColorBrush>(label.Foreground).Color;
+                Assert.True(color.R < 200 && color.G < 200 && color.B < 200,
+                    $"Calendar label '{label.Text}' must stay dark on its light background; actual color {color}.");
+            }
+        }
+        calendar.DisplayMode = CalendarMode.Month;
+        var calendarItem = Assert.Single(Descendants(calendar).OfType<CalendarItem>());
+        var previous = (Button)calendarItem.Template.FindName("PART_PreviousButton", calendarItem);
+        previous.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        Assert.Equal(originalDate.AddMonths(-1).Month, calendar.DisplayDate.Month);
+        var header = (Button)calendarItem.Template.FindName("PART_HeaderButton", calendarItem);
+        header.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        Assert.Equal(CalendarMode.Year, calendar.DisplayMode);
+        header.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        Assert.Equal(CalendarMode.Decade, calendar.DisplayMode);
+        calendar.DisplayDate = originalDate;
+        calendar.DisplayMode = CalendarMode.Month;
+
+        static IEnumerable<DependencyObject> Descendants(DependencyObject parent)
+        {
+            for (var index = 0; index < System.Windows.Media.VisualTreeHelper.GetChildrenCount(parent); index++)
+            {
+                var child = System.Windows.Media.VisualTreeHelper.GetChild(parent, index);
+                yield return child;
+                foreach (var descendant in Descendants(child)) yield return descendant;
+            }
+        }
     }
 
     private static void VerifySetupFlow()

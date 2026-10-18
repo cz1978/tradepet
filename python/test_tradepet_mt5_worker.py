@@ -4,10 +4,11 @@ import io
 import json
 import types
 import unittest
+from unittest.mock import patch
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from tradepet_mt5_worker import JsonLineEmitter, ReadOnlyMt5Api, TradePetMt5Worker
+from tradepet_mt5_worker import JsonLineEmitter, ReadOnlyMt5Api, TradePetMt5Worker, WorkerCommand
 
 
 class FakeApi(ReadOnlyMt5Api):
@@ -229,6 +230,54 @@ class WorkerTests(unittest.TestCase):
             item["kind"] == "deals" and item["payload"].get("historySync", {}).get("isComplete")
             for item in envelopes
         ))
+
+    def test_history_retry_reemits_deals_already_sent_before_persistence_failure(self) -> None:
+        api = FakeApi()
+        api.history = (types.SimpleNamespace(ticket=9001, order=9001, position_id=10, symbol="TEST",
+            type=0, entry=1, volume=1.0, price=100.0, profit=25.0, commission=0.0, swap=0.0,
+            fee=0.0, time_msc=1_741_564_800_000, reason=0, comment=""),)
+        output = io.StringIO()
+        worker = TradePetMt5Worker("C:/fake/terminal64.exe", api, JsonLineEmitter(output))
+        worker._seen_deal_tickets.add(9001)
+        worker._pending_history_years.put((2025, 1))
+        worker._history_year_source_counts[2025] = 0
+        self.assertTrue(worker._emit_next_history_year())
+        message = json.loads(output.getvalue().splitlines()[-1])["payload"]
+        self.assertEqual([9001], [deal["ticket"] for deal in message["deals"]])
+        self.assertTrue(message["historySync"]["isComplete"])
+
+    def test_run_retries_failed_last_month_after_queue_becomes_empty(self) -> None:
+        class FinalChunkApi(FakeApi):
+            january_calls = 0
+
+            def deals_between(self, date_from, date_to):
+                if date_from == datetime(2025, 1, 1, tzinfo=timezone.utc):
+                    self.january_calls += 1
+                    return None if self.january_calls == 1 else ()
+                return ()
+
+        api = FinalChunkApi()
+        output = io.StringIO()
+        worker = TradePetMt5Worker("C:/fake/terminal64.exe", api, JsonLineEmitter(output))
+        self.assertTrue(worker.connect())
+        worker._pending_history_years.put((2025, 1))
+        worker._history_year_source_counts[2025] = 0
+        ticks = iter(range(0, 1000, 2))
+        cycles = 0
+
+        def sleep(_):
+            nonlocal cycles
+            cycles += 1
+            if cycles >= 5:
+                worker.enqueue_command(WorkerCommand("shutdown", {}))
+
+        with patch("tradepet_mt5_worker.time.monotonic", side_effect=lambda: next(ticks)), \
+             patch("tradepet_mt5_worker.time.sleep", side_effect=sleep):
+            worker.run()
+        self.assertEqual(2, api.january_calls)
+        self.assertIsNone(worker._history_retry)
+        messages = [json.loads(line) for line in output.getvalue().splitlines()]
+        self.assertTrue(any(message["payload"].get("historySync", {}).get("isComplete") for message in messages))
 
     def test_account_change_on_reconnect_clears_previous_session_state(self) -> None:
         api = FakeApi()

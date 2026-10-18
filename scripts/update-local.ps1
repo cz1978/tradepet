@@ -1,4 +1,4 @@
-param([switch]$RepairShortcuts)
+param([switch]$RepairShortcuts = $true)
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
@@ -48,7 +48,8 @@ if ($RepairShortcuts) {
             $shortcut.IconLocation = "$executable,0"
             $shortcut.Save()
             $verified = $shortcutShell.CreateShortcut($file.FullName)
-            if ($verified.TargetPath -ine $executable -or $verified.WorkingDirectory -ine $installDirectory) {
+            if ($verified.TargetPath -ine $executable -or $verified.WorkingDirectory -ine $installDirectory -or
+                $verified.IconLocation -ine "$executable,0") {
                 throw "Shortcut verification failed: $($file.FullName)"
             }
             Write-Output "Shortcut updated: $($file.FullName)"

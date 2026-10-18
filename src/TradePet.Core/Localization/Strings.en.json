@@ -1,5 +1,47 @@
 [
   {
+    "key": "DailyReportDate",
+    "source": "交易日（服务器）",
+    "english": "Trading day (server)",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "DailyReportPreviousDay",
+    "source": "前一天",
+    "english": "Previous day",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "DailyReportNextDay",
+    "source": "后一天",
+    "english": "Next day",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "DailyReportToday",
+    "source": "今天",
+    "english": "Today",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "DailyReportLoading",
+    "source": "正在加载…",
+    "english": "Loading…",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "DailyReportDateLoadFailed",
+    "source": "所选日期的日报未能加载，已保留原报告和日总结，请重试。",
+    "english": "Could not load the selected day's report. The previous report and daily summary are preserved; please retry.",
+    "template": false,
+    "preserve": []
+  },
+  {
     "key": "PetGoalSummaryDetails",
     "source": "完整小结与目标进度",
     "english": "Full summary and goal progress",

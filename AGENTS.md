@@ -1,9 +1,9 @@
 # 本机更新
 
 - 本机正式安装固定在 `artifacts/TradePet-win-x64`，桌面、开始菜单和任务栏快捷方式都指向其中的 `TradePet.exe`。
-- 修改软件后，在宣告本机更新完成前执行 `scripts/update-local.ps1`，确认发布成功。首次修复已有快捷方式时加 `-RepairShortcuts`。
+- 每次修改软件后，在宣告本机更新完成前执行 `scripts/update-local.ps1 -RepairShortcuts`，确认发布成功；每次都必须修复并逐一核对桌面、开始菜单和已有任务栏快捷方式的目标、工作目录和图标，确保指向本次更新后的固定安装目录，不能只在首次更新时执行，也不能只完成编译就宣告更新完成。
 - 测试目录和 `src/TradePet.App/bin` 的编译结果只用于验证，不能代替本机安装更新。
-- 更新前正常退出已运行的 TradePet；更新后从固定安装目录启动。
+- 更新前由代理通过后台命令退出固定安装目录的 TradePet；更新后从该目录后台启动，不带会打开控制台的参数。退出、更新和验证均禁止使用 Computer Use、界面自动化、模拟键鼠或切换焦点；不得操作用户正在交易的 MT4/MT5 窗口。
 
 # GitHub 发布
 
@@ -14,4 +14,4 @@
 
 ## English
 
-The established GitHub upload workflow for this project is a complete candidate release: increment the version, update bilingual README/INSTALL/CHANGELOG, validate changes, commit source, create the matching tag, publish a prerelease, and upload the complete Windows x64 portable ZIP plus SHA256SUMS.txt. Verify the remote commit, tag and downloadable assets. The existing destination is cz1978/tradepet on origin/main; tags use v1.0.0-rc.N. A source-only push does not finish this workflow. Build in a fresh directory with bundled runtimes, read-only bridges and bilingual documentation; exclude user data and development files. Use build-release.ps1 and publish-github-release.ps1. The stable local installation and shortcut target remain artifacts/TradePet-win-x64; run update-local.ps1 before claiming the local installation was updated, and exit the running app normally first.
+The established GitHub upload workflow for this project is a complete candidate release: increment the version, update bilingual README/INSTALL/CHANGELOG, validate changes, commit source, create the matching tag, publish a prerelease, and upload the complete Windows x64 portable ZIP plus SHA256SUMS.txt. Verify the remote commit, tag and downloadable assets. The existing destination is cz1978/tradepet on origin/main; tags use v1.0.0-rc.N. A source-only push does not finish this workflow. Build in a fresh directory with bundled runtimes, read-only bridges and bilingual documentation; exclude user data and development files. Use build-release.ps1 and publish-github-release.ps1. The stable local installation and shortcut target remain artifacts/TradePet-win-x64. On every local software update, use background commands to exit only the TradePet process from the fixed installation, run scripts/update-local.ps1 -RepairShortcuts, and verify the target, working directory and icon of each desktop, Start Menu and existing taskbar shortcut before claiming completion. Shortcut repair is required every time, not only on the first update. Then launch the updated app in the background from the fixed installation directory without arguments that open the console. Never use Computer Use, UI automation, simulated input or focus changes to exit, update or validate TradePet; never interact with the user's MT4/MT5 trading windows.
