@@ -6,9 +6,9 @@
 
 > Trade alongside you, never on your behalf.
 
-**Current version: 1.0.0-rc.12** · [Download Windows portable release](https://github.com/cz1978/tradepet/releases/tag/v1.0.0-rc.12) · [Installation and upgrades](INSTALL.en.md) · [Changelog](CHANGELOG.en.md) · [MIT License](LICENSE)
+**Current version: 1.0.0 (stable)** · [Download Windows portable release](https://github.com/cz1978/tradepet/releases/tag/v1.0.0) · [Installation and upgrades](INSTALL.en.md) · [Changelog](CHANGELOG.en.md) · [MIT License](LICENSE)
 
-`rc.12` improves runtime calculations, review pagination and position refreshes, with background report generation and fewer redundant database writes. It fixes history retries, maintenance deadlocks and cross-day partial-close P/L calculations. Daily reports now support date navigation and retain unsaved summaries when switching days. The complete Windows package includes bundled runtimes, read-only MT4/MT5 bridges and bilingual documentation.
+`1.0.0` improves runtime calculations, review pagination and position refreshes, with background report generation and fewer redundant database writes. It fixes history retries, maintenance deadlocks and cross-day partial-close P/L calculations. Daily reports now support date navigation and retain unsaved summaries when switching days. The complete Windows package includes bundled runtimes, read-only MT4/MT5 bridges and bilingual documentation.
 
 TradePet is a local Windows trading desktop pet. It connects to MT5 or MT4 in read-only mode and brings positions, risk, quick notes, reviews, macroeconomic events and daily reports into a desktop assistant.
 
@@ -82,11 +82,11 @@ Default archive:
 
 The [illustrated guide](docs/images/tradepet-rc6-install-guide.png) shows extraction, bridge installation and chart attachment. Its screenshots use Chinese; [English instructions](INSTALL.en.md) describe the same actions. Python is bundled; the bridge still needs installation and manual chart attachment.
 
-Download **`TradePet-1.0.0-rc.12-win-x64.zip`**, extract the entire ZIP and run `TradePet.exe`. GitHub **Source code** archives are not application installers. Do not move the EXE alone.
+Download **`TradePet-1.0.0-win-x64.zip`**, extract the entire ZIP and run `TradePet.exe`. GitHub **Source code** archives are not application installers. Do not move the EXE alone.
 
 The package includes .NET 8, 64-bit Python 3.13, MetaTrader5/NumPy, read-only MT4/MT5 plugins and documentation. No separate Python or dependency download is needed. `rc.5` and earlier did not bundle Python; upgrading is recommended. MT4 needs no Python. See [installation, upgrades, checksums and troubleshooting](INSTALL.en.md).
 
-#### Platform support (rc.12)
+#### Platform support (1.0.0)
 
 | Feature | MT5 | MT4 |
 | --- | --- | --- |
@@ -172,9 +172,9 @@ An evolving personal tool, primarily verified on Windows x64, WeTrade MT5 and he
 
 > 陪你交易，不替你交易。
 
-**当前版本：1.0.0-rc.12** · [下载 Windows 便携版](https://github.com/cz1978/tradepet/releases/tag/v1.0.0-rc.12) · [安装与升级说明](INSTALL.md) · [更新日志](CHANGELOG.md) · [MIT 许可证](LICENSE)
+**当前版本：1.0.0（正式版）** · [下载 Windows 便携版](https://github.com/cz1978/tradepet/releases/tag/v1.0.0) · [安装与升级说明](INSTALL.md) · [更新日志](CHANGELOG.md) · [MIT 许可证](LICENSE)
 
-`rc.12` 优化实时计算、复盘分页与持仓刷新，将日报计算移到后台，并减少数据库重复写入；修复历史重试、维护死锁和跨日部分平仓的盈亏口径问题。日报支持日期切换，切换日期时保留未保存的日总结。完整 Windows 便携包内置运行环境、MT4/MT5 只读插件和中英说明。
+`1.0.0` 优化实时计算、复盘分页与持仓刷新，将日报计算移到后台，并减少数据库重复写入；修复历史重试、维护死锁和跨日部分平仓的盈亏口径问题。日报支持日期切换，切换日期时保留未保存的日总结。完整 Windows 便携包内置运行环境、MT4/MT5 只读插件和中英说明。
 
 TradePet 是一款面向 Windows 的本地交易桌宠。它以只读方式连接 MT5 或 MT4，把持仓、风险、快速记录、复盘、宏观事件和每日报告收进桌面助手里。
 
@@ -248,11 +248,11 @@ TradePet 会把完整亏损交易投影为可追溯的价格区域，记录进�
 
 **[查看图文安装教程（含 Bridge 安装与挂图）](docs/images/tradepet-rc6-install-guide.png)**。Python 已内置，Bridge 仍需点击安装，再手动拖到交易终端的图表上运行。
 
-普通用户请下载发布页中的 **`TradePet-1.0.0-rc.12-win-x64.zip`**，完整解压后运行 `TradePet.exe`。不要下载 GitHub 自动生成的 `Source code` 源码包作为安装包，也不要单独移动 EXE。
+普通用户请下载发布页中的 **`TradePet-1.0.0-win-x64.zip`**，完整解压后运行 `TradePet.exe`。不要下载 GitHub 自动生成的 `Source code` 源码包作为安装包，也不要单独移动 EXE。
 
-`rc.12` 便携包已包含 .NET 8、64 位 Python 3.13、MetaTrader5/NumPy 依赖、MT4/MT5 只读插件和安装文档，无需另装 Python 或联网下载依赖。旧版 `rc.5` 及更早版本未包含 Python，建议升级；MT4 无需 Python。首次配置、升级保留数据、校验安装包和排障步骤见 [INSTALL.md](INSTALL.md)。
+`1.0.0` 便携包已包含 .NET 8、64 位 Python 3.13、MetaTrader5/NumPy 依赖、MT4/MT5 只读插件和安装文档，无需另装 Python 或联网下载依赖。旧版 `rc.5` 及更早版本未包含 Python，建议升级；MT4 无需 Python。首次配置、升级保留数据、校验安装包和排障步骤见 [INSTALL.md](INSTALL.md)。
 
-#### 平台支持范围（rc.12）
+#### 平台支持范围（1.0.0）
 
 | 功能 | MT5 | MT4 |
 | --- | --- | --- |

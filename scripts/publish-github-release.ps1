@@ -2,14 +2,20 @@ param(
     [Parameter(Mandatory = $true)][string]$Version,
     [Parameter(Mandatory = $true)][string]$PackagePath,
     [Parameter(Mandatory = $true)][string]$ChecksumPath,
-    [Parameter(Mandatory = $true)][string]$NotesPath
+    [Parameter(Mandatory = $true)][string]$NotesPath,
+    [switch]$Prerelease
 )
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $repository = 'cz1978/tradepet'
 $tag = "v$Version"
-if ($Version -notmatch '^1\.0\.0-rc\.[0-9]+$') { throw 'Expected a TradePet candidate version.' }
+if ($Version -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-rc\.[1-9][0-9]*)?$') {
+    throw 'Expected a version such as 1.0.0 or an explicitly requested release candidate.'
+}
+if (($Version -match '-rc\.[0-9]+$') -ne [bool]$Prerelease) {
+    throw 'Candidate versions require -Prerelease; stable versions must omit it.'
+}
 if ((git -C $repoRoot remote get-url origin) -ne "https://github.com/$repository.git") { throw 'Unexpected Git remote.' }
 if ((git -C $repoRoot branch --show-current) -ne 'main') { throw 'Publish from main.' }
 if (git -C $repoRoot status --porcelain) { throw 'Commit the release changes before publishing.' }
@@ -87,7 +93,7 @@ try {
     git -C $repoRoot -c http.proxy= -c http.https://github.com.proxy= push --atomic origin main $tag
     if ($LASTEXITCODE -ne 0) { throw 'Source/tag push failed.' }
     $releaseBody = @{ tag_name=$tag; target_commitish=$commit; name="TradePet $Version";
-        body=(Get-Content -LiteralPath $notes.FullName -Raw -Encoding UTF8); draft=$true; prerelease=$true }
+        body=(Get-Content -LiteralPath $notes.FullName -Raw -Encoding UTF8); draft=$true; prerelease=[bool]$Prerelease }
     if ($release) { $release = Invoke-ReleaseApi PATCH "$api/releases/$($release.id)" $releaseBody }
     else { $release = Invoke-ReleaseApi POST "$api/releases" $releaseBody }
     foreach ($assetFile in @($package, $checksums)) {
@@ -115,6 +121,8 @@ try {
         } finally { $content.Dispose(); $stream.Dispose() }
     }
     $release = Invoke-ReleaseApi PATCH "$api/releases/$($release.id)" @{ draft=$false }
-    if ($release.draft -or @($release.assets).Count -ne 2) { throw 'Published release verification failed.' }
+    if ($release.draft -or $release.prerelease -ne [bool]$Prerelease -or @($release.assets).Count -ne 2) {
+        throw 'Published release verification failed.'
+    }
     Write-Output "Published: $($release.html_url)"
 } finally { $client.Dispose(); $handler.Dispose() }

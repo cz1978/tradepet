@@ -2,6 +2,13 @@
 
 English | [简体中文](CHANGELOG.md)
 
+## 1.0.0 — 2026-10-18
+
+- Publish stable version 1.0.0 with all performance improvements, reliability fixes and daily-report date navigation from the previous release. Trading, calculation and storage logic are unchanged in this release.
+- Align the application, downloads, bilingual documentation and GitHub release on the stable version, without the prerelease label.
+- Default the publishing workflow to stable releases. Candidate versions require an explicit user request, preventing future updates from automatically adding candidate labels.
+- Retain the previous validation of 408 relevant .NET tests and 25 Python tests. Additional checks cover update-version comparison, the publishing script, package version/source correspondence, download checksums and local shortcuts.
+
 ## 1.0.0-rc.12 — 2026-10-18
 
 - Optimize behavior analytics with chronological scans and sliding windows, using the most recent 20 trading days consistently. Cache daily deals, trades and behavior results with invalidation for account, date, offset, history and record changes.

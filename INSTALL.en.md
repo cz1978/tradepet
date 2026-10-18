@@ -2,11 +2,11 @@
 
 English | [简体中文](INSTALL.md)
 
-For **1.0.0-rc.12 / Windows 10 or 11 x64**. Supports MT5 and MT4, including archived MT4 orders, evidence-based partial-close grouping and actual-quote replay. TradePet does not place, close or modify orders.
+For **1.0.0 / Windows 10 or 11 x64**. Supports MT5 and MT4, including archived MT4 orders, evidence-based partial-close grouping and actual-quote replay. TradePet does not place, close or modify orders.
 
-`rc.12` improves runtime calculations, review pagination and position refreshes, with background report generation and fewer redundant database writes. It fixes history retries, maintenance deadlocks and cross-day partial-close P/L calculations. Daily reports now support date navigation and retain unsaved summaries when switching days. The complete Windows package includes bundled runtimes, read-only MT4/MT5 bridges and bilingual documentation.
+`1.0.0` improves runtime calculations, review pagination and position refreshes, with background report generation and fewer redundant database writes. It fixes history retries, maintenance deadlocks and cross-day partial-close P/L calculations. Daily reports now support date navigation and retain unsaved summaries when switching days. The complete Windows package includes bundled runtimes, read-only MT4/MT5 bridges and bilingual documentation.
 
-`rc.5` and earlier require manual Python setup; the complete `rc.12` portable package is recommended.
+`rc.5` and earlier require manual Python setup; the complete `1.0.0` portable package is recommended.
 
 ## Illustrated quick setup
 
@@ -18,9 +18,9 @@ For **1.0.0-rc.12 / Windows 10 or 11 x64**. Supports MT5 and MT4, including arch
 
 ## Download and launch
 
-1. Open [GitHub Releases](https://github.com/cz1978/tradepet/releases/tag/v1.0.0-rc.12).
-2. Download `TradePet-1.0.0-rc.12-win-x64.zip` under Assets. Source code archives are for development, not runnable installers.
-3. Extract the **entire ZIP**, for example to `D:\Apps\TradePet-1.0.0-rc.12`.
+1. Open [GitHub Releases](https://github.com/cz1978/tradepet/releases/tag/v1.0.0).
+2. Download `TradePet-1.0.0-win-x64.zip` under Assets. Source code archives are for development, not runnable installers.
+3. Extract the **entire ZIP**, for example to `D:\Apps\TradePet-1.0.0`.
 4. Run `TradePet.exe` and follow the four-step wizard. Do not run inside the ZIP or copy only the EXE.
 
 Use `TradePet.exe --review` to open Review analysis directly. Exit any older running instance from its tray menu first.
@@ -30,7 +30,7 @@ Use `TradePet.exe --review` to open Review analysis directly. Exit any older run
 Compare the ZIP's hash with the release's `SHA256SUMS.txt`:
 
 ```powershell
-Get-FileHash .\TradePet-1.0.0-rc.12-win-x64.zip -Algorithm SHA256
+Get-FileHash .\TradePet-1.0.0-win-x64.zip -Algorithm SHA256
 ```
 
 This checks file consistency, not a digital signature. The package is currently unsigned. Verify source/hash when Windows prompts; do not disable system protection.
@@ -42,7 +42,7 @@ TradePet's bundled `LICENSE` is MIT: personal/commercial use, modification and d
 ### 1. Prepare terminal and Python
 
 - Install/start MetaTrader 5 and log in to the account to monitor.
-- `rc.12` bundles **64-bit Python 3.13** and dependencies. `rc.5` and older require a separate 64-bit Python 3.13.
+- `1.0.0` bundles **64-bit Python 3.13** and dependencies. `rc.5` and older require a separate 64-bit Python 3.13.
 - Select MT5 and its `terminal64.exe` in the wizard; use Browse terminal if not detected.
 
 Connect one terminal at a time. Complete reviews require an MT5 hedging account; netting/exchange accounts provide position and account-risk monitoring.
