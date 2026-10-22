@@ -7,8 +7,16 @@ using TradePet.Infrastructure.Mt5;
 
 namespace TradePet.App.ViewModels;
 
-public sealed class MainViewModel : ObservableObject
+public sealed partial class MainViewModel : ObservableObject
 {
+    private bool _automaticBackupEnabled = true;
+    private string _automaticBackupStatus = "";
+    public bool AutomaticBackupEnabled { get => _automaticBackupEnabled; set => SetProperty(ref _automaticBackupEnabled, value); }
+    public string AutomaticBackupStatus { get => _automaticBackupStatus; set => SetProperty(ref _automaticBackupStatus, value); }
+    private string _portfolioRiskText = "";
+    private string _dataHealthText = "";
+    public string PortfolioRiskText { get => _portfolioRiskText; set => SetProperty(ref _portfolioRiskText, value); }
+    public string DataHealthText { get => _dataHealthText; set => SetProperty(ref _dataHealthText, value); }
     private string _connectionText = "正在寻找交易终端…";
     private string _bridgeText = "桥接插件未连接";
     private string _accountLabel = "未连接账户";
@@ -40,8 +48,9 @@ public sealed class MainViewModel : ObservableObject
     private bool _isMouseThrough;
     private bool _startWithWindows;
     private bool _dailyReportEnabled = true;
-    private bool _quickReviewPromptEnabled = true;
-    private bool _entryReasonPromptEnabled = true;
+    private bool _quickReviewPromptEnabled;
+    private bool _entryReasonPromptEnabled;
+    private bool _dailyReportPopupEnabled;
     private bool _updateNotificationsEnabled = true;
     private string _uiLanguage = "zh-CN";
     private string _updateStatus = "尚未检查新版本。";
@@ -97,7 +106,7 @@ public sealed class MainViewModel : ObservableObject
     private string _todayBehaviorTriggeredText = "当前没有触发规则";
     private string _selectedBehaviorPreset = "平衡";
     private int _dailyTargetUnitIndex;
-    private string _newPlanSymbol = "XAUUSD.s";
+    private string _newPlanSymbol = string.Empty;
     private string _newPlanReferenceEntry = string.Empty;
     private string _newPlanEntryLow = string.Empty;
     private string _newPlanEntryHigh = string.Empty;
@@ -129,6 +138,9 @@ public sealed class MainViewModel : ObservableObject
         InstallBridgeCommand = AsyncCommand(() => InstallBridgeAsync?.Invoke() ?? Task.CompletedTask);
         ReplayScenarioCommand = AsyncCommand(() => ReplayScenarioAsync?.Invoke() ?? Task.CompletedTask);
         CreateStructuredPlanCommand = AsyncCommand(() => CreateStructuredPlanAsync?.Invoke() ?? Task.CompletedTask);
+        ComposeChartPlanCommand = AsyncCommand(() => ComposeChartPlanAsync?.Invoke() ?? Task.CompletedTask);
+        OpenOfflineArchiveCommand = AsyncCommand(() => OpenOfflineArchiveAsync?.Invoke() ?? Task.CompletedTask);
+        CheckDataHealthCommand = AsyncCommand(() => CheckDataHealthAsync?.Invoke() ?? Task.CompletedTask);
         ApplyBehaviorPresetCommand = AsyncCommand(() => ApplyBehaviorPresetAsync?.Invoke() ?? Task.CompletedTask);
         SaveBehaviorSettingsCommand = AsyncCommand(() => SaveBehaviorSettingsAsync?.Invoke() ?? Task.CompletedTask);
         RefreshReviewCommand = AsyncCommand(async () =>
@@ -145,7 +157,12 @@ public sealed class MainViewModel : ObservableObject
             ReviewWorkspace.Page = 1;
             await (RefreshReviewAsync?.Invoke() ?? Task.CompletedTask);
         });
-        ToggleFocusCommand = new RelayCommand(() => IsFocusMode = !IsFocusMode);
+        ToggleFocusCommand = AsyncCommand(async () =>
+        {
+            IsFocusMode = !IsFocusMode;
+            await (SaveCompanionPreferencesAsync?.Invoke() ?? Task.CompletedTask);
+        });
+        InteractWithPetCommand = AsyncCommand(() => InteractWithPetAsync?.Invoke() ?? Task.CompletedTask);
         ShowMainWindowCommand = new RelayCommand(() => ShowMainWindow?.Invoke());
         ShowPlanPageCommand = new RelayCommand(() => ShowConsolePage?.Invoke(1));
         ShowLossZonesPageCommand = new RelayCommand(() => ShowConsolePage?.Invoke(2));
@@ -168,10 +185,15 @@ public sealed class MainViewModel : ObservableObject
     public Func<Task>? TogglePlanRecordingAsync { get; set; }
     public Func<Task>? ImportPlanAsync { get; set; }
     public Func<Task>? SaveSettingsAsync { get; set; }
+    public Func<Task>? SaveCompanionPreferencesAsync { get; set; }
+    public Func<Task>? InteractWithPetAsync { get; set; }
     public Func<Task>? SaveDailyPlanAsync { get; set; }
     public Func<Task>? InstallBridgeAsync { get; set; }
     public Func<Task>? ReplayScenarioAsync { get; set; }
     public Func<Task>? CreateStructuredPlanAsync { get; set; }
+    public Func<Task>? ComposeChartPlanAsync { get; set; }
+    public Func<Task>? OpenOfflineArchiveAsync { get; set; }
+    public Func<Task>? CheckDataHealthAsync { get; set; }
     public Func<Task>? ApplyBehaviorPresetAsync { get; set; }
     public Func<Task>? SaveBehaviorSettingsAsync { get; set; }
     public Func<Task>? RefreshReviewAsync { get; set; }
@@ -197,10 +219,14 @@ public sealed class MainViewModel : ObservableObject
     public ICommand InstallBridgeCommand { get; }
     public ICommand ReplayScenarioCommand { get; }
     public ICommand CreateStructuredPlanCommand { get; }
+    public ICommand ComposeChartPlanCommand { get; }
+    public ICommand OpenOfflineArchiveCommand { get; }
+    public ICommand CheckDataHealthCommand { get; }
     public ICommand ApplyBehaviorPresetCommand { get; }
     public ICommand SaveBehaviorSettingsCommand { get; }
     public ICommand RefreshReviewCommand { get; }
     public ICommand ToggleFocusCommand { get; }
+    public ICommand InteractWithPetCommand { get; }
     public ICommand ShowMainWindowCommand { get; }
     public ICommand ShowPlanPageCommand { get; }
     public ICommand ShowLossZonesPageCommand { get; }
@@ -256,6 +282,7 @@ public sealed class MainViewModel : ObservableObject
         new(PlanCategory.BreakoutWatch, "突破观察"),
         new(PlanCategory.EntryWatch, "入场观察"),
         new(PlanCategory.StopReference, "止损参考"),
+        new(PlanCategory.TargetReference, "目标参考"),
         new(PlanCategory.MarkOnly, "仅作标记"),
         new(PlanCategory.LongWatchZone, "做多观察区"),
         new(PlanCategory.ShortWatchZone, "做空观察区"),
@@ -323,13 +350,15 @@ public sealed class MainViewModel : ObservableObject
     public decimal GivebackValue { get => _givebackValue; set => SetProperty(ref _givebackValue, Math.Clamp(value, 1m, 100m)); }
     public bool IsPlanRecording { get => _isPlanRecording; set => SetProperty(ref _isPlanRecording, value); }
     public string PlanRecordingText => IsPlanRecording ? "结束记录图表标记" : "开始记录图表标记";
-    public bool IsFocusMode { get => _isFocusMode; set => SetProperty(ref _isFocusMode, value); }
+    public bool IsFocusMode { get => _isFocusMode; set { if (SetProperty(ref _isFocusMode, value)) RaisePropertyChanged(nameof(FocusModeMenuText)); } }
+    public string FocusModeMenuText => IsFocusMode ? "恢复日常陪伴" : "安静陪我";
     public bool ConsoleGuideCompleted { get; set; }
     public bool IsTopmost { get => _isTopmost; set => SetProperty(ref _isTopmost, value); }
     public bool IsPositionLocked { get => _isPositionLocked; set => SetProperty(ref _isPositionLocked, value); }
     public bool IsMouseThrough { get => _isMouseThrough; set => SetProperty(ref _isMouseThrough, value); }
     public bool StartWithWindows { get => _startWithWindows; set => SetProperty(ref _startWithWindows, value); }
     public bool DailyReportEnabled { get => _dailyReportEnabled; set => SetProperty(ref _dailyReportEnabled, value); }
+    public bool DailyReportPopupEnabled { get => _dailyReportPopupEnabled; set => SetProperty(ref _dailyReportPopupEnabled, value); }
     public bool QuickReviewPromptEnabled { get => _quickReviewPromptEnabled; set => SetProperty(ref _quickReviewPromptEnabled, value); }
     public bool EntryReasonPromptEnabled { get => _entryReasonPromptEnabled; set => SetProperty(ref _entryReasonPromptEnabled, value); }
     public bool UpdateNotificationsEnabled { get => _updateNotificationsEnabled; set => SetProperty(ref _updateNotificationsEnabled, value); }
@@ -338,7 +367,9 @@ public sealed class MainViewModel : ObservableObject
         [new("zh-CN", "简体中文"), new("en-US", "English")];
     public string UpdateStatus { get => _updateStatus; set => SetProperty(ref _updateStatus, value); }
     public bool UpdateAvailable { get => _updateAvailable; set => SetProperty(ref _updateAvailable, value); }
-    public string AppVersionText => "当前版本 " + Runtime.GitHubReleaseChecker.CurrentVersion;
+    public string AppVersionText => "当前版本 " + Runtime.GitHubReleaseChecker.CurrentVersion + LocalBuildSuffix;
+    public string ConsoleTitle => TradePet.Core.Localization.UiText.Get("S350ce565e947d392") + LocalBuildSuffix;
+    private static string LocalBuildSuffix => Runtime.AppBuildInfo.Label is { Length: > 0 } label ? " · " + label : string.Empty;
     public string DailyReportTimeText { get => _dailyReportTimeText; set => SetProperty(ref _dailyReportTimeText, value); }
     public double PetOpacity { get => _petOpacity; set => SetProperty(ref _petOpacity, Math.Clamp(value, 0.25, 1.0)); }
     public double PetScale { get => _petScale; set => SetProperty(ref _petScale, Math.Clamp(value, 0.4, 1.5)); }
@@ -393,8 +424,8 @@ public sealed class MainViewModel : ObservableObject
     public IReadOnlyList<PlanComplianceOption> PlanComplianceOptions { get; } =
     [
         new(PlanComplianceStatus.Unclassified, "未归类"),
-        new(PlanComplianceStatus.Matched, "自动：计划内"),
-        new(PlanComplianceStatus.OutsidePlan, "自动：计划外"),
+        new(PlanComplianceStatus.Matched, "自动：入场区匹配"),
+        new(PlanComplianceStatus.OutsidePlan, "自动：入场区外"),
         new(PlanComplianceStatus.ManualInside, "人工：计划内"),
         new(PlanComplianceStatus.ManualOutside, "人工：计划外"),
     ];

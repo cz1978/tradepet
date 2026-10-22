@@ -1035,6 +1035,9 @@ public sealed class ReviewWorkspaceCalculator
         {
             var activeFrom = goal.StartServerDate > from ? goal.StartServerDate : from;
             var activeTo = goal.EndServerDate is { } end && end < to ? end : to;
+            var windowEnd = DateOnly.FromDayNumber(Math.Min(DateOnly.MaxValue.DayNumber,
+                goal.StartServerDate.DayNumber + Math.Max(1, goal.ObservationWindowDays) - 1));
+            if (goal.EndServerDate is null && activeTo > windowEnd) activeTo = windowEnd;
             var applicableDays = activeTo < activeFrom ? 0 : activeTo.DayNumber - activeFrom.DayNumber + 1;
             var selected = observations.Where(item => item.GoalId == goal.Id && item.AccountKey == goal.AccountKey &&
                 item.ServerDate >= activeFrom && item.ServerDate <= activeTo).ToArray();

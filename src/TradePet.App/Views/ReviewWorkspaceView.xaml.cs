@@ -4,6 +4,8 @@ public partial class ReviewWorkspaceView : System.Windows.Controls.UserControl
 {
     public ReviewWorkspaceView() => InitializeComponent();
 
+    private void ReplayScreenshots_Click(object sender, System.Windows.RoutedEventArgs e) => ReviewGuideAttachments.BringIntoView();
+
     private void WorkspaceTabs_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
     {
         if (e.Source == WorkspaceTabs && WorkspaceTabs.SelectedIndex == 2 &&

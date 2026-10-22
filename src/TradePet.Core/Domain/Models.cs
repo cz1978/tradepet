@@ -7,6 +7,12 @@ public sealed record AccountScope(string Server, long Login)
     public string AccountKey => $"{Server.Trim()}|{Login.ToString(CultureInfo.InvariantCulture)}";
 }
 
+public sealed record LocalAccountArchive(AccountScope Scope, string Currency, DateOnly? FirstTradeDate,
+    DateOnly? LastTradeDate, ServerTimeSegment? TimeSegment)
+{
+    public string Label => $"{Scope.Server} · {Scope.Login} · {Currency}";
+}
+
 public sealed record AccountSnapshot(
     AccountScope Scope,
     string Currency,
@@ -14,7 +20,10 @@ public sealed record AccountSnapshot(
     decimal Equity,
     decimal FloatingPnl,
     int MarginMode,
-    DateTimeOffset CapturedAtUtc);
+    DateTimeOffset CapturedAtUtc,
+    decimal? UsedMargin = null,
+    decimal? FreeMargin = null,
+    decimal? MarginLevel = null);
 
 public sealed record SymbolSpecification(
     string Symbol,

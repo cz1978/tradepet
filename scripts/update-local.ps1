@@ -12,11 +12,19 @@ if (-not (Test-Path -LiteralPath (Join-Path $installDirectory 'Runtime\python-ru
     throw 'Run scripts/build-release.ps1 first to create the bundled local installation.'
 }
 
+$versionSettings = [xml](Get-Content -LiteralPath (Join-Path $repoRoot 'VERSION.props') -Raw)
+$releaseVersion = [string]$versionSettings.Project.PropertyGroup.VersionPrefix
+$releaseSuffix = [string]$versionSettings.Project.PropertyGroup.VersionSuffix
+if ($releaseSuffix) { $releaseVersion += "-$releaseSuffix" }
+$localBuildStamp = [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssZ')
+$localVersion = "$releaseVersion+local.$localBuildStamp"
+
 dotnet publish (Join-Path $repoRoot 'src\TradePet.App\TradePet.App.csproj') `
     --configuration Release `
     --runtime win-x64 `
     --self-contained true `
     --property:PublishSingleFile=false `
+    --property:InformationalVersion=$localVersion `
     --no-restore `
     --output $installDirectory
 if ($LASTEXITCODE -ne 0) { throw 'Local TradePet update failed.' }
@@ -46,10 +54,12 @@ if ($RepairShortcuts) {
             $shortcut.TargetPath = $executable
             $shortcut.WorkingDirectory = $installDirectory
             $shortcut.IconLocation = "$executable,0"
+            $shortcut.Arguments = ''
+            $shortcut.Description = "TradePet local build $localBuildStamp"
             $shortcut.Save()
             $verified = $shortcutShell.CreateShortcut($file.FullName)
             if ($verified.TargetPath -ine $executable -or $verified.WorkingDirectory -ine $installDirectory -or
-                $verified.IconLocation -ine "$executable,0") {
+                $verified.IconLocation -ine "$executable,0" -or $verified.Arguments -ne '') {
                 throw "Shortcut verification failed: $($file.FullName)"
             }
             Write-Output "Shortcut updated: $($file.FullName)"
@@ -58,4 +68,5 @@ if ($RepairShortcuts) {
 }
 
 Write-Output "Local installation updated: $executable"
+Write-Output "Local build: $localVersion"
 Write-Output "Application SHA256: $((Get-FileHash -LiteralPath (Join-Path $installDirectory 'TradePet.dll')).Hash)"

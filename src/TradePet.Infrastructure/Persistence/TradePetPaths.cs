@@ -17,4 +17,8 @@ public static class TradePetPaths
     public static string GetAttachmentDirectory() => Path.Combine(GetDataDirectory(), "attachments");
 
     public static string GetExportDirectory() => Path.Combine(GetDataDirectory(), "exports");
+
+    public static string GetCollectorDataDirectory() => Path.Combine(GetAttachmentDirectory(), "_system", "collectors");
+
+    public static string GetReportDirectory() => Path.Combine(GetAttachmentDirectory(), "_system", "reports");
 }

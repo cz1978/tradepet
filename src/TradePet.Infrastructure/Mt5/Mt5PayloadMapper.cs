@@ -29,6 +29,9 @@ public sealed record Mt5DealBatch(
 
 public static class Mt5PayloadMapper
 {
+    private static decimal? OptionalDecimal(System.Text.Json.JsonElement value, string name) =>
+        value.TryGetProperty(name, out var number) && number.ValueKind == System.Text.Json.JsonValueKind.Number &&
+        number.TryGetDecimal(out var result) ? result : null;
     public static Mt5SnapshotBatch MapSnapshot(ProtocolEnvelope envelope)
     {
         if (envelope.Kind != "snapshot")
@@ -49,7 +52,9 @@ public static class Mt5PayloadMapper
             payload.GetProperty("equity").GetDecimal(),
             payload.GetProperty("floatingPnl").GetDecimal(),
             accountPayload.GetProperty("marginMode").GetInt32(),
-            capturedAt);
+            capturedAt,
+            OptionalDecimal(accountPayload, "usedMargin"), OptionalDecimal(accountPayload, "freeMargin"),
+            OptionalDecimal(accountPayload, "marginLevel"));
         var positions = payload.GetProperty("positions").EnumerateArray().Select(position => new PositionSnapshot(
             position.GetProperty("ticket").GetInt64(),
             position.GetProperty("positionId").GetInt64(),

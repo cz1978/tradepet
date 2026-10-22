@@ -110,12 +110,13 @@ public sealed class PetWindowTests
                 window.ContextMenu.IsOpen = true;
                 window.ContextMenu.UpdateLayout();
                 var topLevelItems = window.ContextMenu.Items.OfType<MenuItem>().ToArray();
-                Assert.Equal(8, topLevelItems.Length);
-                Assert.Contains(topLevelItems, item => ReferenceEquals(item.Command, viewModel.ShowEntryReasonCommand));
-                Assert.Contains(topLevelItems, item => ReferenceEquals(item.Command, viewModel.ShowOpportunityCommand));
-                Assert.Contains(topLevelItems, item => ReferenceEquals(item.Command, viewModel.ShowWeeklyGoalCommand));
-                var reviewTools = Assert.Single(topLevelItems, item => Equals(item.Header, "复盘与工具"));
-                Assert.Equal(7, reviewTools.Items.Count);
+                Assert.Equal(5, topLevelItems.Length);
+                var quickNote = Assert.Single(topLevelItems, item => Equals(item.Header, "记一下"));
+                Assert.Equal(4, quickNote.Items.Count);
+                Assert.Contains(quickNote.Items.OfType<MenuItem>(), item => ReferenceEquals(item.Command, viewModel.ShowEntryReasonCommand));
+                Assert.Contains(quickNote.Items.OfType<MenuItem>(), item => ReferenceEquals(item.Command, viewModel.ShowOpportunityCommand));
+                Assert.Contains(topLevelItems, item => ReferenceEquals(item.Command, viewModel.ToggleFocusCommand));
+                var reviewTools = Assert.Single(topLevelItems, item => Equals(item.Header, "更多"));
                 var dailyReport = Assert.Single(reviewTools.Items.OfType<MenuItem>(),
                     item => ReferenceEquals(item.Command, viewModel.ShowDailyTradingReportCommand));
                 reviewTools.IsSubmenuOpen = true;
@@ -126,10 +127,9 @@ public sealed class PetWindowTests
                 Assert.True(dailyReport.IsVisible);
                 Assert.NotNull(PresentationSource.FromVisual(dailyReport));
                 reviewTools.IsSubmenuOpen = false;
-                var displaySettings = Assert.Single(topLevelItems, item => Equals(item.Header, "显示与设置"));
-                Assert.Contains(displaySettings.Items.OfType<MenuItem>(),
+                Assert.Contains(reviewTools.Items.OfType<MenuItem>(),
                     item => ReferenceEquals(item.Command, viewModel.ShowSettingsPageCommand));
-                var quickReviewItem = Assert.Single(window.ContextMenu.Items.OfType<MenuItem>(),
+                var quickReviewItem = Assert.Single(quickNote.Items.OfType<MenuItem>(),
                     item => Equals(item.Header, "快速复盘"));
                 Assert.Same(viewModel.ShowQuickReviewCommand, quickReviewItem.Command);
                 var quickReviewCount = 0;
@@ -199,7 +199,7 @@ public sealed class PetWindowTests
             {
                 var menu = (System.Windows.Forms.ContextMenuStrip)typeof(PetWindow).GetField("_trayMenu", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(englishPet)!;
                 var trayItems = menu.Items.OfType<System.Windows.Forms.ToolStripMenuItem>().ToArray();
-                Assert.Equal(9, trayItems.Length);
+                Assert.Equal(6, trayItems.Length);
                 Assert.Equal(2, trayItems.Count(item => item.HasDropDownItems));
                 Assert.All(trayItems.Concat(trayItems.SelectMany(item => item.DropDownItems.OfType<System.Windows.Forms.ToolStripMenuItem>())), item =>
                     Assert.DoesNotContain(item.Text ?? string.Empty, c => c is >= '\u3400' and <= '\u9fff'));

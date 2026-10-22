@@ -722,7 +722,13 @@ public sealed record ImprovementGoalProgress(
     int UnknownObservationCount,
     int NotApplicableObservationCount,
     decimal? AdherencePercentage,
-    IReadOnlyList<string> EvidenceIds);
+    IReadOnlyList<string> EvidenceIds)
+{
+    // This is an assessment of observed opportunities, not proof that unobserved days passed.
+    public bool? MeetsObservedTarget => Goal.Rule is not null && Goal.TargetValue is >= 0m and <= 100m &&
+        AdherencePercentage is { } adherence && UnknownObservationCount == 0
+            ? adherence >= Goal.TargetValue.Value : null;
+}
 
 public sealed record ReviewWorkspaceFilter(
     string AccountKey,

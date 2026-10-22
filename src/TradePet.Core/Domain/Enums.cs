@@ -37,6 +37,7 @@ public enum PlanCategory
     NoTradeZone,
     KeyZone,
     Note,
+    TargetReference,
 }
 
 public enum TimelineKind

@@ -13,7 +13,13 @@ namespace TradePet.App.ViewModels.Review;
 
 public sealed partial class ReviewWorkspaceViewModel : ObservableObject
 {
-    public int ServerUtcOffsetSeconds { get; set; }
+    private ReplayFrame? _replayChartFrame;
+    public ReplayFrame? ReplayChartFrame { get => _replayChartFrame; private set => SetProperty(ref _replayChartFrame, value); }
+    private DateTimeOffset? _replayChartFrom, _replayChartTo;
+    public DateTimeOffset? ReplayChartFrom { get => _replayChartFrom; private set => SetProperty(ref _replayChartFrom, value); }
+    public DateTimeOffset? ReplayChartTo { get => _replayChartTo; private set => SetProperty(ref _replayChartTo, value); }
+    private int _serverUtcOffsetSeconds;
+    public int ServerUtcOffsetSeconds { get => _serverUtcOffsetSeconds; set => SetProperty(ref _serverUtcOffsetSeconds, value); }
     private DateTimeOffset BrokerTime(DateTimeOffset value) => value.ToOffset(TimeSpan.FromSeconds(ServerUtcOffsetSeconds));
     private DateTimeOffset? BrokerTime(DateTimeOffset? value) => value?.ToOffset(TimeSpan.FromSeconds(ServerUtcOffsetSeconds));
     private string _search = string.Empty;
@@ -161,6 +167,7 @@ public sealed partial class ReviewWorkspaceViewModel : ObservableObject
         var clock = timeProvider ?? TimeProvider.System;
         _dailyDate = DateOnly.FromDateTime(clock.GetLocalNow().DateTime).ToString("yyyy-MM-dd");
         InitializePlaybookRuleEditor();
+        InitializeReplayTools();
         RefreshCommand = Command(async () =>
         {
             Page = 1;
@@ -192,7 +199,7 @@ public sealed partial class ReviewWorkspaceViewModel : ObservableObject
         BulkStatusCommand = Command(() => BulkEditAsync?.Invoke(ReviewBulkEditKind.Status, BulkStatus) ?? Task.CompletedTask);
         GeneratePeriodDraftCommand = new RelayCommand(GeneratePeriodDraft);
         SavePeriodReviewCommand = Command(() => SavePeriodReviewAsync?.Invoke() ?? Task.CompletedTask);
-        LoadReplayCommand = Command(() => LoadReplayAsync?.Invoke() ?? Task.CompletedTask);
+        LoadReplayCommand = Command(ReloadReplayAsync);
         PreviousReplayEventCommand = Command(() => StepReplayEventAsync(-1));
         NextReplayEventCommand = Command(() => StepReplayEventAsync(1));
         ToggleReplayCommand = Command(ToggleReplayAsync);
@@ -465,7 +472,7 @@ public sealed partial class ReviewWorkspaceViewModel : ObservableObject
     public int PeriodRevision { get => _periodRevision; set => SetProperty(ref _periodRevision, value); }
     public string? PeriodReviewId { get => _periodReviewId; set => SetProperty(ref _periodReviewId, value); }
     public string ReplayStatus { get => _replayStatus; set => SetProperty(ref _replayStatus, value); }
-    public string ReplayPrecision { get => _replayPrecision; set => SetProperty(ref _replayPrecision, value); }
+    public string ReplayPrecision { get => _replayPrecision; set { if (ReplayPrecisionOptions.Contains(value) && SetProperty(ref _replayPrecision, value)) ReplayOptionsChanged(); } }
     public double ReplayProgress
     {
         get => _replayProgress;
@@ -478,7 +485,7 @@ public sealed partial class ReviewWorkspaceViewModel : ObservableObject
             }
         }
     }
-    public bool IsReplayPlaying { get => _isReplayPlaying; set { if (SetProperty(ref _isReplayPlaying, value)) RaisePropertyChanged(nameof(ReplayButtonText)); } }
+    public bool IsReplayPlaying { get => _isReplayPlaying; set { if (SetProperty(ref _isReplayPlaying, value)) { _replayPlaybackVersion++; RaisePropertyChanged(nameof(ReplayButtonText)); } } }
     public string ReplaySpeed { get => _replaySpeed; set => SetProperty(ref _replaySpeed, value); }
     public bool ShowFullReplayReview
     {
@@ -710,9 +717,15 @@ public sealed partial class ReviewWorkspaceViewModel : ObservableObject
             var baseline = item.BaselineOpportunityCount == 0
                 ? "基线：缺少合格机会样本"
                 : $"基线 {item.BaselineFromServerDate:yyyy-MM-dd}—{item.BaselineToServerDate:yyyy-MM-dd} · {item.BaselinePassCount}/{item.BaselinePassCount + item.BaselineFailCount} · {item.BaselineValue:0.##}%";
+            var targetAssessment = TradePet.Core.Localization.UiText.Get(progress?.MeetsObservedTarget switch
+            {
+                true => "FunctionalGoalObservedPass",
+                false => "FunctionalGoalObservedFail",
+                _ => "FunctionalGoalObservedUnknown",
+            });
             return new GoalRow(item.Name, $"v{Math.Max(1, item.Version)} · {FormatGoalStatus(item.Status)}", item.Measurement,
                 item.TargetValue?.ToString("0.##") ?? "人工检查", item.NotificationEnabled ? "桌宠提醒" : "仅复盘",
-                $"{observationSummary}\n{baseline}\n窗口 {item.ObservationWindowDays} 天 · 适用品种 {(string.IsNullOrWhiteSpace(item.ApplicableSymbols) ? "全部" : item.ApplicableSymbols)}",
+                $"{observationSummary}\n{baseline}\n{targetAssessment}\n窗口 {item.ObservationWindowDays} 天 · 适用品种 {(string.IsNullOrWhiteSpace(item.ApplicableSymbols) ? "全部" : item.ApplicableSymbols)}",
                 item.Status != ImprovementGoalStatus.Archived,
                 new RelayCommand(() => SelectGoal(item)),
                 new AsyncRelayCommand(() => ArchiveGoalAsync?.Invoke(item) ?? Task.CompletedTask));
@@ -743,6 +756,7 @@ public sealed partial class ReviewWorkspaceViewModel : ObservableObject
         AddGroups("形态", snapshot.Analytics.SetupPerformance);
         AddGroups("标签", snapshot.Analytics.TagPerformance);
         UpdateAnalysisGroups();
+        ApplyHoldingProcessGroups(snapshot, data);
         RiskExcursions.ReplaceWith((snapshot.RiskSamples ?? []).Select(sample =>
             new RiskExcursionRow(sample.Trade.PositionId, sample.Symbol, sample.NetPnl, sample.OpeningVolume,
                 sample.InitialRiskAmount, sample.Mae, sample.Mfe, sample.ActualRiskMultiple,
@@ -916,7 +930,8 @@ public sealed partial class ReviewWorkspaceViewModel : ObservableObject
         long sessionGeneration,
         PlaybookVersion? fallbackPlaybook = null,
         string currency = "",
-        IReadOnlyList<ReviewTagSuggestion>? tagSuggestions = null)
+        IReadOnlyList<ReviewTagSuggestion>? tagSuggestions = null,
+        decimal priceStep = 0.00000001m)
     {
         CancelPendingReviewAutoSave();
         var key = new TradeKey(detail.Trade.AccountKey, detail.Trade.PositionId);
@@ -945,6 +960,8 @@ public sealed partial class ReviewWorkspaceViewModel : ObservableObject
                 ? $"具体计划：未绑定 · 策略版本：{detail.Playbook?.Name ?? "未绑定"}"
                 : $"{planTiming} · {plan.Strategy}/{plan.Setup} · 入场区 {plan.EntryLow?.ToString() ?? "?"}–{plan.EntryHigh?.ToString() ?? "?"} · 止损 {plan.StopPrice?.ToString() ?? "?"} · 目标 {plan.TargetPrice?.ToString() ?? "?"} · 策略版本 {detail.Playbook?.Name ?? "未绑定"}";
             RiskFacts = FormatRiskFacts(detail.Excursion, detail.Trade.NetPnl);
+            PlanFacts += "\n" + TradePet.Core.Trading.PlanExecutionChecker.Check(
+                detail.Trade, plan, detail.PnlSamples, detail.Excursion, priceStep).Detail;
             var document = detail.Document;
             ExitSelfReportFacts = document is null ||
                 (document.ReportedExitExecution is null && string.IsNullOrWhiteSpace(document.ExitEmotion))
@@ -1007,7 +1024,11 @@ public sealed partial class ReviewWorkspaceViewModel : ObservableObject
                 : string.Join(",", detail.Campaign.PositionIds);
             CampaignName = detail.Campaign?.Name ?? string.Empty;
             CampaignThesis = detail.Campaign?.Thesis ?? string.Empty;
+            ResetReplayPresentation(true);
+            _replayEntryUtc = detail.Trade.OpenedAtUtc;
+            _replayExitUtc = detail.Trade.ClosedAtUtc;
             ReplayEvents.Clear();
+            ReplayChartFrame = null;
             ReplayProgress = 0d;
             ShowFullReplayReview = false;
             _replayNavigationEvents = [];
@@ -1201,6 +1222,9 @@ public sealed partial class ReviewWorkspaceViewModel : ObservableObject
             IsReplayPlaying = false;
             ShowFullReplayReview = false;
             ReplayStatus = "选择交易后可加载真实历史行情";
+            ResetReplayPresentation(true);
+            HoldingProcessGroups.Clear();
+            ReplayChartFrame = null;
             _periodFactsSnapshot = null;
             _periodComparisonSnapshot = null;
             _replayNavigationEvents = [];
@@ -1273,15 +1297,19 @@ public sealed partial class ReviewWorkspaceViewModel : ObservableObject
         _draftDelay = null;
     }
 
-    public void ApplyReplay(MarketHistoryResult history, ReplayFrame frame, double progress)
+    public void ApplyReplay(MarketHistoryResult history, ReplayFrame frame, double progress, ReplayFrame? secondary = null)
     {
+        ReplayChartFrame = frame;
+        ReplayChartFrom = history.Range.RequestedFromUtc;
+        ReplayChartTo = history.Range.RequestedToUtc;
         _applyingDetail = true;
         ReplayProgress = progress;
         _applyingDetail = false;
-        _replayStartUtc = history.Range.ActualFromUtc ?? history.Range.RequestedFromUtc;
+        _replayStartUtc = history.Range.RequestedFromUtc;
         _replayEndUtc = history.Range.RequestedToUtc;
         _replayNavigationEvents = frame.NavigationEvents ?? [];
         _replayCurrentEventIndex = frame.CurrentEventIndex;
+        ApplyReplayTools(frame, secondary);
         ReplayEvents.Clear();
         foreach (var bar in frame.VisibleBars.TakeLast(80))
         {
@@ -1488,22 +1516,31 @@ public sealed partial class ReviewWorkspaceViewModel : ObservableObject
         }
     }
 
-    private async Task ToggleReplayAsync()
+    private Task ToggleReplayAsync()
     {
+        if (ReplayChartFrame is null) return Task.CompletedTask;
         IsReplayPlaying = !IsReplayPlaying;
-        while (IsReplayPlaying && ReplayProgress < 100d)
+        if (IsReplayPlaying) _ = PlayReplayAsync(_replayPlaybackVersion);
+        return Task.CompletedTask;
+    }
+
+    private async Task PlayReplayAsync(long playbackVersion)
+    {
+        try
         {
-            await _scheduler.DelayAsync(TimeSpan.FromMilliseconds(450d / ReplaySpeedMultiplier()));
-            if (!IsReplayPlaying)
+            while (IsReplayPlaying && playbackVersion == _replayPlaybackVersion && ReplayProgress < 100d)
             {
-                break;
+                await _scheduler.DelayAsync(TimeSpan.FromMilliseconds(450d / ReplaySpeedMultiplier()));
+                if (!IsReplayPlaying || playbackVersion != _replayPlaybackVersion) break;
+                await StepReplayEventAsync(1);
             }
-            await StepReplayEventAsync(1);
         }
-        if (ReplayProgress >= 100d)
+        catch (OperationCanceledException) { }
+        catch (Exception exception)
         {
-            IsReplayPlaying = false;
+            if (playbackVersion == _replayPlaybackVersion) ReplayStatus = exception.Message;
         }
+        finally { if (playbackVersion == _replayPlaybackVersion) IsReplayPlaying = false; }
     }
 
     private async Task StepReplayEventAsync(int delta)

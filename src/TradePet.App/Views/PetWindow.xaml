@@ -106,21 +106,25 @@
                 </Style>
             </ContextMenu.Resources>
             <MenuItem Header="{l:Text Key=S02b74652eeae4c95}" Click="ShowQuickCard_Click" />
-            <MenuItem Header="{l:Text Key=S371d943a67b5707e}" Command="{Binding ShowEntryReasonCommand}" />
-            <MenuItem Header="{l:Text Key=Sf0849eecd0bf645e}" Command="{Binding ShowQuickReviewCommand}" />
-            <MenuItem Header="{l:Text Key=PetRecordOpportunity}" Command="{Binding ShowOpportunityCommand}" />
-            <MenuItem Header="{l:Text Key=PetTradingSummary}" Command="{Binding ShowWeeklyGoalCommand}" />
+            <MenuItem Header="{l:Text Key=PetQuickNoteMenu}">
+                <MenuItem Header="{l:Text Key=S371d943a67b5707e}" Command="{Binding ShowEntryReasonCommand}" />
+                <MenuItem Header="{l:Text Key=Sf0849eecd0bf645e}" Command="{Binding ShowQuickReviewCommand}" />
+                <MenuItem Header="{l:Text Key=PetRecordOpportunity}" Command="{Binding ShowOpportunityCommand}" />
+                <MenuItem Header="{l:Text Key=PetTradingSummary}" Command="{Binding ShowWeeklyGoalCommand}" />
+            </MenuItem>
+            <MenuItem Header="{Binding FocusModeMenuText, Converter={StaticResource UiTranslation}}"
+                      Command="{Binding ToggleFocusCommand}" ToolTip="{l:Text Key=PetQuietModeHint}" />
             <Separator />
-            <MenuItem Header="{l:Text Key=PetReviewToolsMenu}">
+            <MenuItem Header="{l:Text Key=PetMoreMenu}">
                 <MenuItem Header="{l:Text Key=S7438a1abd7803ce5}" Command="{Binding ShowMainWindowCommand}" />
                 <MenuItem Header="{l:Text Key=S7482b58d44b922f6}" Command="{Binding ShowDailyTradingReportCommand}" />
                 <MenuItem Header="{l:Text Key=S2b9f7901b72f0549}" Command="{Binding ShowReviewPageCommand}" />
+                <MenuItem Header="{l:Text Key=FunctionalOfflineTitle}" Command="{Binding OpenOfflineArchiveCommand}" />
                 <MenuItem Header="{l:Text Key=S67819401c5dcb20e}" Command="{Binding ShowTimelinePageCommand}" />
                 <MenuItem Header="{l:Text Key=S7a632e2762cb093d}" Command="{Binding ShowPlanPageCommand}" />
                 <MenuItem Header="{l:Text Key=S39f12fd8d6936711}" Command="{Binding ShowLossZonesPageCommand}" />
                 <MenuItem Header="{l:Text Key=Sfd62c7a47ec1aa6a}" Command="{Binding ShowMacroCalendarCommand}" />
-            </MenuItem>
-            <MenuItem Header="{l:Text Key=PetDisplaySettingsMenu}">
+                <Separator />
                 <MenuItem Click="ToggleMiniPosition_Click">
                     <MenuItem.Style>
                         <Style TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}">
@@ -151,9 +155,16 @@
                                    Activity="{Binding PetActivity}"
                                    AtlasPath="Assets/baoer-pet/spritesheet.webp"
                                    PlaybackRate="0.65"
+                                   ToolTip="{l:Text Key=PetInteractionHint}"
                                    MouseEnter="PetSprite_MouseEnter"
                                    MouseLeave="PetSprite_MouseLeave"
                                    MouseLeftButtonDown="PetSprite_MouseLeftButtonDown" />
+        <primitives:Popup x:Name="CompanionCaptionPopup" PlacementTarget="{Binding ElementName=PetSprite}"
+                          Placement="Top" AllowsTransparency="True" StaysOpen="True" Focusable="False" IsHitTestVisible="False">
+            <Border Background="#ED202B35" BorderBrush="#536F78" BorderThickness="1" CornerRadius="10" Padding="10,7" MaxWidth="190">
+                <TextBlock x:Name="CompanionCaption" Foreground="#ECF6F3" FontSize="11" TextWrapping="Wrap" TextAlignment="Center"/>
+            </Border>
+        </primitives:Popup>
 
         <primitives:Popup x:Name="QuickCardPopup"
                           Placement="Custom" CustomPopupPlacementCallback="PlaceQuickCard"

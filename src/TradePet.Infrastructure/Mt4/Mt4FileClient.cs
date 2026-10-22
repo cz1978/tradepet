@@ -10,7 +10,8 @@ namespace TradePet.Infrastructure.Mt4;
 public sealed record Mt4Frame(string InstanceId, long Sequence, DateTimeOffset CapturedAtUtc,
     bool Connected, string AccountKey, JsonElement Payload);
 
-public sealed class Mt4FileClient(string terminalPath, string dataDirectory) : ITradingWorkerClient
+public sealed class Mt4FileClient(string terminalPath, string dataDirectory, string? archiveDataDirectory = null,
+    Func<CancellationToken, ValueTask<IAsyncDisposable>>? enterArchiveOperation = null) : ITradingWorkerClient
 {
     public const string SnapshotFileName = "TradePet\\snapshot.json";
     public const string HistoryFileName = "TradePet\\history.json";
@@ -87,8 +88,8 @@ public sealed class Mt4FileClient(string terminalPath, string dataDirectory) : I
         var knownDeals = new Dictionary<long, DealRecord>();
         var knownCashFlows = new Dictionary<long, AccountCashFlow>();
         IReadOnlyDictionary<long, long> aliases = new Dictionary<long, long>();
-        var archive = new Mt4OrderArchive(dataDirectory);
-        var tickArchive = new Mt4TickArchive(dataDirectory);
+        var archive = new Mt4OrderArchive(archiveDataDirectory ?? dataDirectory);
+        var tickArchive = new Mt4TickArchive(archiveDataDirectory ?? dataDirectory);
         var historyReceived = false;
         int? historyOffset = null;
         var nextHistoryRead = DateTimeOffset.MinValue;
@@ -149,7 +150,9 @@ public sealed class Mt4FileClient(string terminalPath, string dataDirectory) : I
                             FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
                         if (historyStream.Length > 64 * 1024 * 1024) throw new InvalidDataException("MT4 history exceeds size limit.");
                         using var historyReader = new StreamReader(historyStream);
-                        var batch = await archive.MergeAsync(await historyReader.ReadToEndAsync(cancellationToken), frame, terminalPath, now, cancellationToken);
+                        Mt5DealBatch batch;
+                        await using (var lease = enterArchiveOperation is null ? null : await enterArchiveOperation(cancellationToken))
+                            batch = await archive.MergeAsync(await historyReader.ReadToEndAsync(cancellationToken), frame, terminalPath, now, cancellationToken);
                         var offset = frame.Payload.GetProperty("serverUtcOffsetSeconds").GetInt32();
                         var nextAliases = batch.Mt4PositionAliases ?? new Dictionary<long, long>();
                         var linksChanged = aliases.Count != nextAliases.Count || nextAliases.Any(p => aliases.GetValueOrDefault(p.Key) != p.Value);
@@ -192,7 +195,11 @@ public sealed class Mt4FileClient(string terminalPath, string dataDirectory) : I
                     await EmitAsync("chart_snapshot", charts, frame.AccountKey, cancellationToken, frame.CapturedAtUtc);
                     lastCharts = charts.GetRawText();
                 }
-                try { await tickArchive.AppendAsync(frame, cancellationToken); }
+                try
+                {
+                    await using var lease = enterArchiveOperation is null ? null : await enterArchiveOperation(cancellationToken);
+                    await tickArchive.AppendAsync(frame, cancellationToken);
+                }
                 catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException
                     or InvalidOperationException or JsonException or KeyNotFoundException or FormatException or OverflowException)
                 {

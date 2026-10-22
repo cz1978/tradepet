@@ -1,5 +1,103 @@
 [
   {
+    "key": "PetReportArchiveRetry",
+    "source": "日报归档未完成，将稍后重试。",
+    "english": "The report could not be archived. It will be retried later.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetQuickNoteMenu",
+    "source": "记一下",
+    "english": "Quick note",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetMoreMenu",
+    "source": "更多",
+    "english": "More",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetQuietMode",
+    "source": "安静陪我",
+    "english": "Quiet company",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetResumeCompany",
+    "source": "恢复日常陪伴",
+    "english": "Resume everyday company",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetQuietModeHint",
+    "source": "暂停日常气泡和自动填表，重要风险提醒继续保留。",
+    "english": "Pause everyday messages and automatic forms. Important risk alerts remain enabled.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetInteractionHint",
+    "source": "点一下和我打招呼；双击看今日状态；拖动移动；右键打开菜单。",
+    "english": "Click to say hello; double-click for today's status; drag to move; right-click for the menu.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetDailyReportArchive",
+    "source": "每天自动生成并归档交易日报",
+    "english": "Generate and archive a trading report automatically each day",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetDailyReportPopup",
+    "source": "自动生成日报后弹出窗口（默认关闭）",
+    "english": "Open the report window after automatic generation (off by default)",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetGreeting",
+    "source": "我在这里陪你。",
+    "english": "I'm here with you.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetGreetingDetail",
+    "source": "慢慢来，按你的节奏就好。",
+    "english": "Take your time. We'll go at your pace.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetTradeRecorded",
+    "source": "交易已记录，先缓一缓。",
+    "english": "Trade recorded. Take a moment to unwind.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetSavePreferences",
+    "source": "保存陪伴偏好",
+    "english": "Save companion preferences",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "PetReportArchiveDate",
+    "source": "记录交易日报归档日期",
+    "english": "Record the trading report archive date",
+    "template": false,
+    "preserve": []
+  },
+  {
     "key": "DailyReportDate",
     "source": "交易日（服务器）",
     "english": "Trading day (server)",
@@ -2898,8 +2996,8 @@
   },
   {
     "key": "Sd72d478f9cbaa78f",
-    "source": "两个提示默认开启，可分别关闭。显示在宠物旁，不抢焦点；也可从宠物菜单手动打开。",
-    "english": "Both prompts are enabled by default and can be disabled separately. They appear beside the pet without taking focus; you can also open them from the pet menu.",
+    "source": "两个提示默认关闭，可分别开启。显示在宠物旁，不抢焦点；也可从宠物菜单手动打开。",
+    "english": "Both prompts are disabled by default and can be enabled separately. They appear beside the pet without taking focus; you can also open them from the pet menu.",
     "template": false,
     "preserve": []
   },
@@ -3668,8 +3766,8 @@
   },
   {
     "key": "S0218dff10ed3dbff",
-    "source": "双击桌宠打开主面板；右键打开功能菜单。更多提醒阈值可在设置中心调整。",
-    "english": "Double-click the pet to open the main panel; right-click for its menu. More reminder thresholds are available in Settings.",
+    "source": "点一下和桌宠打招呼，双击看今日状态；右键选“记一下”记录交易，“更多”打开复盘工具与设置。",
+    "english": "Click to greet your pet and double-click for today's status. Right-click for Quick note; More contains review tools and settings.",
     "template": false,
     "preserve": []
   },
@@ -4130,8 +4228,8 @@
   },
   {
     "key": "Sc8b2dc8747fd40ea",
-    "source": "悬停展开速览（关闭时点击展开）",
-    "english": "Expand overview on hover (click when disabled)",
+    "source": "悬停展开速览（也可双击或从菜单打开）",
+    "english": "Expand overview on hover (also available by double-click or menu)",
     "template": false,
     "preserve": []
   },
@@ -18561,5 +18659,627 @@
     "english": "Skip all queued exit reviews for this account. New trades will still prompt.",
     "template": false,
     "preserve": []
-  }
+  },
+{
+    "key": "FunctionalPlanTitle",
+    "source": "完整交易计划",
+    "english": "Complete trade plan",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalPlanHint",
+    "source": "可手工填写，或将同品种的入场、止损参考、目标参考三个对象组合为草稿；保存前请检查。",
+    "english": "Enter a plan, or compose a draft from one entry, stop-reference and target-reference object for the same symbol. Check before saving.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalSymbol",
+    "source": "品种",
+    "english": "Symbol",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalSide",
+    "source": "方向",
+    "english": "Direction",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalReference",
+    "source": "参考入场价",
+    "english": "Reference entry",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalEntryLow",
+    "source": "入场区下限",
+    "english": "Entry range low",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalEntryHigh",
+    "source": "入场区上限",
+    "english": "Entry range high",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalStop",
+    "source": "止损价",
+    "english": "Stop price",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalTarget",
+    "source": "目标价",
+    "english": "Target price",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalStrategy",
+    "source": "策略",
+    "english": "Strategy",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalSetup",
+    "source": "形态",
+    "english": "Setup",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalTags",
+    "source": "标签（逗号分隔）",
+    "english": "Tags (comma separated)",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalComposePlan",
+    "source": "从图表对象组合草稿",
+    "english": "Compose from chart objects",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalSavePlan",
+    "source": "保存计划版本",
+    "english": "Save plan version",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalRevisePlan",
+    "source": "修订新版本",
+    "english": "Create revision",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalReplayEmpty",
+    "source": "选择交易并加载行情后显示价格图。",
+    "english": "Select a trade and load market data to display the chart.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalReplayNoPrices",
+    "source": "当前游标之前没有可用价格，缺口不补造。",
+    "english": "No prices are available before this cursor. Gaps are not filled.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalReplayLegend",
+    "source": "K线 / 蓝色报价 · 黄色入场 / 紫色退出 · 红色止损 / 绿色目标 · 白线为游标",
+    "english": "Candles / blue quotes | yellow entries / purple exits | red stop / green target | white cursor",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalTargetReference",
+    "source": "目标参考",
+    "english": "Target reference",
+    "template": false,
+    "preserve": []
+  },
+{
+    "key": "FunctionalOfflineTitle",
+    "source": "离线账户档案",
+    "english": "Offline account archive",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalQuery",
+    "source": "查询",
+    "english": "Query",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalOfflineHint",
+    "source": "仅使用已保存的账户数据与行情缓存，不启动或切换交易终端；编辑仍可保存。",
+    "english": "Uses saved account data and cached prices only. Trading terminals are neither started nor switched. Edits can be saved.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalOfflineNoAccounts",
+    "source": "本地尚无账户档案，请先连接一次账户。",
+    "english": "No local accounts yet. Connect an account once to create an archive.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalOfflineTimeUnknown",
+    "source": "该账户没有保存服务器时区；保留已存服务器日期，精确时间暂按 UTC 显示。不会连接终端校时。",
+    "english": "No saved server offset. Stored server dates are retained; timestamps display in UTC. The terminal is not contacted.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalAutoBackup",
+    "source": "每日自动备份，保留最近 7 份（随设置保存）",
+    "english": "Back up daily; keep the latest 7 copies (save with settings)",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalBackupHint",
+    "source": "迁移备份包含数据库、附件、日报及已迁入助手的 MT4 原始订单和 Tick 存档；旧版备份可能不含采集存档。",
+    "english": "Migration backups include the database, attachments, reports and MT4 raw order/tick archives imported into the assistant. Older backups may omit collector archives.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalBackupSuccess",
+    "source": "自动备份已通过校验：",
+    "english": "Automatic backup verified: ",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalBackupFailed",
+    "source": "自动备份失败，请查看日志；一小时后重试。",
+    "english": "Automatic backup failed. Check the log; retry in one hour.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalUnknown",
+    "source": "未知",
+    "english": "Unknown",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalWaitingAccount",
+    "source": "等待账户数据。",
+    "english": "Waiting for account data.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalStaleRisk",
+    "source": "数据已过期，仅供查看上次快照。\n",
+    "english": "Stale data: last snapshot only.\n",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalStale",
+    "source": "断开或过期",
+    "english": "Disconnected or stale",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalFresh",
+    "source": "实时",
+    "english": "Live",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalHistoryReady",
+    "source": "首轮历史已同步，历史范围仍以覆盖说明为准",
+    "english": "Initial history synced; date coverage remains subject to coverage notes",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalHistoryPending",
+    "source": "等待历史，统计可能不完整",
+    "english": "History pending; statistics may be incomplete",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalPortfolioRisk",
+    "source": "已知止损亏损下限 {0:0.##} {2} · 从当前浮盈亏回撤至止损估计 {1:0.##} {2}\n估值覆盖 {3}/{4} 笔 · 无止损 {5} 笔 · 无法估值 {6} 笔",
+    "english": "Known loss at stops (lower bound) {0:0.##} {2} | Estimated drawdown from current P/L to stops {1:0.##} {2}\nValued {3}/{4} positions | No stop {5} | Unvalued {6}",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalMargin",
+    "source": "已用保证金 {0} · 可用保证金 {1} · 保证金水平 {2}%",
+    "english": "Used margin {0} | Free margin {1} | Margin level {2}%",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalHealth",
+    "source": "数据检查：连接 {0} · 插件 {1}\n历史：{2} · 可靠入场风险采样 {3}/{4} 笔",
+    "english": "Data check: connection {0} | Bridge {1}\nHistory: {2} | Reliable entry-risk samples {3}/{4} positions",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalHealthCheck",
+    "source": "检查数据",
+    "english": "Check data",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalRiskTitle",
+    "source": "持仓止损风险与数据完整性",
+    "english": "Position stop risk and data completeness",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalRiskHint",
+    "source": "金额按账户币种估算，未计滑点和额外费用；无止损或无法估值的持仓不算零，组合风险仅显示已知下限。保证金水平不代表经纪商强平线。",
+    "english": "Amounts use the account currency and exclude slippage and additional costs. Missing stops or valuations are unknown; portfolio totals are lower bounds. Margin level is not the broker stop-out threshold.",
+    "template": false,
+    "preserve": []
+  },
+{
+    "key": "FunctionalGoalReminder",
+    "source": "改进目标「{0}」需要留意。",
+    "english": "Improvement goal \"{0}\" needs attention.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalGoalReminderDetail",
+    "source": "{0} · {1} · 规则阈值 {2:0.##}；本次观察未通过。",
+    "english": "{0} | {1} | Rule threshold {2:0.##}; this observation failed.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalPlanNoEvidence",
+    "source": "未绑定盘前计划，无法自动核验执行。",
+    "english": "No linked plan recorded before entry; execution cannot be checked automatically.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalRulePassed",
+    "source": "符合",
+    "english": "Passed",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalRuleFailed",
+    "source": "偏离",
+    "english": "Deviated",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalRuleUnknown",
+    "source": "证据不足",
+    "english": "Insufficient evidence",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalPlanExecution",
+    "source": "执行核验：入场 {0} · 初始止损 {1} · 初始目标 {2} · 退出 {3}。非止损/目标价退出需结合成交滑点及人工退出评价，不能仅凭价格判违规。",
+    "english": "Execution checks: entry {0} | initial stop {1} | initial target {2} | exit {3}. Exits away from planned levels require slippage evidence and a manual exit assessment; price alone does not establish a violation.",
+    "template": false,
+    "preserve": []
+  },
+{
+    "key": "FunctionalGoalObservedPass",
+    "source": "已知机会执行率达到目标；未记录日期不视为通过，结束条件需人工复核。",
+    "english": "Observed-opportunity adherence meets the target. Unrecorded days are not passes; review the end condition manually.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalGoalObservedFail",
+    "source": "已知机会执行率未达到目标；可查看失败证据。",
+    "english": "Observed-opportunity adherence is below target; inspect the failed observations.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalGoalObservedUnknown",
+    "source": "目标暂不能自动验收：缺少目标值、合格机会或可靠证据。",
+    "english": "The target cannot yet be assessed: target value, applicable opportunities or reliable evidence is missing.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalGoalTargetLabel",
+    "source": "自动目标执行率（%）；主观目标为人工验收值",
+    "english": "Automatic adherence target (%); subjective targets are reviewed manually",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalGoalTargetHint",
+    "source": "自动目标填 0–100，按已知通过/失败机会的执行率验收；未知和不适用单列，不改变原规则阈值。",
+    "english": "For automatic goals enter 0-100. Assess adherence over known pass/fail opportunities; unknown and inapplicable observations stay separate. Rule thresholds are unchanged.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalGoalEndManual",
+    "source": "完成或结束条件（人工复核）",
+    "english": "Completion or end condition (manual review)",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalComposeEntryError",
+    "source": "请给一个入场对象分类为入场观察、做多观察区或做空观察区；有多个品种时先填写品种。每次组合只保留一个有效入场对象。",
+    "english": "Classify one entry object as Entry watch, Long watch zone or Short watch zone. Enter a symbol if multiple symbols exist. Keep one active entry object per composition.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalComposeLevelsError",
+    "source": "同品种需要各一个有效的止损参考和目标参考对象；多余对象可改为仅作标记。",
+    "english": "The symbol needs exactly one active stop-reference and one target-reference object. Change unused objects to Mark only.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalComposeDone",
+    "source": "图表对象已组合为计划草稿；请检查方向、入场、止损和目标，再保存。保存后冻结本次价格，不随图线移动改写历史。",
+    "english": "Chart objects composed into a draft. Check direction, entry, stop and target before saving. Saved prices are frozen; moving chart lines does not rewrite history.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalPlanEntryMatched",
+    "source": "自动：入场区匹配",
+    "english": "Automatic: entry range matched",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalPlanEntryOutside",
+    "source": "自动：入场区外",
+    "english": "Automatic: outside entry range",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalPlanEntryMatchedDetail",
+    "source": "自动匹配入场区（止损与退出另行核验）",
+    "english": "Entry range matched automatically (stop and exit checked separately)",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalPlanEntryOutsideDetail",
+    "source": "自动判断入场区外",
+    "english": "Automatically outside entry range",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalGoalTargetValidation",
+    "source": "自动目标值为执行率，须在 0 到 100% 之间；主观目标由人工验收。",
+    "english": "Automatic goals use adherence from 0 to 100%; subjective goals require manual assessment.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalGoalWindowValidation",
+    "source": "观察周期必须是 1 到 3660 天。",
+    "english": "The observation window must be 1 to 3660 days.",
+    "template": false,
+    "preserve": []
+  },
+{
+    "key": "FunctionalMigrationFailed",
+    "source": "旧存档迁移未完成，原文件已保留；请查看日志。自动备份和完整迁移备份暂不可用，避免生成缺少原始采集数据的包。",
+    "english": "Legacy archive migration did not finish. Original files were retained; check the log. Automatic and complete migration backups are unavailable to avoid omitting raw collector data.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalFloatingReminder",
+    "source": "账户浮亏仍达到提醒线。",
+    "english": "Account floating loss remains above the reminder threshold.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "FunctionalFloatingReminderDetail",
+    "source": "当前浮亏 {0:0.##} {1}，占余额 {2:0.##}%；第 {3} 段阈值 {4:0.##}%。",
+    "english": "Current floating loss {0:0.##} {1}, {2:0.##}% of balance; stage {3} threshold {4:0.##}%.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "EntryScreenshots",
+    "source": "入场截图（可选）",
+    "english": "Entry screenshots (optional)",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "EntryPasteScreenshot",
+    "source": "粘贴截图",
+    "english": "Paste screenshot",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "EntryImportScreenshot",
+    "source": "导入截图",
+    "english": "Import screenshot",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "EntryScreenshotHint",
+    "source": "截图添加后立即保存；跳过理由也会保留。可在交易档案中查看或删除。单张不超过 25 MB。",
+    "english": "Screenshots are saved immediately, even if you skip the reason. View or delete them in the trade record. Up to 25 MB per image.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "EntryScreenshotSaving",
+    "source": "正在保存截图…",
+    "english": "Saving screenshot…",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "EntryScreenshotSaved",
+    "source": "截图已保存到这笔交易的复盘附件。",
+    "english": "Screenshot saved to this trade's review attachments.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "EntryScreenshotTitle",
+    "source": "入场截图",
+    "english": "Entry screenshot",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "EntryScreenshotDialog",
+    "source": "导入入场截图",
+    "english": "Import entry screenshot",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "EntryScreenshotFilter",
+    "source": "截图图片|*.png;*.jpg;*.jpeg;*.webp;*.gif;*.bmp",
+    "english": "Screenshot images|*.png;*.jpg;*.jpeg;*.webp;*.gif;*.bmp",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "EntryScreenshotFormats",
+    "source": "仅支持 PNG、JPG、WebP、GIF 和 BMP 截图。",
+    "english": "Only PNG, JPG, WebP, GIF and BMP screenshots are supported.",
+    "template": false,
+    "preserve": []
+  },
+  {
+    "key": "CompanionSettingsTitle",
+    "source": "趣味互动",
+    "english": "Playful companion",
+    "template": false, "preserve": []
+  },
+  {
+    "key": "CompanionTapSetting",
+    "source": "点击、靠近与拖放回应",
+    "english": "Respond to taps, hover and drops",
+    "template": false, "preserve": []
+  },
+  {
+    "key": "CompanionFeedbackSetting",
+    "source": "打卡、截图与复盘完成反馈",
+    "english": "Celebrate saved entries, screenshots and completed reviews",
+    "template": false, "preserve": []
+  },
+  {
+    "key": "CompanionIdleSetting",
+    "source": "日常小动作与散步",
+    "english": "Idle animations and wandering",
+    "template": false, "preserve": []
+  },
+  {
+    "key": "CompanionSoundSetting",
+    "source": "趣味提示音（默认关闭）",
+    "english": "Companion sounds (off by default)",
+    "template": false, "preserve": []
+  },
+  {
+    "key": "CompanionVolume",
+    "source": "趣味提示音音量",
+    "english": "Companion sound volume",
+    "template": false, "preserve": []
+  },
+  {
+    "key": "CompanionSettingsHint",
+    "source": "四项可分别关闭，关闭后立即生效，保存设置后下次仍有效。“安静陪我”暂停全部趣味互动与声音；日常小动作约每 90–120 秒出现一次。",
+    "english": "Each option can be disabled immediately. Save settings to keep your choices after restart. Quiet mode pauses all playful interactions and sounds. Idle moments occur about every 90–120 seconds.",
+    "template": false, "preserve": []
+  },
+  {
+    "key": "CompanionTapCaption",
+    "source": "我在，慢慢来。",
+    "english": "I'm here. Take your time.",
+    "template": false, "preserve": []
+  },
+  {
+    "key": "CompanionSavedCaption",
+    "source": "记好了，给认真记录的你盖个章。",
+    "english": "Saved. A little stamp for taking the time to reflect.",
+    "template": false, "preserve": []
+  },
+  {
+    "key": "CompanionCompletedCaption",
+    "source": "复盘完成，今天又多懂了自己一点。",
+    "english": "Review complete. One more step toward understanding yourself.",
+    "template": false, "preserve": []
+  },
+{"key":"ReplayNoClosedBar","source":"此处没有已完成的 K 线","english":"No completed candle here"},
+{"key":"ReplayPrimaryPeriod","source":"主图周期","english":"Primary interval"},
+{"key":"ReplayDual","source":"同步副图","english":"Linked chart"},
+{"key":"ReplayResetView","source":"重置视图","english":"Reset view"},
+{"key":"ReplayEntry","source":"到入场","english":"Entry"},
+{"key":"ReplayExit","source":"到离场","english":"Exit"},
+{"key":"ReplayScreenshots","source":"查看截图","english":"Screenshots"},
+{"key":"ReplayInteractionHint","source":"滚轮缩放 · 按住左键拖动 · 双击重置 · 十字光标查看 OHLC；双图共用时间范围，只显示回放游标之前已完成的 K 线。","english":"Wheel to zoom · Drag to pan · Double-click to reset · Hover for OHLC. Linked charts share a time range and only show candles completed before the replay cursor."},
+{"key":"ReplayHoldingTitle","source":"持仓盈亏过程","english":"P&L during the trade"},
+{"key":"ReplayHoldingSummary","source":"观测峰值 {0} · 观测低谷 {1} · 最终净盈亏 {2} · 盈利回吐 {3} · 采样 {4} 条","english":"Observed peak {0} · Observed trough {1} · Final net P&L {2} · Giveback {3} · {4} samples"},
+{"key":"ReplayHoldingGaps","source":"存在采样缺口或旧版数据","english":"Sampling gaps or legacy data present"},
+{"key":"ReplayHoldingDisclosure","source":"金额为账户币种。蓝线为含浮盈亏的净额，绿线为已实现净额，金色虚线为最终结果。峰值和低谷仅来自已显示的采样；缺口不连线，未采集期间不推算。回吐仅在观测到盈利且最终结果可见时计算。","english":"Amounts are in account currency. Blue: total net P&L including open P&L. Green: realized net P&L. Gold dashed: final result. Peaks and troughs use visible samples only; gaps are not interpolated. Giveback requires an observed profit and a visible final result."},
+{"key":"ReplayHoldingLegend","source":"蓝：净盈亏  ·  绿：已实现  ·  金：最终结果","english":"Blue: net P&L · Green: realized · Gold: final result"},
+{"key":"ReplayHoldingNoSamples","source":"当前时间范围没有持仓盈亏采样","english":"No position P&L samples in this time range"},
+{"key":"ReplayHoldingNoSampleAtCursor","source":"光标处没有相邻采样","english":"No nearby sample at the crosshair"},
+{"key":"ReplayHoldingHover","source":"净盈亏 {0:0.##} · 已实现 {1:0.##}","english":"Net P&L {0:0.##} · Realized {1:0.##}"},
+{"key":"ReplayRawEvents","source":"展开行情与复盘记录","english":"Market data and review records"},
+{"key":"ReplayGroupTitle","source":"策略 / 入场时段的持仓表现","english":"Excursions by strategy / entry hour"},
+{"key":"ReplayGroupDisclosure","source":"沿用当前筛选。均值仅使用采样可靠的交易；回吐仅计算已平仓且曾有浮盈的可靠交易，金额为账户币种。时段按交易服务器入场小时分组。","english":"Uses the current filters. Averages require reliable sampling. Giveback uses reliable closed trades with a positive excursion. Amounts are in account currency; hours use trade-server entry time."},
+{"key":"ReplayGroupKind","source":"分组方式","english":"Grouping"},
+{"key":"ReplayGroupName","source":"分组","english":"Group"},
+{"key":"ReplayGroupCoverage","source":"可靠 / 总数","english":"Reliable / total"},
+{"key":"ReplayAverageMae","source":"平均 MAE","english":"Average MAE"},
+{"key":"ReplayAverageMfe","source":"平均 MFE","english":"Average MFE"},
+{"key":"ReplayAverageGiveback","source":"平均回吐","english":"Average giveback"},
+{"key":"ReplayStrategyGroup","source":"策略","english":"Strategy"},
+{"key":"ReplayHourGroup","source":"入场小时","english":"Entry hour"},
+{"key":"ReplayUnclassified","source":"未分类","english":"Unclassified"},
+{"key":"ReplayLoadFailed","source":"行情加载失败：","english":"Market data load failed: "},
+{"key":"LocalBuildLabel","source":"本机更新 {0}","english":"Local build {0}","template":true}
 ]

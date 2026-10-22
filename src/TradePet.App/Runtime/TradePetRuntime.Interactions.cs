@@ -59,11 +59,14 @@ public sealed partial class TradePetRuntime
                 TradeEntryReasonNote.SettingKey(key.PositionId), _cancellation.Token);
             if (note?.TradeKey == key && !string.IsNullOrWhiteSpace(note.Reason))
             { _pendingEntryReasons.TryRemove(pending.Key, out _); continue; }
+            var detail = await _reviewRepository.LoadTradeDetailAsync(key, _cancellation.Token);
             await OnUiAsync(() =>
             {
                 if (!_accountSessions.IsCurrent(session.AccountKey, session.Generation) || _entryReasonCard is not null || _quickReviewCard is not null || _behaviorActionCard is not null ||
                     !showEmptyMessage && !_viewModel.EntryReasonPromptEnabled) return;
                 var card = new EntryReasonCard(trade, _serverUtcOffsetSeconds);
+                card.SetScreenshots(detail?.Attachments ?? []);
+                card.AddScreenshotAsync = paste => AddEntryScreenshotAsync(key, session.Generation, paste);
                 card.SaveReasonAsync = async response =>
                 {
                     await using var lease = await EnterRuntimeOperationAsync(MaintenanceOperationKind.Write, _cancellation.Token);
@@ -72,6 +75,8 @@ public sealed partial class TradePetRuntime
                     await _database.SaveSettingAsync(TradeEntryReasonNote.Scope(key.AccountKey), TradeEntryReasonNote.SettingKey(key.PositionId),
                         new TradeEntryReasonNote(key, response.Reason, _timeProvider.GetUtcNow(),
                             response.ReportedExecution, response.Emotion), _cancellation.Token);
+                    if (_accountSessions.IsCurrent(key.AccountKey, session.Generation))
+                        await RequestCompanionReactionAsync(TradePet.Core.Pet.CompanionTrigger.EntrySaved);
                     return null;
                 };
                 _entryReasonCard = card;

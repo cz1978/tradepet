@@ -30,6 +30,7 @@ public partial class PetWindow : Window
     private readonly DispatcherTimer _fullScreenTimer;
     private readonly Forms.NotifyIcon _trayIcon;
     private readonly Forms.ContextMenuStrip _trayMenu;
+    private readonly Forms.ToolStripMenuItem _quietModeMenuItem;
     private readonly Drawing.Font _trayMenuFont;
     private readonly Drawing.Icon _trayIconImage;
     private bool _trayResourcesDisposed;
@@ -59,6 +60,7 @@ public partial class PetWindow : Window
         SpeechBubblePopup.PlacementTarget = PetSprite;
         ReviewCardPopup.PlacementTarget = PetSprite;
         _viewModel.PropertyChanged += ViewModel_PropertyChanged;
+        InitializeCompanion();
         SourceInitialized += (_, _) =>
         {
             // Keep the small, layered pet window off the hardware composition path.
@@ -108,6 +110,7 @@ public partial class PetWindow : Window
         {
             if (!IsVisible)
             {
+                StopCompanionReaction();
                 _hoverTimer.Stop();
                 _hideTimer.Stop();
                 _quickCardPinned = false;
@@ -146,25 +149,33 @@ public partial class PetWindow : Window
             _quickCardPinned = true;
             SetQuickCardVisible(true);
         }));
-        _trayMenu.Items.Add("快速入场原因", null, (_, _) => Dispatcher.Invoke(() => _viewModel.ShowEntryReasonCommand.Execute(null)));
-        _trayMenu.Items.Add("快速复盘", null, (_, _) => Dispatcher.Invoke(() => _viewModel.ShowQuickReviewCommand.Execute(null)));
-        _trayMenu.Items.Add("记录未交易机会", null, (_, _) => Dispatcher.Invoke(() => _viewModel.ShowOpportunityCommand.Execute(null)));
-        _trayMenu.Items.Add("交易小结与改进", null, (_, _) => Dispatcher.Invoke(() => _viewModel.ShowWeeklyGoalCommand.Execute(null)));
+        var quickNote = new Forms.ToolStripMenuItem("记一下");
+        quickNote.DropDownItems.Add("快速入场原因", null, (_, _) => Dispatcher.Invoke(() => _viewModel.ShowEntryReasonCommand.Execute(null)));
+        quickNote.DropDownItems.Add("快速复盘", null, (_, _) => Dispatcher.Invoke(() => _viewModel.ShowQuickReviewCommand.Execute(null)));
+        quickNote.DropDownItems.Add("记录未交易机会", null, (_, _) => Dispatcher.Invoke(() => _viewModel.ShowOpportunityCommand.Execute(null)));
+        quickNote.DropDownItems.Add("交易小结与改进", null, (_, _) => Dispatcher.Invoke(() => _viewModel.ShowWeeklyGoalCommand.Execute(null)));
+        _trayMenu.Items.Add(quickNote);
+        _quietModeMenuItem = new Forms.ToolStripMenuItem(_viewModel.FocusModeMenuText, null,
+            (_, _) => Dispatcher.Invoke(() => _viewModel.ToggleFocusCommand.Execute(null)))
+        {
+            ToolTipText = TradePet.Core.Localization.UiText.Get("PetQuietModeHint"),
+        };
+        _trayMenu.Items.Add(_quietModeMenuItem);
         _trayMenu.Items.Add(new Forms.ToolStripSeparator());
-        var reviewTools = new Forms.ToolStripMenuItem("复盘与工具");
+        var reviewTools = new Forms.ToolStripMenuItem("更多");
         reviewTools.DropDownItems.Add("打开控制台", null, (_, _) => Dispatcher.Invoke(() => _viewModel.ShowMainWindowCommand.Execute(null)));
         reviewTools.DropDownItems.Add("交易日报", null, (_, _) => Dispatcher.Invoke(() => _viewModel.ShowDailyTradingReportCommand.Execute(null)));
         reviewTools.DropDownItems.Add("复盘分析", null, (_, _) => Dispatcher.Invoke(() => _viewModel.ShowReviewPageCommand.Execute(null)));
+        reviewTools.DropDownItems.Add("离线账户档案", null, (_, _) => Dispatcher.Invoke(() => _viewModel.OpenOfflineArchiveCommand.Execute(null)));
         reviewTools.DropDownItems.Add("时间线", null, (_, _) => Dispatcher.Invoke(() => _viewModel.ShowTimelinePageCommand.Execute(null)));
         reviewTools.DropDownItems.Add("交易计划", null, (_, _) => Dispatcher.Invoke(() => _viewModel.ShowPlanPageCommand.Execute(null)));
         reviewTools.DropDownItems.Add("亏损区域", null, (_, _) => Dispatcher.Invoke(() => _viewModel.ShowLossZonesPageCommand.Execute(null)));
         reviewTools.DropDownItems.Add("宏观日历", null, (_, _) => Dispatcher.Invoke(() => _viewModel.ShowMacroCalendarCommand.Execute(null)));
+        reviewTools.DropDownItems.Add(new Forms.ToolStripSeparator());
+        reviewTools.DropDownItems.Add("显示/隐藏迷你持仓", null, (_, _) => Dispatcher.Invoke(() => _viewModel.MiniPositionVisible = !_viewModel.MiniPositionVisible));
+        reviewTools.DropDownItems.Add("设置", null, (_, _) => Dispatcher.Invoke(() => _viewModel.ShowSettingsPageCommand.Execute(null)));
+        reviewTools.DropDownItems.Add("关闭鼠标穿透", null, (_, _) => Dispatcher.Invoke(() => _viewModel.IsMouseThrough = false));
         _trayMenu.Items.Add(reviewTools);
-        var displaySettings = new Forms.ToolStripMenuItem("显示与设置");
-        displaySettings.DropDownItems.Add("显示/隐藏迷你持仓", null, (_, _) => Dispatcher.Invoke(() => _viewModel.MiniPositionVisible = !_viewModel.MiniPositionVisible));
-        displaySettings.DropDownItems.Add("设置", null, (_, _) => Dispatcher.Invoke(() => _viewModel.ShowSettingsPageCommand.Execute(null)));
-        displaySettings.DropDownItems.Add("关闭鼠标穿透", null, (_, _) => Dispatcher.Invoke(() => _viewModel.IsMouseThrough = false));
-        _trayMenu.Items.Add(displaySettings);
         _trayMenu.Items.Add(new Forms.ToolStripSeparator());
         _trayMenu.Items.Add("退出天禄交易助手", null, (_, _) => Dispatcher.Invoke(() => _viewModel.ExitCommand.Execute(null)));
         ConfigureTrayItems(_trayMenu.Items);
@@ -199,6 +210,9 @@ public partial class PetWindow : Window
         _hoverTimer.Stop();
         _hideTimer.Stop();
         _viewModel.PropertyChanged -= ViewModel_PropertyChanged;
+        StopCompanionReaction();
+        PetSprite.CompanionReactionEnded -= CompanionReactionEnded;
+        _companionSounds.Dispose();
         QuickCardPopup.IsOpen = false;
         ReviewCardPopup.IsOpen = false;
         if (_reviewCard is not null) _reviewCard.Completed -= ReviewCard_Completed;
@@ -256,9 +270,8 @@ public partial class PetWindow : Window
         e.Handled = true;
         if (e.ClickCount == 2)
         {
-            _quickCardPinned = false;
-            SetQuickCardVisible(false);
-            _viewModel.ShowMainWindowCommand.Execute(null);
+            _quickCardPinned = true;
+            SetQuickCardVisible(true);
             return;
         }
         if (_viewModel.IsMouseThrough || e.LeftButton != MouseButtonState.Pressed)
@@ -267,11 +280,12 @@ public partial class PetWindow : Window
         }
         if (_viewModel.IsPositionLocked)
         {
-            ToggleQuickCard();
+            _viewModel.InteractWithPetCommand.Execute(null);
             return;
         }
 
         _isDragging = true;
+        StopCompanionReaction();
         _hoverTimer.Stop();
         _hideTimer.Stop();
         _movementTimer.Stop();
@@ -305,16 +319,18 @@ public partial class PetWindow : Window
                     Math.Abs(end.Y - start.Y) >= SystemParameters.MinimumVerticalDragDistance;
         if (!moved)
         {
-            ToggleQuickCard();
+            _viewModel.InteractWithPetCommand.Execute(null);
         }
         else
         {
             _quickCardPinned = false;
+            RequestCompanionInteraction(TradePet.Core.Pet.CompanionTrigger.Landed);
         }
     }
 
     private void PetSprite_MouseEnter(object sender, System.Windows.Input.MouseEventArgs e)
     {
+        if (!_isDragging) RequestCompanionInteraction(TradePet.Core.Pet.CompanionTrigger.Hover);
         _hideTimer.Stop();
         if (_viewModel.ExpandCardOnHover && !_isDragging && !_quickCardVisible)
         {
@@ -402,6 +418,9 @@ public partial class PetWindow : Window
 
     private void ViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        HandleCompanionPropertyChanged(e.PropertyName);
+        if (e.PropertyName == nameof(MainViewModel.FocusModeMenuText))
+            _quietModeMenuItem.Text = TradePet.Core.Localization.UiText.Translate(_viewModel.FocusModeMenuText);
         if (e.PropertyName == nameof(MainViewModel.IsMouseThrough))
         {
             ApplyMouseThrough();
@@ -482,6 +501,7 @@ public partial class PetWindow : Window
     private void UpdateSpeechBubble()
     {
         ReviewCardPopup.IsOpen = !_trayResourcesDisposed && IsVisible && !_isDragging && (_reviewCard is not null || _entryReasonCard is not null || _behaviorActionCard is not null);
+        if (ReviewCardPopup.IsOpen) CompanionCaptionPopup.IsOpen = false;
         SpeechBubblePopup.IsOpen = !_trayResourcesDisposed && IsVisible &&
                                    !_isDragging && _viewModel.IsBubbleVisible && !ReviewCardPopup.IsOpen;
     }
@@ -558,12 +578,14 @@ public partial class PetWindow : Window
                    rect.Left <= bounds.Left && rect.Top <= bounds.Top && rect.Right >= bounds.Right && rect.Bottom >= bounds.Bottom;
         if (full == _fullscreenActive) return;
         _fullscreenActive = full;
+        if (full) StopCompanionReaction();
         FullscreenSuppressionChanged?.Invoke(full);
     }
 
     private void MoveWithActivity()
     {
-        if (_isDragging || _viewModel.IsPositionLocked || !IsVisible || _quickCardVisible || _reviewCard is not null || _entryReasonCard is not null ||
+        if (!_viewModel.PetIdleAnimationsEnabled || _viewModel.IsFocusMode || PetSprite.HasCompanionReaction ||
+            _isDragging || _viewModel.IsPositionLocked || !IsVisible || _quickCardVisible || _reviewCard is not null || _entryReasonCard is not null ||
             _viewModel.IsBubbleVisible || ContextMenu?.IsOpen == true || PetSprite.IsMouseOver)
         {
             return;

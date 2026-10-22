@@ -208,7 +208,10 @@ void OnTimer()
       + ",\"sequence\":" + IntegerToString(++sequence) + ",\"terminalPath\":" + Quote(TerminalInfoString(TERMINAL_PATH))
       + ",\"connected\":" + (IsConnected() ? "true" : "false") + ",\"capturedAtUtc\":" + Utc(utc)
       + ",\"account\":{\"server\":" + Quote(AccountServer()) + ",\"login\":" + IntegerToString(AccountNumber())
-      + ",\"currency\":" + Quote(AccountCurrency()) + "},\"balance\":" + Number(AccountBalance())
+      + ",\"currency\":" + Quote(AccountCurrency()) + ",\"usedMargin\":" + Number(AccountMargin())
+      + ",\"freeMargin\":" + Number(AccountFreeMargin())
+      + ",\"marginLevel\":" + (AccountMargin() > 0 ? Number(AccountEquity() / AccountMargin() * 100.0) : "null")
+      + "},\"balance\":" + Number(AccountBalance())
       + ",\"equity\":" + Number(AccountEquity()) + ",\"floatingPnl\":" + Number(AccountProfit())
       + (have_offset ? ",\"serverUtcOffsetSeconds\":" + IntegerToString(offset) : "")
       + ",\"positions\":[" + positions + "],\"orders\":[" + orders + "],\"symbolSpecifications\":[" + specs + "]"
@@ -328,7 +331,9 @@ void PollMarketHistory()
    string id = JsonStringValue(command, "requestId");
    string account = "MT4:" + AccountServer() + "|" + IntegerToString(AccountNumber());
    if(StringLen(id) != 32 || filename != "market-request-" + id + ".json") { FileDelete(path); return; }
-   if(JsonStringValue(command, "accountKey") != account || JsonStringValue(command, "timeframe") != "M5" ||
+   string timeframe = JsonStringValue(command, "timeframe");
+   int period = timeframe == "M1" ? PERIOD_M1 : timeframe == "M5" ? PERIOD_M5 : timeframe == "M15" ? PERIOD_M15 : timeframe == "H1" ? PERIOD_H1 : 0;
+   if(JsonStringValue(command, "accountKey") != account || period == 0 ||
       StringCompare(JsonStringValue(command, "terminalPath"), TerminalInfoString(TERMINAL_PATH), false) != 0 ||
       JsonLongValue(command, "serverUtcOffsetSeconds", 100000) != server_offset ||
       MathAbs((double)(TimeGMT() - JsonLongValue(command, "createdAtEpochUtc", 0))) > 30)
@@ -340,7 +345,7 @@ void PollMarketHistory()
    MqlRates rates[];
    string error = "";
    bool selected = SymbolSelect(symbol,true);
-   int count = selected ? CopyRates(symbol, PERIOD_M5, from, to, rates) : 0;
+   int count = selected ? CopyRates(symbol, period, from, to, rates) : 0;
    if(!selected) error = "该 MT4 账户没有此品种，无法读取历史行情。请核对品种后缀。";
    if(count < 0) return; // MT4 may be downloading history; retry while the request is fresh.
    int maximum = (int)MathMin(5000, MathMax(1, JsonLongValue(command, "maximumBars", 5000)));
@@ -356,7 +361,7 @@ void PollMarketHistory()
    }
    string response = "{\"requestId\":" + Quote(id) + ",\"accountKey\":" + Quote(account)
       + ",\"terminalPath\":" + Quote(TerminalInfoString(TERMINAL_PATH)) + ",\"symbol\":" + Quote(symbol)
-      + ",\"timeframe\":\"M5\",\"serverUtcOffsetSeconds\":" + IntegerToString(server_offset) + ",\"error\":" + Quote(error) + ",\"bars\":[" + bars + "]}";
+      + ",\"timeframe\":" + Quote(timeframe) + ",\"serverUtcOffsetSeconds\":" + IntegerToString(server_offset) + ",\"error\":" + Quote(error) + ",\"bars\":[" + bars + "]}";
    string result = "TradePet\\market-response-" + id;
    file = FileOpen(result + ".tmp", FILE_WRITE | FILE_TXT | FILE_ANSI, 0, CP_UTF8);
    if(file == INVALID_HANDLE) return;

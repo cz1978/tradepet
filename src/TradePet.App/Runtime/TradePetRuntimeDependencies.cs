@@ -13,7 +13,8 @@ public sealed record TradePetRuntimeDependencies(
     TimeProvider TimeProvider,
     IAsyncScheduler Scheduler,
     IAccountSessionCoordinator AccountSessions,
-    IMaintenanceCoordinator Maintenance)
+    IMaintenanceCoordinator Maintenance,
+    string? AutomaticBackupDirectory = null)
 {
     public static TradePetRuntimeDependencies CreateDefault()
     {

@@ -2,6 +2,26 @@
 
 English | [简体中文](CHANGELOG.md)
 
+## 1.1.0 — 2026-10-22
+
+- Paste or import entry screenshots and review them with the trade. Reason prompts remain optional and default off.
+- Independently disable tap responses, save/review feedback, ambient animations or sounds. Sounds default off; quiet mode suppresses playful interactions.
+- Replay supports zoom, pan, crosshair/OHLC, M1/M5/M15/H1 linked charts and entry/exit/event navigation. MT4 requires the updated bridge; missing market data is never synthesized.
+- View sampled net/realized P/L, observed peaks/troughs and giveback, with reliable excursion summaries by strategy and server entry hour. Sampling gaps stay explicit; final results remain hidden until close unless revealed.
+- Local source updates display their build time in the console title and Settings, record the running assembly, and repair shortcut targets, working directories, icons and launch arguments on every update.
+
+- Simplify companionship: click for a friendly wave, double-click for today's status, use Quick note for recording and Quiet company for fewer interruptions. Entry/exit forms and report popups default off while reports remain automatically archived. Migrate legacy defaults once, then retain explicit choices. Closed trades receive calm company regardless of profit or loss.
+- Upgrade the native SQLite engine from 3.41.2 to 3.53.3, including the official WAL-reset corruption fix; verify the engine version, concurrent writes/checkpoints, backup contents and restart integrity.
+- Priority-ordered reminders, per-position stop-alert delivery, and snoozed alerts revalidated against the account, positions and current risk.
+- Complete trade plans can be entered or composed from one entry, stop-reference and target-reference chart object for the same symbol. Saved prices are frozen. Entry-range matching is separate from evidence-based stop, target and exit checks.
+- Graphical replay displays actual candles, quotes, executions and stop/target levels on a synchronized timeline without filling gaps or exposing future prices.
+- Open Offline account archive from the pet menu or review page to query, edit and replay cached data by account and date without starting or switching terminals.
+- Overview displays account-currency stop-risk lower bounds, estimated drawdown to stops, margin fields and data completeness. Missing stops/valuations are unknown. MT4 margin fields require reattaching the updated bridge.
+- Goal notification switches control goal reminders. Automatic targets assess observed-opportunity adherence (0–100%); unknown samples are not passes, and end conditions require manual review.
+- Automatic daily migration backups are validated and retain the latest seven copies; disable in Settings. Packages include the database, attachments, reports and managed MT4 raw order/tick archives, with existing hash/path/integrity checks and rollback on restore.
+
+Validation: 499 .NET tests excluding UI automation and 28 Python tests passed, covering replay isolation, interval selection, sampling semantics, companion preferences, storage and backups.
+
 ## 1.0.0 — 2026-10-18
 
 - Publish stable version 1.0.0 with all performance improvements, reliability fixes and daily-report date navigation from the previous release. Trading, calculation and storage logic are unchanged in this release.

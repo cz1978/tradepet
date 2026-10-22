@@ -202,6 +202,90 @@ public sealed class RuntimeContractTests
     }
 
     [Fact]
+    public async Task CompanionDefaults_MigrateOnceAndRetainLaterExplicitChoices()
+    {
+        var database = new AppDatabase(Path.Combine(Path.GetTempPath(), $"tradepet-companion-{Guid.NewGuid():N}.db"));
+        await database.InitializeAsync();
+        await database.SaveSettingAsync("global", "desktop", new
+        {
+            FocusMode = true, QuickReviewPromptEnabled = true, EntryReasonPromptEnabled = true,
+            DailyReportEnabled = true,
+        });
+        var dependencies = new TradePetRuntimeDependencies(database,
+            DispatchProxy.Create<IReviewWorkspaceRepository, ThrowingProxy>(),
+            DispatchProxy.Create<IReviewPackageWriter, ThrowingProxy>(),
+            DispatchProxy.Create<IReviewAttachmentStore, ThrowingProxy>(),
+            DispatchProxy.Create<IReviewBackupService, ThrowingProxy>(),
+            TimeProvider.System, new ManualAsyncScheduler(), new AccountSessionCoordinator(), new MaintenanceCoordinator());
+        var vm = new TradePet.App.ViewModels.MainViewModel();
+        await using var runtime = new TradePetRuntime(vm, dependencies);
+        var load = typeof(TradePetRuntime).GetMethod("LoadDesktopSettingsAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        await (Task)load.Invoke(runtime, null)!;
+
+        Assert.True(vm.IsFocusMode);
+        Assert.True(vm.DailyReportEnabled);
+        Assert.False(vm.QuickReviewPromptEnabled);
+        Assert.False(vm.EntryReasonPromptEnabled);
+        Assert.False(vm.DailyReportPopupEnabled);
+        var saved = await database.LoadSettingAsync<System.Text.Json.JsonElement>("global", "desktop");
+        Assert.Equal(1, saved.GetProperty("companionSettingsVersion").GetInt32());
+
+        await database.SaveSettingAsync("global", "desktop", new
+        {
+            QuickReviewPromptEnabled = true, EntryReasonPromptEnabled = true,
+            DailyReportEnabled = true, DailyReportPopupEnabled = true, CompanionSettingsVersion = 1,
+        });
+        await (Task)load.Invoke(runtime, null)!;
+        Assert.True(vm.QuickReviewPromptEnabled);
+        Assert.True(vm.EntryReasonPromptEnabled);
+        Assert.True(vm.DailyReportPopupEnabled);
+
+        vm.IsFocusMode = true;
+        await vm.SaveCompanionPreferencesAsync!();
+        saved = await database.LoadSettingAsync<System.Text.Json.JsonElement>("global", "desktop");
+        Assert.True(saved.GetProperty("focusMode").GetBoolean());
+        Assert.True(saved.GetProperty("quickReviewPromptEnabled").GetBoolean());
+    }
+
+    [Fact]
+    public async Task PetInteraction_UsesSeparateReactionWithoutReplacingRiskAlerts()
+    {
+        var scheduler = new ManualAsyncScheduler();
+        var database = new AppDatabase(Path.Combine(Path.GetTempPath(), $"tradepet-greeting-{Guid.NewGuid():N}.db"));
+        var dependencies = new TradePetRuntimeDependencies(database,
+            DispatchProxy.Create<IReviewWorkspaceRepository, ThrowingProxy>(),
+            DispatchProxy.Create<IReviewPackageWriter, ThrowingProxy>(),
+            DispatchProxy.Create<IReviewAttachmentStore, ThrowingProxy>(),
+            DispatchProxy.Create<IReviewBackupService, ThrowingProxy>(),
+            TimeProvider.System, scheduler, new AccountSessionCoordinator(), new MaintenanceCoordinator());
+        var vm = new TradePet.App.ViewModels.MainViewModel();
+        await using var runtime = new TradePetRuntime(vm, dependencies);
+        var engine = new TradePet.Core.Pet.PetBehaviorEngine();
+        var now = DateTimeOffset.UtcNow;
+        typeof(TradePetRuntime).GetField("_petState", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(runtime, engine.ApplySignal(engine.CreateInitial(now), PetSignal.Risk, now));
+        vm.BubbleHeadline = "重要风险";
+        vm.PetActivity = PetActivity.Failed;
+        vm.IsAlertActionVisible = vm.IsBubbleVisible = true;
+        await vm.InteractWithPetAsync!();
+        Assert.Equal("重要风险", vm.BubbleHeadline);
+        Assert.Equal(PetActivity.Failed, vm.PetActivity);
+        Assert.True(vm.IsAlertActionVisible);
+        Assert.Null(vm.CompanionReaction);
+
+        typeof(TradePetRuntime).GetField("_petState", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(runtime, engine.CreateInitial(now));
+        vm.IsAlertActionVisible = vm.IsBubbleVisible = false;
+        vm.PetActivity = PetActivity.Idle;
+        await vm.InteractWithPetAsync!();
+        Assert.NotNull(vm.CompanionReaction);
+        Assert.Equal(TradePet.Core.Pet.CompanionAnimation.Wave, vm.CompanionReaction.Animation);
+        Assert.True(vm.CompanionReaction.Duration > TimeSpan.Zero);
+        Assert.Equal(PetActivity.Idle, vm.PetActivity);
+        Assert.False(vm.IsBubbleVisible);
+    }
+
+    [Fact]
     public async Task ConsoleGuideCompletion_SurvivesRuntimeRestartWithoutSavingOtherSettings()
     {
         var path = Path.Combine(Path.GetTempPath(), $"tradepet-guide-{Guid.NewGuid():N}.db");

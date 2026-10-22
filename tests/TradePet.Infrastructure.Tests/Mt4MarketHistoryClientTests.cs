@@ -10,27 +10,35 @@ namespace TradePet.Infrastructure.Tests;
 
 public sealed class Mt4MarketHistoryClientTests
 {
-    [Fact]
-    public async Task RequestResponse_UsesSelectedTerminalAndRemovesOnlyItsRequestFiles()
+    [Theory]
+    [InlineData("M1")]
+    [InlineData("M5")]
+    [InlineData("M15")]
+    [InlineData("H1")]
+    public async Task RequestResponse_UsesSelectedTerminalAndRemovesOnlyItsRequestFiles(string timeframe)
     {
+        var request = Request with { Timeframe = timeframe };
         var directory = Path.Combine(Path.GetTempPath(), "mt4-market-tests", Guid.NewGuid().ToString("N"));
         var files = Path.Combine(directory, "MQL4", "Files", "TradePet");
         var requestPath = Path.Combine(files, $"market-request-{Request.RequestId}.json");
         var responsePath = Path.Combine(files, $"market-response-{Request.RequestId}.json");
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         var client = new Mt4MarketHistoryClient(@"C:\BrokerMT4", directory, 10800);
-        var task = client.LoadAsync(Request, cancellation.Token);
+        var task = client.LoadAsync(request, cancellation.Token);
         try
         {
             while (!File.Exists(requestPath)) await Task.Delay(20, cancellation.Token);
             var command = JsonNode.Parse(await File.ReadAllTextAsync(requestPath, cancellation.Token))!;
             Assert.Equal(Request.ExpectedAccountKey, command["accountKey"]!.GetValue<string>());
+            Assert.Equal(timeframe, command["timeframe"]!.GetValue<string>());
             Assert.Equal(Request.FromUtc.ToUnixTimeSeconds(), command["fromEpochUtc"]!.GetValue<long>());
             var unrelated = Path.Combine(files, "market-response-unrelated.json");
             await File.WriteAllTextAsync(unrelated, "keep", cancellation.Token);
-            await File.WriteAllTextAsync(responsePath + ".tmp", Response(), cancellation.Token);
+            var response = JsonNode.Parse(Response())!;
+            response["timeframe"] = timeframe;
+            await File.WriteAllTextAsync(responsePath + ".tmp", response.ToJsonString(), cancellation.Token);
             File.Move(responsePath + ".tmp", responsePath);
-            Assert.Single((await task).Bars);
+            Assert.Equal(timeframe, Assert.Single((await task).Bars).Timeframe);
             Assert.False(File.Exists(requestPath));
             Assert.False(File.Exists(responsePath));
             Assert.True(File.Exists(unrelated));
@@ -66,6 +74,7 @@ public sealed class Mt4MarketHistoryClientTests
     [InlineData("requestId", "old-request")]
     [InlineData("terminalPath", "C:\\OtherMT4")]
     [InlineData("symbol", "XAUUSD")]
+    [InlineData("timeframe", "H1")]
     public void Bars_RejectAnotherRequestAccountTerminalOrSymbol(string field, string value)
     {
         var response = JsonNode.Parse(Response())!;

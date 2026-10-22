@@ -784,9 +784,11 @@ public sealed class ImprovementService
         {
             return ReviewSaveResult<ImprovementGoal>.Validation("主观目标不能启用自动桌宠提醒。");
         }
-        if (goal.ObservationWindowDays <= 0)
+        if (goal.Rule is not null && goal.TargetValue is < 0m or > 100m)
+            return ReviewSaveResult<ImprovementGoal>.Validation("自动目标值为执行率，须在 0 到 100% 之间；主观目标由人工验收。");
+        if (goal.ObservationWindowDays <= 0 || goal.ObservationWindowDays > 3660)
         {
-            return ReviewSaveResult<ImprovementGoal>.Validation("观察周期必须至少为 1 天。");
+            return ReviewSaveResult<ImprovementGoal>.Validation("观察周期必须是 1 到 3660 天。");
         }
         if (goal.Rule is not null && string.IsNullOrWhiteSpace(goal.RuleVersion))
         {
@@ -868,7 +870,8 @@ public sealed class ImprovementService
             UpdatedAtUtc = now,
         };
         if (string.IsNullOrWhiteSpace(candidate.Name) || string.IsNullOrWhiteSpace(candidate.Measurement) ||
-            candidate.ObservationWindowDays <= 0 ||
+            candidate.ObservationWindowDays <= 0 || candidate.ObservationWindowDays > 3660 ||
+            candidate.Rule is not null && candidate.TargetValue is < 0m or > 100m ||
             candidate.NotificationEnabled && candidate.Rule is null ||
             candidate.Rule is not null && string.IsNullOrWhiteSpace(candidate.RuleVersion))
         {

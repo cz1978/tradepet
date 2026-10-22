@@ -9,7 +9,7 @@ using TradePet.Core.Domain;
 
 namespace TradePet.App.Controls;
 
-public sealed class PetSpriteControl : System.Windows.Controls.UserControl, IDisposable
+public sealed partial class PetSpriteControl : System.Windows.Controls.UserControl, IDisposable
 {
     public static readonly DependencyProperty ActivityProperty = DependencyProperty.Register(
         nameof(Activity),
@@ -78,7 +78,8 @@ public sealed class PetSpriteControl : System.Windows.Controls.UserControl, IDis
     }
 
     private void UpdateAnimationTimer() =>
-        _timer.IsEnabled = !_disposed && !_animationPaused && IsLoaded && IsVisible;
+        _timer.IsEnabled = !_disposed && !_animationPaused && IsLoaded && IsVisible &&
+            (_ambientAnimationEnabled || _companionReaction is not null || HasFunctionalAnimation);
 
     public void Dispose()
     {
@@ -142,11 +143,13 @@ public sealed class PetSpriteControl : System.Windows.Controls.UserControl, IDis
     {
         _frameIndex = 0;
         _timer.Interval = GetFrameDuration(GetAnimation(Activity).Durations[0]);
+        UpdateAnimationTimer();
         _surface.InvalidateVisual();
     }
 
     private void AdvanceFrame()
     {
+        if (AdvanceCompanionFrame()) return;
         var animation = GetAnimation(Activity);
         _frameIndex = (_frameIndex + 1) % animation.Durations.Length;
         _timer.Interval = GetFrameDuration(animation.Durations[_frameIndex]);
@@ -165,11 +168,13 @@ public sealed class PetSpriteControl : System.Windows.Controls.UserControl, IDis
             return;
         }
 
-        var animation = GetAnimation(Activity);
+        if (PaintCompanionReaction(canvas, eventArgs.Info.Width, eventArgs.Info.Height)) return;
+        var animation = GetAnimation(_ambientAnimationEnabled || HasFunctionalAnimation ? Activity : PetActivity.Idle);
+        var frameIndex = _ambientAnimationEnabled || HasFunctionalAnimation ? _frameIndex : 0;
         var source = new SKRect(
-            _frameIndex * 192,
+            frameIndex * 192,
             animation.Row * 208,
-            (_frameIndex + 1) * 192,
+            (frameIndex + 1) * 192,
             (animation.Row + 1) * 208);
         var scale = Math.Min(eventArgs.Info.Width / 192f, eventArgs.Info.Height / 208f);
         var width = 192f * scale;

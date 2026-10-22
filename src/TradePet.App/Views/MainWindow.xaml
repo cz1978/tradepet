@@ -4,7 +4,7 @@
         xmlns:l="clr-namespace:TradePet.App.Localization"
         xmlns:controls="clr-namespace:TradePet.App.Controls"
         xmlns:views="clr-namespace:TradePet.App.Views"
-        Title="{l:Text Key=S350ce565e947d392}" Icon="/TradePet;component/Assets/tradepet-icon.ico"
+        Title="{Binding ConsoleTitle}" Icon="/TradePet;component/Assets/tradepet-icon.ico"
         Width="1040" Height="696" MinWidth="920" MinHeight="640"
         WindowStartupLocation="CenterScreen" Background="{StaticResource AppBackgroundBrush}"
         UseLayoutRounding="True">
@@ -275,6 +275,14 @@
                             <TextBlock Text="{l:Text Key=Se44e647e4fadd563}"
                                        TextWrapping="Wrap" Style="{StaticResource MutedTextStyle}" Margin="0,0,0,12"
                                        Visibility="{Binding IsMt4, Converter={StaticResource BoolToVisibility}}" />
+                            <Border Style="{StaticResource PageCardStyle}" Margin="0,0,0,12">
+                                <StackPanel>
+                                    <DockPanel><Button DockPanel.Dock="Right" Content="{l:Text Key=FunctionalHealthCheck}" Command="{Binding CheckDataHealthCommand}" Style="{StaticResource QuietButtonStyle}"/><TextBlock Text="{l:Text Key=FunctionalRiskTitle}" Style="{StaticResource SectionTitleStyle}"/></DockPanel>
+                                    <TextBlock Text="{Binding PortfolioRiskText}" TextWrapping="Wrap" Margin="0,6"/>
+                                    <TextBlock Text="{l:Text Key=FunctionalRiskHint}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap"/>
+                                    <TextBlock Text="{Binding DataHealthText}" TextWrapping="Wrap" Style="{StaticResource MutedTextStyle}" Margin="0,6,0,0"/>
+                                </StackPanel>
+                            </Border>
                             <UniformGrid x:Name="GuideOverviewMetrics" Columns="4" Margin="0,0,0,12">
                                 <Border Style="{StaticResource MetricCardStyle}" Background="{Binding TotalPnlBackground}">
                                     <StackPanel>
@@ -593,7 +601,7 @@
                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <Grid>
                         <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <Grid x:Name="GuidePlanHeader" Margin="0,0,0,12">
                             <StackPanel>
@@ -718,6 +726,28 @@
                                 </ListView>
                             </Grid>
                         </Border>
+                        <Border Grid.Row="3" Style="{StaticResource PageCardStyle}" Margin="0,12,0,0">
+                            <StackPanel>
+                                <TextBlock Text="{l:Text Key=FunctionalPlanTitle}" Style="{StaticResource SectionTitleStyle}"/>
+                                <TextBlock Text="{l:Text Key=FunctionalPlanHint}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,6"/>
+                                <WrapPanel>
+                                    <StackPanel Width="140" Margin="0,0,8,8"><TextBlock Text="{l:Text Key=FunctionalSymbol}"/><TextBox Text="{Binding NewPlanSymbol, UpdateSourceTrigger=PropertyChanged}"/></StackPanel>
+                                    <StackPanel Width="110" Margin="0,0,8,8"><TextBlock Text="{l:Text Key=FunctionalSide}"/><ComboBox ItemsSource="{Binding TradeSideOptions}" SelectedValuePath="Value" SelectedValue="{Binding NewPlanSide}"><ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Label, Converter={StaticResource UiTranslation}}"/></DataTemplate></ComboBox.ItemTemplate></ComboBox></StackPanel>
+                                    <StackPanel Width="120" Margin="0,0,8,8"><TextBlock Text="{l:Text Key=FunctionalReference}"/><TextBox Text="{Binding NewPlanReferenceEntry, UpdateSourceTrigger=PropertyChanged}"/></StackPanel>
+                                    <StackPanel Width="120" Margin="0,0,8,8"><TextBlock Text="{l:Text Key=FunctionalEntryLow}"/><TextBox Text="{Binding NewPlanEntryLow, UpdateSourceTrigger=PropertyChanged}"/></StackPanel>
+                                    <StackPanel Width="120" Margin="0,0,8,8"><TextBlock Text="{l:Text Key=FunctionalEntryHigh}"/><TextBox Text="{Binding NewPlanEntryHigh, UpdateSourceTrigger=PropertyChanged}"/></StackPanel>
+                                    <StackPanel Width="120" Margin="0,0,8,8"><TextBlock Text="{l:Text Key=FunctionalStop}"/><TextBox Text="{Binding NewPlanStop, UpdateSourceTrigger=PropertyChanged}"/></StackPanel>
+                                    <StackPanel Width="120" Margin="0,0,8,8"><TextBlock Text="{l:Text Key=FunctionalTarget}"/><TextBox Text="{Binding NewPlanTarget, UpdateSourceTrigger=PropertyChanged}"/></StackPanel>
+                                    <StackPanel Width="140" Margin="0,0,8,8"><TextBlock Text="{l:Text Key=FunctionalStrategy}"/><TextBox Text="{Binding NewPlanStrategy, UpdateSourceTrigger=PropertyChanged}"/></StackPanel>
+                                    <StackPanel Width="140" Margin="0,0,8,8"><TextBlock Text="{l:Text Key=FunctionalSetup}"/><TextBox Text="{Binding NewPlanSetup, UpdateSourceTrigger=PropertyChanged}"/></StackPanel>
+                                    <StackPanel Width="160" Margin="0,0,8,8"><TextBlock Text="{l:Text Key=FunctionalTags}"/><TextBox Text="{Binding NewPlanTags, UpdateSourceTrigger=PropertyChanged}"/></StackPanel>
+                                </WrapPanel>
+                                <TextBox Text="{Binding NewPlanNotes, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" MinHeight="42" TextWrapping="Wrap"/>
+                                <WrapPanel Margin="0,8"><Button Content="{l:Text Key=FunctionalComposePlan}" Command="{Binding ComposeChartPlanCommand}" Style="{StaticResource QuietButtonStyle}"/><Button Content="{l:Text Key=FunctionalSavePlan}" Command="{Binding CreateStructuredPlanCommand}" Style="{StaticResource PrimaryButtonStyle}"/></WrapPanel>
+                                <TextBlock Text="{Binding StructuredPlanStatusText, Converter={StaticResource UiTranslation}}" TextWrapping="Wrap" Style="{StaticResource MutedTextStyle}"/>
+                                <ItemsControl ItemsSource="{Binding StructuredPlans}" Margin="0,8,0,0"><ItemsControl.ItemTemplate><DataTemplate><Border BorderBrush="#263142" BorderThickness="0,0,0,1" Padding="0,8"><StackPanel><WrapPanel><TextBlock Text="{Binding Symbol}" FontWeight="SemiBold" Margin="0,0,10,0"/><TextBlock Text="{Binding Side, Converter={StaticResource UiTranslation}}"/><TextBlock Text="{Binding Status, Converter={StaticResource UiTranslation}}" Margin="10,0"/></WrapPanel><TextBlock Text="{Binding EntryRange, Converter={StaticResource UiTranslation}}"/><TextBlock Text="{Binding StopTarget, Converter={StaticResource UiTranslation}}"/><WrapPanel><Button Content="{Binding ToggleText, Converter={StaticResource UiTranslation}}" Command="{Binding ToggleActiveCommand}" Style="{StaticResource QuietButtonStyle}"/><Button Content="{l:Text Key=FunctionalRevisePlan}" Command="{Binding ReviseCommand}" Style="{StaticResource QuietButtonStyle}"/></WrapPanel></StackPanel></Border></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+                            </StackPanel>
+                        </Border>
                     </Grid>
                     </ScrollViewer>
                 </TabItem>
@@ -783,8 +813,11 @@
                                 <TextBlock Text="{l:Text Key=S2b9f7901b72f0549}" FontSize="20" FontWeight="SemiBold" />
                                 <TextBlock Text="{l:Text Key=Sd5f77eeda30ad524}" Style="{StaticResource MutedTextStyle}" Margin="0,5,0,0" />
                             </StackPanel>
-                            <Button x:Name="ReviewGuideButton" Grid.Column="1" Content="{l:Text Key=S0f74dc8b1450ae43}" Click="StartReviewGuide_Click"
-                                    VerticalAlignment="Center" Margin="12,0,0,0" ToolTip="{l:Text Key=Sc66bfd39165bf39a}" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Button Content="{l:Text Key=FunctionalOfflineTitle}" Command="{Binding OpenOfflineArchiveCommand}" Margin="12,0,0,0"/>
+                                <Button x:Name="ReviewGuideButton" Content="{l:Text Key=S0f74dc8b1450ae43}" Click="StartReviewGuide_Click"
+                                        Margin="12,0,0,0" ToolTip="{l:Text Key=Sc66bfd39165bf39a}" />
+                            </StackPanel>
                         </Grid>
                         <Border x:Name="GuideReviewRange" Grid.Row="1" Style="{StaticResource PageCardStyle}" Padding="10" Margin="0,0,0,8">
                             <WrapPanel VerticalAlignment="Center">
@@ -999,6 +1032,9 @@
                                     <StackPanel Grid.Column="1">
                                         <TextBlock Text="{l:Text Key=Sf9e30b75f34c8667}" Style="{StaticResource SectionTitleStyle}" Margin="0,0,0,8" />
                                         <CheckBox Content="{l:Text Key=Sb26d9b72d321fbad}" IsChecked="{Binding UpdateNotificationsEnabled}" />
+                                        <CheckBox Content="{l:Text Key=FunctionalAutoBackup}" IsChecked="{Binding AutomaticBackupEnabled}" Margin="0,8,0,0"/>
+                                        <TextBlock Text="{l:Text Key=FunctionalBackupHint}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap"/>
+                                        <TextBlock Text="{Binding AutomaticBackupStatus}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap"/>
                                         <TextBlock Text="{Binding AppVersionText, Converter={StaticResource UiTranslation}}" Style="{StaticResource MutedTextStyle}" />
                                         <TextBlock Text="{Binding UpdateStatus, Converter={StaticResource UiTranslation}}" Foreground="{StaticResource AccentBrush}" TextWrapping="Wrap" Margin="0,5,0,7" />
                                         <WrapPanel><Button Content="{l:Text Key=S1b021801bdd4caca}" Command="{Binding CheckUpdatesCommand}" Padding="9,5"/><Button Content="{l:Text Key=Sbc9234b659a5463e}" Command="{Binding OpenReleasePageCommand}" Padding="9,5"/></WrapPanel>
@@ -1013,7 +1049,7 @@
                                         <CheckBox Content="{l:Text Key=Sf2254661aefee231}" IsChecked="{Binding IsTopmost}" />
                                         <CheckBox Content="{l:Text Key=S551d10238c4eb7cf}" IsChecked="{Binding IsPositionLocked}" />
                                         <CheckBox Content="{l:Text Key=Sbd558debb4fadb58}" IsChecked="{Binding IsMouseThrough}" />
-                                        <CheckBox Content="{l:Text Key=S3594a85d4434a5bb}" IsChecked="{Binding IsFocusMode}" />
+                                        <CheckBox Content="{l:Text Key=PetQuietMode}" IsChecked="{Binding IsFocusMode}" ToolTip="{l:Text Key=PetQuietModeHint}" />
                                         <CheckBox Content="{l:Text Key=Sc8b2dc8747fd40ea}" IsChecked="{Binding ExpandCardOnHover}" />
                                         <CheckBox Content="{l:Text Key=S7f86eaa5db5a5f74}" IsChecked="{Binding MiniPositionVisible}" />
                                         <CheckBox Content="{l:Text Key=S602304d530b7044b}" IsChecked="{Binding StartWithWindows}" />
@@ -1021,6 +1057,15 @@
                                         <Slider Minimum="0.4" Maximum="1.5" Value="{Binding PetScale}" TickFrequency="0.1" IsSnapToTickEnabled="True" />
                                         <TextBlock Text="{l:Text Key=Sa34944c307ec3566}" Style="{StaticResource FieldLabelStyle}" Margin="0,14,0,5" />
                                         <Slider Minimum="0.25" Maximum="1" Value="{Binding PetOpacity}" TickFrequency="0.05" />
+                                        <TextBlock Text="{l:Text Key=CompanionSettingsTitle}" Style="{StaticResource SectionTitleStyle}" Margin="0,18,0,8"/>
+                                        <CheckBox Content="{l:Text Key=CompanionTapSetting}" IsChecked="{Binding PetTapResponseEnabled}"/>
+                                        <CheckBox Content="{l:Text Key=CompanionFeedbackSetting}" IsChecked="{Binding PetCompletionFeedbackEnabled}"/>
+                                        <CheckBox Content="{l:Text Key=CompanionIdleSetting}" IsChecked="{Binding PetIdleAnimationsEnabled}"/>
+                                        <CheckBox Content="{l:Text Key=CompanionSoundSetting}" IsChecked="{Binding PetSoundEnabled}"/>
+                                        <TextBlock Text="{l:Text Key=CompanionVolume}" Style="{StaticResource FieldLabelStyle}" Margin="0,8,0,4"/>
+                                        <Slider Minimum="0" Maximum="1" Value="{Binding PetSoundVolume}" IsEnabled="{Binding PetSoundEnabled}" TickFrequency="0.05" IsSnapToTickEnabled="True"/>
+                                        <TextBlock Text="{l:Text Key=CompanionSettingsHint}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,6,0,10"/>
+                                        <Button Content="{l:Text Key=Se80ec7afbc69b76f}" Command="{Binding SaveSettingsCommand}" Style="{StaticResource PrimaryButtonStyle}" HorizontalAlignment="Left"/>
                                     </StackPanel>
                                 </Border>
                                 <Border Grid.Column="1" Style="{StaticResource PageCardStyle}">
@@ -1035,14 +1080,14 @@
                                         <TextBox Width="150" HorizontalAlignment="Left"
                                                  Text="{Binding GivebackValue, UpdateSourceTrigger=LostFocus}" />
                                         <TextBlock Text="{l:Text Key=Sf090a0242ad9c32b}" Style="{StaticResource MutedTextStyle}" Margin="0,7,0,16" />
-                                        <CheckBox Content="{l:Text Key=S4e5643a88bb27f34}" IsChecked="{Binding DailyReportEnabled}" />
+                                        <CheckBox Content="{l:Text Key=PetDailyReportArchive}" IsChecked="{Binding DailyReportEnabled}" />
+                                        <CheckBox Content="{l:Text Key=PetDailyReportPopup}" IsChecked="{Binding DailyReportPopupEnabled}" IsEnabled="{Binding DailyReportEnabled}" />
                                         <TextBlock Text="{l:Text Key=S46bfbf8de97260cc}" Style="{StaticResource FieldLabelStyle}" Margin="0,14,0,7" />
                                         <TextBox Width="100" MaxLength="5" HorizontalAlignment="Left"
                                                  Text="{Binding DailyReportTimeText, UpdateSourceTrigger=LostFocus}" />
                                         <TextBlock Text="{l:Text Key=S6a7370d30fe5c048}" Style="{StaticResource MutedTextStyle}" Margin="0,7,0,16" />
                                         <Button Content="{l:Text Key=S13a6adea20ae1eef}" Command="{Binding SaveSettingsCommand}" Style="{StaticResource PrimaryButtonStyle}" Margin="0,0,0,9" />
                                         <Button Content="{l:Text Key=S50b98131a47c06db}" Command="{Binding InstallBridgeCommand}" Margin="0,0,0,9" />
-                                        <Button Content="{l:Text Key=S5a25c20761544571}" Command="{Binding ReplayScenarioCommand}" Style="{StaticResource QuietButtonStyle}" Margin="0" />
                                     </StackPanel>
                                 </Border>
                             </Grid>

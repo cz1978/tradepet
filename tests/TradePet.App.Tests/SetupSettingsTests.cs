@@ -21,8 +21,9 @@ public sealed class SetupSettingsTests
         Assert.Equal(0, type.GetProperty("SetupVersion")!.GetValue(settings));
         Assert.Equal(TradingPlatform.Mt5, type.GetProperty("Platform")!.GetValue(settings));
         Assert.Equal("zh-CN", type.GetProperty("UiLanguage")!.GetValue(settings));
-        foreach (var name in new[] { "QuickReviewPromptEnabled", "EntryReasonPromptEnabled", "UpdateNotificationsEnabled" })
-            Assert.Equal(true, type.GetProperty(name)!.GetValue(settings));
+        foreach (var name in new[] { "QuickReviewPromptEnabled", "EntryReasonPromptEnabled", "DailyReportPopupEnabled" })
+            Assert.Equal(false, type.GetProperty(name)!.GetValue(settings));
+        Assert.Equal(true, type.GetProperty("UpdateNotificationsEnabled")!.GetValue(settings));
         var json = JsonSerializer.SerializeToNode(settings, type, ProtocolJson.Options)!;
         json["platform"] = "mt4";
         json["setupVersion"] = 1;
@@ -34,16 +35,18 @@ public sealed class SetupSettingsTests
     }
 
     [Fact]
-    public void PromptPreferences_DefaultOnAndExplicitOffSurvivesReload()
+    public void PromptPreferences_DefaultQuietAndExplicitChoicesSurviveReload()
     {
         var vm = new MainViewModel();
-        Assert.True(vm.QuickReviewPromptEnabled);
-        Assert.True(vm.EntryReasonPromptEnabled);
+        Assert.False(vm.QuickReviewPromptEnabled);
+        Assert.False(vm.EntryReasonPromptEnabled);
+        Assert.False(vm.DailyReportPopupEnabled);
+        Assert.True(vm.DailyReportEnabled);
         var type = typeof(TradePetRuntime).GetNestedType("DesktopSettings", BindingFlags.NonPublic)!;
-        var settings = JsonSerializer.Deserialize("""{"quickReviewPromptEnabled":false,"entryReasonPromptEnabled":false,"updateNotificationsEnabled":false}""", type, ProtocolJson.Options)!;
+        var settings = JsonSerializer.Deserialize("""{"quickReviewPromptEnabled":true,"entryReasonPromptEnabled":true,"dailyReportPopupEnabled":true,"companionSettingsVersion":1}""", type, ProtocolJson.Options)!;
         var restored = JsonSerializer.Deserialize(JsonSerializer.Serialize(settings, type, ProtocolJson.Options), type, ProtocolJson.Options)!;
-        foreach (var name in new[] { "QuickReviewPromptEnabled", "EntryReasonPromptEnabled", "UpdateNotificationsEnabled" })
-            Assert.Equal(false, type.GetProperty(name)!.GetValue(restored));
+        foreach (var name in new[] { "QuickReviewPromptEnabled", "EntryReasonPromptEnabled", "DailyReportPopupEnabled" })
+            Assert.Equal(true, type.GetProperty(name)!.GetValue(restored));
     }
 
     [Fact]

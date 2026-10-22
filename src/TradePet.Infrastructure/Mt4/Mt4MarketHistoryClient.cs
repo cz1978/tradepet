@@ -6,18 +6,19 @@ using TradePet.Infrastructure.Mt5;
 
 namespace TradePet.Infrastructure.Mt4;
 
-public sealed class Mt4MarketHistoryClient(string terminalPath, string dataDirectory, int offsetSeconds) : IMarketHistorySource
+public sealed class Mt4MarketHistoryClient(string terminalPath, string dataDirectory, int offsetSeconds,
+    string? archiveDataDirectory = null) : IMarketHistorySource
 {
     public async Task<MarketHistoryResult> LoadAsync(MarketHistoryRequest request, CancellationToken cancellationToken = default)
     {
         if (request.TerminalId != Mt5TerminalDiscovery.CreateTerminalId(terminalPath) ||
             !request.ExpectedAccountKey.StartsWith("MT4:", StringComparison.Ordinal) ||
             !Guid.TryParseExact(request.RequestId, "N", out _) || request.ToUtc <= request.FromUtc ||
-            request.ToUtc - request.FromUtc > TimeSpan.FromDays(366) || request.Timeframe != "M5" ||
+            request.ToUtc - request.FromUtc > TimeSpan.FromDays(366) || request.Timeframe is not ("M1" or "M5" or "M15" or "H1") ||
             offsetSeconds is < -50400 or > 50400)
             throw new InvalidOperationException("MT4 行情请求身份、服务器时间或范围无效（单次最多一年）。");
         if (request.Precision == MarketDataPrecision.Ticks)
-            return await new Mt4TickArchive(dataDirectory).LoadAsync(request, offsetSeconds, cancellationToken);
+            return await new Mt4TickArchive(archiveDataDirectory ?? dataDirectory).LoadAsync(request, offsetSeconds, cancellationToken);
         var directory = Path.Combine(dataDirectory, "MQL4", "Files", "TradePet");
         Directory.CreateDirectory(directory);
         var path = Path.Combine(directory, $"market-request-{request.RequestId}.json");

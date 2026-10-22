@@ -326,6 +326,7 @@ public sealed class ReviewBackupService : IReviewBackupService
             $"TradePet-backup-{_timeProvider.GetUtcNow():yyyyMMdd-HHmmssfff}-{Guid.NewGuid():N}"[..55] + ".zip");
         var snapshot = Path.Combine(directory, $".{Guid.NewGuid():N}.db");
         var tempArchive = destination + ".tmp";
+        var collectorSnapshots = new List<string>();
         try
         {
             await using (var source = await _database.OpenConnectionAsync(cancellationToken))
@@ -347,7 +348,22 @@ public sealed class ReviewBackupService : IReviewBackupService
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     var relative = Path.GetRelativePath(_attachmentRoot, file).Replace('\\', '/');
-                    sourceFiles.Add((NormalizeArchivePath("attachments/" + relative), file));
+                    if (relative.StartsWith("_system/collectors/", StringComparison.Ordinal) &&
+                        (relative.EndsWith("-wal", StringComparison.Ordinal) || relative.EndsWith("-shm", StringComparison.Ordinal))) continue;
+                    var backupSource = file;
+                    if (relative.StartsWith("_system/collectors/", StringComparison.Ordinal) && relative.EndsWith(".db", StringComparison.Ordinal))
+                    {
+                        backupSource = Path.Combine(directory, $".{Guid.NewGuid():N}.db");
+                        collectorSnapshots.Add(backupSource);
+                        await using var collector = new SqliteConnection(new SqliteConnectionStringBuilder
+                            { DataSource = file, Mode = SqliteOpenMode.ReadOnly, Pooling = false }.ToString());
+                        await using var copy = new SqliteConnection(new SqliteConnectionStringBuilder
+                            { DataSource = backupSource, Pooling = false }.ToString());
+                        await collector.OpenAsync(cancellationToken);
+                        await copy.OpenAsync(cancellationToken);
+                        collector.BackupDatabase(copy);
+                    }
+                    sourceFiles.Add((NormalizeArchivePath("attachments/" + relative), backupSource));
                 }
             }
 
@@ -391,6 +407,7 @@ public sealed class ReviewBackupService : IReviewBackupService
         }
         finally
         {
+            foreach (var collectorSnapshot in collectorSnapshots) if (File.Exists(collectorSnapshot)) File.Delete(collectorSnapshot);
             if (File.Exists(snapshot))
             {
                 File.Delete(snapshot);
@@ -786,6 +803,9 @@ public sealed class ReviewBackupService : IReviewBackupService
             }
 
             var databasePath = ResolveInside(root, DatabaseEntry);
+            foreach (var collector in manifest.Files.Where(item => item.Path.StartsWith("attachments/_system/collectors/", StringComparison.Ordinal) &&
+                         item.Path.EndsWith(".db", StringComparison.Ordinal)))
+                await VerifyReadableDatabaseAsync(ResolveInside(root, collector.Path), cancellationToken);
             await VerifyDatabaseAsync(databasePath, manifest, cancellationToken);
             return new ValidatedBackup(root, databasePath, Path.Combine(root, "attachments"), manifest);
         }

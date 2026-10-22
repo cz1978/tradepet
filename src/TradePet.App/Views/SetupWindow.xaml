@@ -57,7 +57,7 @@
                     </ComboBox>
                     <CheckBox Content="{l:Text Key=S9ab7648e208b0224}" IsChecked="{Binding IsTopmost}"/>
                     <CheckBox Content="{l:Text Key=S7f86eaa5db5a5f74}" IsChecked="{Binding MiniPositionVisible}"/>
-                    <CheckBox Content="{l:Text Key=S3c75ec103e4868fb}" IsChecked="{Binding IsFocusMode}"/>
+                    <CheckBox Content="{l:Text Key=PetQuietMode}" IsChecked="{Binding IsFocusMode}" ToolTip="{l:Text Key=PetQuietModeHint}"/>
                     <CheckBox Content="{l:Text Key=Sd3ddc5206b2af7cc}" IsChecked="{Binding ExpandCardOnHover}"/>
                     <CheckBox Content="{l:Text Key=S36fa06144a4fc61d}" IsChecked="{Binding StartWithWindows}"/>
                     <TextBlock Text="{l:Text Key=Sda7d82318eca3713}" Style="{StaticResource FieldLabelStyle}" Margin="0,16,0,7"/>

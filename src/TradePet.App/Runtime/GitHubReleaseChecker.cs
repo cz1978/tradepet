@@ -14,9 +14,11 @@ public sealed class GitHubReleaseChecker : IDisposable
     private readonly bool _ownsClient;
     private readonly string _currentVersion;
 
-    public static string CurrentVersion => typeof(GitHubReleaseChecker).Assembly
-        .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0]
+    public static string BuildVersion => typeof(GitHubReleaseChecker).Assembly
+        .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
         ?? typeof(GitHubReleaseChecker).Assembly.GetName().Version!.ToString(3);
+
+    public static string CurrentVersion => BuildVersion.Split('+')[0];
 
     public GitHubReleaseChecker(HttpClient? client = null, string? currentVersion = null)
     {

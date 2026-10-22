@@ -4,13 +4,21 @@ English | [简体中文](README.md#简体中文)
 
 > Trade alongside you, never on your behalf.
 
-**Current version: 1.0.0 (stable)** · [Download Windows portable release](https://github.com/cz1978/tradepet/releases/tag/v1.0.0) · [Installation and upgrades](INSTALL.en.md) · [Changelog](CHANGELOG.en.md) · [MIT License](LICENSE)
+**Current version: 1.1.0 (stable)** · [Download Windows portable release](https://github.com/cz1978/tradepet/releases/tag/v1.1.0) · [Installation and upgrades](INSTALL.en.md) · [Changelog](CHANGELOG.en.md) · [MIT License](LICENSE)
 
-`1.0.0` improves runtime calculations, review pagination and position refreshes, with background report generation and fewer redundant database writes. It fixes history retries, maintenance deadlocks and cross-day partial-close P/L calculations. Daily reports now support date navigation and retain unsaved summaries when switching days. The complete Windows package includes bundled runtimes, read-only MT4/MT5 bridges and bilingual documentation.
+`1.1.0` adds entry screenshots, optional pet interactions and sounds, interactive multi-timeframe replay, and sampled holding P/L analysis. It also includes offline account archives, portfolio risk checks, plan execution evidence, validated automatic backups and an updated SQLite engine. Windows packages bundle .NET, Python, both read-only bridges and bilingual documentation.
 
 TradePet is a local Windows trading desktop pet. It connects to MT5 or MT4 in read-only mode and brings positions, risk, quick notes, reviews, macroeconomic events and daily reports into a desktop assistant.
 
 It does not place, close or modify orders. It focuses on easily overlooked questions: did you follow your plan, repeatedly lose in the same zone, give back profits, and what did you do well today?
+
+## 1.1.0 updates
+
+- Paste or import entry screenshots and review them with the trade. Reason prompts remain optional and default off.
+- Independently disable tap responses, save/review feedback, ambient animations or sounds. Sounds default off; quiet mode suppresses playful interactions.
+- Replay supports zoom, pan, crosshair/OHLC, M1/M5/M15/H1 linked charts and entry/exit/event navigation. MT4 requires the updated bridge; missing market data is never synthesized.
+- View sampled net/realized P/L, observed peaks/troughs and giveback, with reliable excursion summaries by strategy and server entry hour. Sampling gaps stay explicit; final results remain hidden until close unless revealed.
+- Local source updates display their build time in the console title and Settings, record the running assembly, and repair shortcut targets, working directories, icons and launch arguments on every update.
 
 ## Core features
 
@@ -29,7 +37,7 @@ Select **UI language** in Settings or the initial setup wizard, save, exit and r
 
 - Starts in the lower-right corner; adjust scale, opacity, position lock and mouse passthrough.
 - A floating position card shows live P/L. Collapse or hide it and restore it through the pet menu.
-- New entries and closes show entry-reason and quick-review cards without stealing focus. History sync does not trigger cards. Both prompts default on, can be disabled independently, and remain manually accessible. Skip all clears the current account’s queue for that card type; new trades can still prompt, and skipped records do not become completed reviews.
+- Entry-reason and quick-review cards are available on demand without stealing focus. History sync does not trigger cards. Both automatic prompts default off and remain available under Quick note; enable either one in Settings if desired. Skip all clears the current account’s queue for that card type; new trades can still prompt, and skipped records do not become completed reviews.
 - Select or write an entry reason. Quick reviews use actual executions and reliable position samples and allow quick records and corrections. Longer handwritten reviews remain optional.
 - Check GitHub updates automatically or manually. A new version is announced once, links to Releases and is never installed automatically.
 
@@ -66,7 +74,7 @@ Complete losing trades become traceable price zones with entry counts, cumulativ
 Default archive:
 
 ```text
-%LOCALAPPDATA%\TradePet\reports\<account>\<yyyy-MM-dd>-trading-report.md
+%LOCALAPPDATA%\TradePet\attachments\_system\reports\<account>\<yyyy-MM-dd>-trading-report.md
 ```
 
 ### MT5 macroeconomic calendar
@@ -80,11 +88,11 @@ Default archive:
 
 The [illustrated guide](docs/images/tradepet-rc6-install-guide.png) shows extraction, bridge installation and chart attachment. Its screenshots use Chinese; [English instructions](INSTALL.en.md) describe the same actions. Python is bundled; the bridge still needs installation and manual chart attachment.
 
-Download **`TradePet-1.0.0-win-x64.zip`**, extract the entire ZIP and run `TradePet.exe`. GitHub **Source code** archives are not application installers. Do not move the EXE alone.
+Download **`TradePet-1.1.0-win-x64.zip`**, extract the entire ZIP and run `TradePet.exe`. GitHub **Source code** archives are not application installers. Do not move the EXE alone.
 
 The package includes .NET 8, 64-bit Python 3.13, MetaTrader5/NumPy, read-only MT4/MT5 plugins and documentation. No separate Python or dependency download is needed. `rc.5` and earlier did not bundle Python; upgrading is recommended. MT4 needs no Python. See [installation, upgrades, checksums and troubleshooting](INSTALL.en.md).
 
-### Platform support (1.0.0)
+### Platform support (1.1.0)
 
 | Feature | MT5 | MT4 |
 | --- | --- | --- |
@@ -92,7 +100,7 @@ The package includes .NET 8, 64-bit Python 3.13, MetaTrader5/NumPy, read-only MT
 | History, reviews, loss zones | Hedging accounts | Persistent archive; partial closes grouped only with broker ticket-link evidence |
 | Chart plans and daily reports | Some features require bridge | Updated bridge required |
 | Economic calendar | MT5 built-in | Forex Factory weekly calendar, advance reminders; no live actuals |
-| Historical replay | Candles/ticks, depending on terminal coverage | M5 and local actual ticks; uncollected ticks not backfilled |
+| Historical replay | Candles/ticks, depending on terminal coverage | M1/M5/M15/H1 candles and local actual ticks; uncollected ticks not backfilled |
 | Python | Bundled 64-bit Python 3.13 and dependencies | Not required |
 
 Connect one terminal at a time. Missing MT4 history shows “—”, never zero. See Account modes and accounting below for MT5 netting/exchange limitations.
@@ -126,7 +134,7 @@ First launch, including the first upgrade from older releases, opens four steps:
 
 MT4 needs no Python, API key, DLL or trading permission. Reattach the updated plugin after upgrades and select All history. Disconnect, removal or no live update for over 10 seconds marks data stale. Imported orders persist across reduced history scope and restarts. Partial closes use validated broker `from #ticket` / `to #ticket` comments and order attributes, retain original tickets and each close's fees, and become complete only after full closure. Without reliable links, orders remain independent; equal price/time is not guessed evidence. Unread history still depends on terminal scope. During a closed market on first connection, set verified `InpServerUtcOffsetMinutes` or wait for quote calibration.
 
-Dates/replay use broker time. Raw MT4 times persist in terminal `MQL4/Files/TradePet/order-archive.db` and `tick-archive.db` and are reconverted after offset changes. Preserve both when moving terminals; review-backup ZIPs exclude these collector archives. Current-offset UTC conversion does not establish historical DST offsets, so cross-DST holding duration/external UTC alignment remain limited. Forex/CFD risk uses contract size, P/L currency and conversion quotes; base-currency accounts convert at stop price. Futures/older bridges use broker tick value. Missing parameters stay unknown; R requires reliable entry samples.
+Dates/replay use broker time. Legacy terminal `MQL4/Files/TradePet/order-archive.db` and `tick-archive.db` are imported read-only into `%LOCALAPPDATA%\TradePet\attachments\_system\collectors`. Raw timestamps remain isolated by account and are reconverted after offset changes. New migration backups include managed archives and restore them without moving terminal databases manually. Older backups may omit these files; legacy terminal files are retained. Current-offset UTC conversion does not establish historical DST offsets, so cross-DST holding duration/external UTC alignment remain limited. Forex/CFD risk uses contract size, P/L currency and conversion quotes; base-currency accounts convert at stop price. Futures/older bridges use broker tick value. Missing parameters stay unknown; R requires reliable entry samples.
 
 MT4 tick replay requires assistant and updated plugin running. `OnTick` collects the attached symbol; other open-chart/position symbols are sampled every second. Times have second precision; offline, pre-collection and overflow gaps are not invented and coverage remains partial. This differs from MT5 native historical tick downloads and the MT4 public calendar differs from MT5's built-in calendar.
 

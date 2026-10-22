@@ -62,8 +62,16 @@ public sealed class PetBehaviorEngine
                 ActiveAlertPriority = null,
                 ActivityStartedAtUtc = nowUtc,
             },
-            PetSignal.ProfitClosed => Interrupt(PetMood.Happy, PetActivity.Jumping, TradeContextState.Flat, AlertPriority.Normal),
-            PetSignal.LossClosed => Interrupt(PetMood.Concerned, PetActivity.Failed, TradeContextState.Flat, AlertPriority.Normal),
+            PetSignal.ProfitClosed or PetSignal.LossClosed =>
+                current.ActiveAlertPriority is not null
+                    ? current with { TradeContext = TradeContextState.Flat }
+                    : current with
+                    {
+                        Mood = PetMood.Calm,
+                        Activity = PetActivity.Waiting,
+                        TradeContext = TradeContextState.Flat,
+                        ActivityStartedAtUtc = nowUtc,
+                    },
             PetSignal.Risk => Interrupt(PetMood.Concerned, PetActivity.Failed, current.TradeContext, AlertPriority.Critical),
             _ => throw new ArgumentOutOfRangeException(nameof(signal)),
         };

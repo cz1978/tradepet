@@ -1,0 +1,25 @@
+<Window x:Class="TradePet.App.Views.OfflineArchiveWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="clr-namespace:TradePet.App.Localization"
+        xmlns:views="clr-namespace:TradePet.App.Views"
+        Title="{l:Text Key=FunctionalOfflineTitle}" Width="1100" Height="780" MinWidth="880" MinHeight="600"
+        Background="#101721" Foreground="#F2F5F4" FontFamily="Microsoft YaHei UI" WindowStartupLocation="CenterScreen">
+    <Window.Resources>
+        <Style TargetType="TextBox"><Setter Property="Background" Value="#172331"/><Setter Property="Foreground" Value="#F2F5F4"/><Setter Property="BorderBrush" Value="#3A4B60"/><Setter Property="Padding" Value="6"/></Style>
+        <Style TargetType="ComboBox"><Setter Property="Foreground" Value="#101721"/><Setter Property="Background" Value="#F2F5F4"/><Setter Property="Padding" Value="6"/></Style>
+        <Style TargetType="Button"><Setter Property="Background" Value="#1B6655"/><Setter Property="Foreground" Value="White"/><Setter Property="BorderBrush" Value="#3A4B60"/></Style>
+    </Window.Resources>
+    <Grid Margin="16">
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition/></Grid.RowDefinitions>
+        <WrapPanel>
+            <ComboBox x:Name="Accounts" Width="290" DisplayMemberPath="Label" SelectionChanged="Account_Changed" Margin="0,0,8,8"/>
+            <TextBox Text="{Binding ReviewFromDateText, UpdateSourceTrigger=PropertyChanged}" Width="110" Margin="0,0,8,8"/>
+            <TextBlock Text="—" Margin="0,0,8,8" VerticalAlignment="Center"/>
+            <TextBox Text="{Binding ReviewToDateText, UpdateSourceTrigger=PropertyChanged}" Width="110" Margin="0,0,8,8"/>
+            <Button Content="{l:Text Key=FunctionalQuery}" Command="{Binding RefreshReviewCommand}" Padding="12,4" Margin="0,0,8,8"/>
+        </WrapPanel>
+        <TextBlock x:Name="ArchiveStatus" Grid.Row="1" Text="{l:Text Key=FunctionalOfflineHint}" Foreground="#9DAABC" TextWrapping="Wrap" Margin="0,2,0,10"/>
+        <views:ReviewWorkspaceView Grid.Row="2" DataContext="{Binding ReviewWorkspace}"/>
+    </Grid>
+</Window>

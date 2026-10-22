@@ -542,6 +542,9 @@ class TradePetMt5Worker:
             "login": int(getattr(account, "login", 0)),
             "currency": str(getattr(account, "currency", "")),
             "marginMode": int(getattr(account, "margin_mode", 0)),
+            "usedMargin": float(account.margin) if hasattr(account, "margin") else None,
+            "freeMargin": float(account.margin_free) if hasattr(account, "margin_free") else None,
+            "marginLevel": float(account.margin_level) if hasattr(account, "margin_level") else None,
         }
 
     def _position_payload(self, position: Any) -> dict[str, Any]:

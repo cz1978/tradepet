@@ -31,6 +31,13 @@
         <Expander Header="{l:Text Key=S006cb4d19e8681c9}" Foreground="{StaticResource MutedBrush}" Margin="0,7,0,0" IsExpanded="False">
             <TextBox x:Name="ReasonBox" MaxLength="500" MinHeight="48" AcceptsReturn="True" TextWrapping="Wrap" TextChanged="Reason_TextChanged" Margin="0,7,0,0"/>
         </Expander>
+        <TextBlock Text="{l:Text Key=EntryScreenshots}" FontSize="12" Margin="0,10,0,5"/>
+        <WrapPanel>
+            <Button Content="{l:Text Key=EntryPasteScreenshot}" Click="PasteScreenshot_Click" Padding="9,5"/>
+            <Button Content="{l:Text Key=EntryImportScreenshot}" Click="ImportScreenshot_Click" Padding="9,5"/>
+        </WrapPanel>
+        <TextBlock x:Name="ScreenshotsText" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" FontSize="11" Margin="0,4,0,0"/>
+        <TextBlock Text="{l:Text Key=EntryScreenshotHint}" Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" FontSize="11" Margin="0,4,0,0"/>
         </StackPanel>
         </ScrollViewer>
         <StackPanel Grid.Row="1">

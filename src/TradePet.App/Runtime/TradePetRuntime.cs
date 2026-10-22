@@ -175,6 +175,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
 
     public TradePetRuntime(MainViewModel viewModel, TradePetRuntimeDependencies dependencies)
     {
+        _automaticBackupDirectory = dependencies.AutomaticBackupDirectory;
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         ArgumentNullException.ThrowIfNull(dependencies);
         _database = dependencies.Database;
@@ -204,10 +205,16 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         _viewModel.AcknowledgeAlert = AcknowledgeAlert;
         _viewModel.SnoozeAlert = SnoozeAlert;
         _viewModel.MuteCurrentTradeAlert = MuteCurrentTradeAlert;
+        _viewModel.InteractWithPetAsync = () => RequestCompanionReactionAsync(CompanionTrigger.Tap);
+        _viewModel.CompanionInteractionAsync = RequestCompanionReactionAsync;
+        _viewModel.SaveCompanionPreferencesAsync = () => WithStateGateAsync(SaveCompanionPreferencesCoreAsync);
     }
 
     private void ConfigureReviewWorkspace()
     {
+        _viewModel.ComposeChartPlanAsync = () => WithStateGateAsync(ComposeChartPlanCoreAsync);
+        _viewModel.OpenOfflineArchiveAsync = OpenOfflineArchiveAsync;
+        _viewModel.CheckDataHealthAsync = () => WithStateGateAsync(UpdateDataHealthAsync);
         var review = _viewModel.ReviewWorkspace;
         review.RefreshAsync = RefreshReviewAsync;
         review.RefreshSavedReviewsAsync = RefreshSavedTradeReviewsAsync;
@@ -253,12 +260,17 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
 
     public async Task StartAsync()
     {
+        AppLog.Write($"Starting TradePet build {GitHubReleaseChecker.BuildVersion}; executable {Environment.ProcessPath}; assembly {typeof(TradePetRuntime).Assembly.Location}.");
         try
         {
             var interruptedRestoreRecovered = await _reviewBackupService.RecoverPendingAsync(_cancellation.Token);
             var initialization = await _database.InitializeWithRecoveryAsync(
                 TradePetPaths.GetDatabaseBackupDirectory(),
                 _cancellation.Token);
+            await using (var connection = await _database.OpenConnectionAsync(_cancellation.Token))
+            {
+                AppLog.Write($"Local database integrity check passed; SQLite {connection.ServerVersion}; schema {initialization.SchemaVersion}.");
+            }
             await OnUiAsync(() => _viewModel.ReviewWorkspace.StorageStatus =
                 interruptedRestoreRecovered
                     ? $"上次中断的恢复已校验并收束 · 本地 SQLite 可写 · migration {initialization.SchemaVersion}"
@@ -349,6 +361,8 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
             }
             _ = OnUiAsync(() => _viewModel.BridgeText = connected ? "桥接插件正在校验" : "桥接插件已断开");
         };
+        if (_persistenceAvailable) await InitializeManagedArchivesAsync();
+        StartBackgroundTask("自动备份", RunAutomaticBackupAsync);
         StartBackgroundTask("桌宠状态循环", RunPetLifeAsync);
         StartBackgroundTask("交易日报定时器", RunDailyReportScheduleAsync);
         StartBackgroundTask("宏观事件提醒", RunMacroCalendarMonitorAsync);
@@ -388,12 +402,14 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
 
         if (_activePlatform == TradingPlatform.Mt4)
         {
+            if (_archiveMigrationError is not null) return;
             if (string.IsNullOrWhiteSpace(_terminal.DataDirectory))
             {
                 UpdateDiagnostic("请先打开并登录 MT4，再从设置向导安装插件。完成后重启 TradePet。");
                 return;
             }
-            _worker = new TradePet.Infrastructure.Mt4.Mt4FileClient(_terminal.TerminalPath, _terminal.DataDirectory);
+            _worker = new TradePet.Infrastructure.Mt4.Mt4FileClient(_terminal.TerminalPath, _terminal.DataDirectory,
+                TradePetPaths.GetCollectorDataDirectory(), token => _maintenance.EnterOperationAsync(MaintenanceOperationKind.Write, token));
             StartBackgroundTask("MT4 只读采集", _worker.RunAsync);
             StartBackgroundTask("MT4 事件消费", ConsumeWorkerEventsAsync);
             await OnUiAsync(() =>
@@ -813,7 +829,25 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
             _viewModel.QuickReviewPromptEnabled,
             _viewModel.EntryReasonPromptEnabled,
             _viewModel.UpdateNotificationsEnabled,
-            _viewModel.UiLanguage);
+            _viewModel.UiLanguage,
+            _viewModel.AutomaticBackupEnabled,
+            _viewModel.DailyReportPopupEnabled,
+            1,
+            _viewModel.PetTapResponseEnabled,
+            _viewModel.PetCompletionFeedbackEnabled,
+            _viewModel.PetIdleAnimationsEnabled,
+            _viewModel.PetSoundEnabled,
+            _viewModel.PetSoundVolume);
+
+    private async Task SaveCompanionPreferencesCoreAsync()
+    {
+        var settings = await _database.LoadSettingAsync<DesktopSettings>(GlobalScope, DesktopSettingKey, _cancellation.Token)
+            ?? CaptureDesktopSettings(_setupVersion);
+        await TryPersistLiveAsync(() => _database.SaveSettingAsync(GlobalScope, DesktopSettingKey,
+            settings with { FocusMode = _viewModel.IsFocusMode }, _cancellation.Token), "保存陪伴偏好");
+        if (_viewModel.IsFocusMode && _petState.Current.ActiveAlertPriority is null)
+            DismissActiveAlert();
+    }
 
 
     public async Task InstallBridgeAsync()
@@ -895,6 +929,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         }
 
         _disposed = true;
+        if (_offlineArchiveWindow is not null) await OnUiAsync(_offlineArchiveWindow.Close);
         _cancellation.Cancel();
         _accountSessions.Dispose();
         _reviewQueryCancellation?.Cancel();
@@ -933,6 +968,11 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         TimeSpan? timeout = null,
         CancellationToken cancellationToken = default)
     {
+        if (_offlineArchiveWindow is not null)
+        {
+            var offline = await _offlineArchiveWindow.PrepareForCloseAsync();
+            if (!offline.CanExit) return offline;
+        }
         var review = _viewModel.ReviewWorkspace;
         await OnUiAsync(review.BeginShutdownEdits);
         if (!review.HasUnsavedWorkspaceChanges)
@@ -978,7 +1018,11 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
             draftPath);
     }
 
-    public Task ResumeAfterCancelledShutdownAsync() => OnUiAsync(_viewModel.ReviewWorkspace.ResumeEdits);
+    public async Task ResumeAfterCancelledShutdownAsync()
+    {
+        await OnUiAsync(_viewModel.ReviewWorkspace.ResumeEdits);
+        if (_offlineArchiveWindow is not null) await _offlineArchiveWindow.ResumeEditsAsync();
+    }
 
     private async Task<string?> ExportPendingReviewDraftsAsync(CancellationToken cancellationToken)
     {
@@ -1251,6 +1295,9 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
             _workerSessionPhase != WorkerSessionPhase.Live;
         if (accountChanged)
         {
+            _deferredAlerts.Clear();
+            _activeAlertContext = null;
+            DismissActiveAlert();
             InvalidateAnalytics();
             _mt4HistoryReady = false;
             _chartObjects.Clear();
@@ -1360,6 +1407,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
             _lastSnapshotPersistedAtUtc = batch.Account.CapturedAtUtc;
         }
         await UpdatePositionUiAsync(batch.Positions);
+        await UpdateDataHealthAsync();
         if (_hasInitialSnapshot && _serverDateAuthoritative)
         {
             foreach (var change in changes)
@@ -1726,6 +1774,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
                 await TryPersistLiveAsync(
                     () => _behaviorReviewService.RecordGoalObservationAsync(observation, _cancellation.Token),
                     "保存改进目标观察");
+                await NotifyGoalObservationAsync(goal, observation, evaluation, trade, observedAtUtc);
             }
         }
     }
@@ -1737,7 +1786,8 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         string symbol)
     {
         if (goal.Status != ImprovementGoalStatus.Active || goal.Rule != rule ||
-            goal.StartServerDate > serverDate || goal.EndServerDate is { } end && end < serverDate)
+            goal.StartServerDate > serverDate || goal.EndServerDate is { } end && end < serverDate ||
+            goal.EndServerDate is null && serverDate.DayNumber - goal.StartServerDate.DayNumber >= goal.ObservationWindowDays)
         {
             return false;
         }
@@ -1783,20 +1833,16 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         var signal = trade.NetPnl >= 0m ? PetSignal.ProfitClosed : PetSignal.LossClosed;
         _petState = _petBehavior.ApplySignal(_petState, signal, trade.ClosedAtUtc ?? _timeProvider.GetUtcNow());
         var shouldNotifyLossZone = LossZoneEngine.ShouldNotifyLossClose(trade, result.Zone);
-        if (trade.NetPnl < -0.01m && !shouldNotifyLossZone)
+        if (_viewModel.IsFocusMode || !shouldNotifyLossZone)
         {
             return;
         }
 
         await ShowSpeechAsync(
-            trade.NetPnl >= 0m
-                ? $"+{trade.NetPnl:0.##}"
-                : "又在这个区间交学费了。",
-            trade.NetPnl >= 0m
-                ? trade.Symbol
-                : $"{trade.Symbol} · {trade.NetPnl:0.##}",
-            TimeSpan.FromSeconds(trade.NetPnl < -0.01m ? 10 : 6),
-            trade.NetPnl < -0.01m ? result.Zone : null,
+            "交易已记录，先缓一缓。",
+            $"{trade.Symbol} · {trade.NetPnl:0.##}",
+            TimeSpan.FromSeconds(6),
+            result.Zone,
             trade.EntryPrice);
     }
 
@@ -1949,6 +1995,8 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
             ReportedExitExecution: dialog.ReportedExitExecution, ExitEmotion: dialog.ExitEmotion);
         var result = await _journalService.SaveTradeReviewAsync(command, dialog.DocumentRevision, _cancellation.Token);
         if (!result.IsSaved) return result.Message;
+        if (_accountSessions.IsCurrent(trade.AccountKey, generation))
+            await RequestCompanionReactionAsync(CompanionTrigger.ReviewCompleted);
         try
         {
             await RefreshSavedTradeReviewsAsync();
@@ -1957,7 +2005,6 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
                 !_viewModel.ReviewWorkspace.HasUnsavedReviewChanges)
                 await OpenTradeReviewAsync(trade.PositionId);
             await OnUiAsync(() => _viewModel.ReviewWorkspace.StatusText = "快速复盘已归档，可在交易档案查看。");
-            _ = ShowSpeechAsync("快速复盘已归档", "复盘分析 → 交易档案 → 已保存复盘，可直接查看，无需重复填写。", TimeSpan.FromSeconds(5));
         }
         catch (Exception exception)
         {
@@ -2149,7 +2196,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
                      .OrderBy(position => position.OpenedAtUtc))
         {
             if (capturedAtUtc - position.OpenedAtUtc < TimeSpan.FromSeconds(_settings.StopLossReminderSeconds) ||
-                !_missingStopLossAlerted.Add(position.PositionId))
+                _missingStopLossAlerted.Contains(position.PositionId))
             {
                 continue;
             }
@@ -2167,6 +2214,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
                 capturedAtUtc);
             if (alert is not null && await ShowAlertAsync(alert, PetSignal.Risk))
             {
+                _missingStopLossAlerted.Add(position.PositionId);
                 await AddTimelineAsync(TimelineKind.Alert, fact.Detail);
             }
         }
@@ -2883,7 +2931,6 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
             !TryParseInt(values, BehaviorRuleKind.CooldownViolation, out var cooldown) ||
             !TryParseDecimal(values, BehaviorRuleKind.RevengeScore, out var revenge) ||
             !TryParseDecimal(values, BehaviorRuleKind.OvertradeBurst, out var burst) ||
-            !TryParseDecimal(values, BehaviorRuleKind.PlanDeviationRate, out var deviation) ||
             !TryParseDecimal(values, BehaviorRuleKind.ProfitGiveback, out var giveback) ||
             !TryParseDecimal(values, BehaviorRuleKind.SizeEscalationAfterLoss, out var size) ||
             !TryParseDecimal(values, BehaviorRuleKind.PriceFixationScore, out var fixation))
@@ -2900,7 +2947,6 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
             RapidReentrySeconds = Math.Max(1, cooldown),
             RevengeScoreThreshold = Math.Clamp(revenge, 0m, 100m),
             OvertradeBaselineMultiplier = Math.Max(1m, burst),
-            PlanDeviationRateThreshold = Math.Clamp(deviation, 0m, 100m),
             ProfitGivebackThreshold = Math.Clamp(giveback, 0m, 100m),
             LotEscalationMultiplier = Math.Max(1m, size),
             PriceFixationScoreThreshold = Math.Clamp(fixation, 0m, 100m),
@@ -2909,7 +2955,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
                 enabled.GetValueOrDefault(BehaviorRuleKind.LossZonePersistence, true),
                 enabled.GetValueOrDefault(BehaviorRuleKind.RevengeScore, true),
                 enabled.GetValueOrDefault(BehaviorRuleKind.OvertradeBurst, true),
-                enabled.GetValueOrDefault(BehaviorRuleKind.PlanDeviationRate, true),
+                false,
                 enabled.GetValueOrDefault(BehaviorRuleKind.ProfitGiveback, true),
                 enabled.GetValueOrDefault(BehaviorRuleKind.SizeEscalationAfterLoss, true),
                 enabled.GetValueOrDefault(BehaviorRuleKind.CooldownViolation, true),
@@ -3390,7 +3436,8 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
                     session.Generation,
                     fallbackPlaybook,
                     workspace?.Currency ?? _account?.Currency ?? string.Empty,
-                    tagSuggestions);
+                    tagSuggestions,
+                    _symbolSpecifications.GetValueOrDefault(detail.Trade.Symbol)?.PriceStep ?? 0.00000001m);
             });
         }
         catch (OperationCanceledException) when (requestCancellation.IsCancellationRequested)
@@ -3628,6 +3675,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         });
         if (result.IsSaved && applied)
         {
+            await RequestCompanionReactionAsync(CompanionTrigger.ReviewCompleted);
             if (_lastTradeDetail is not null &&
                 new TradeKey(_lastTradeDetail.Trade.AccountKey, _lastTradeDetail.Trade.PositionId) == key)
             {
@@ -4006,6 +4054,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         });
         if (acknowledged && _accountSessions.IsCurrent(identity.AccountKey, identity.SessionGeneration))
         {
+            await RequestCompanionReactionAsync(CompanionTrigger.ReviewCompleted);
             await RefreshReviewAsync();
         }
     }
@@ -4700,70 +4749,6 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         await RefreshReviewAsync();
     }
 
-    private async Task LoadTradeReplayAsync()
-    {
-        await using var operationLease = await EnterRuntimeOperationAsync(
-            MaintenanceOperationKind.Read, _cancellation.Token);
-        var review = _viewModel.ReviewWorkspace;
-        var detail = _lastTradeDetail;
-        var accountKey = _account?.Scope.AccountKey;
-        if (detail is null || accountKey is null || _terminal is null || detail.Trade.AccountKey != accountKey)
-        {
-            review.ReplayStatus = "请先选择当前账户的一笔交易。";
-            return;
-        }
-        var paths = RuntimePaths.Resolve();
-        if (_activePlatform != TradingPlatform.Mt4 && !File.Exists(paths.HistoryWorkerScript))
-        {
-            review.ReplayStatus = "历史行情脚本缺失，请重新构建或安装应用。";
-            return;
-        }
-        review.ReplayStatus = "正在从所选交易终端读取历史行情…";
-        var from = detail.Trade.OpenedAtUtc.AddHours(-1);
-        var to = (detail.Trade.ClosedAtUtc ?? detail.Trade.OpenedAtUtc.AddHours(4)).AddHours(1);
-        var precision = review.ReplayPrecision == "Tick" ? MarketDataPrecision.Ticks : MarketDataPrecision.Bars;
-        var request = new MarketHistoryRequest(
-            Guid.NewGuid().ToString("N"), _terminal.TerminalId, accountKey, detail.Trade.Symbol, "M5",
-            from, to, precision);
-        IMarketHistorySource client = _activePlatform == TradingPlatform.Mt4
-            ? new TradePet.Infrastructure.Mt4.Mt4MarketHistoryClient(_terminal.TerminalPath, _terminal.DataDirectory!, _serverUtcOffsetSeconds)
-            : new Mt5HistoryClient(new Mt5HistoryOptions(
-                paths.PythonExecutable, paths.HistoryWorkerScript, _terminal.TerminalPath, _terminal.TerminalId));
-        var service = new TradeReplayService(_database, client);
-        var history = await service.LoadAsync(request, _cancellation.Token);
-        _lastReplayHistory = history;
-        var cursor = history.Range.ActualFromUtc ?? from;
-        var notes = detail.Document is null
-            ? Array.Empty<ReviewEvidenceStamp>()
-            : [new ReviewEvidenceStamp(ReviewEvidenceSource.UserBackfill, detail.Trade.OpenedAtUtc,
-                detail.Document.UpdatedAtUtc, ReviewTimeBasis.Local, detail.Document.SourceVersion)];
-        var frame = service.CreateFrame(cursor, history, detail, notes, review.ShowFullReplayReview);
-        await OnUiAsync(() => review.ApplyReplay(history, frame, 0d));
-    }
-
-    private async Task SeekTradeReplayAsync(double progress)
-    {
-        var review = _viewModel.ReviewWorkspace;
-        var history = _lastReplayHistory;
-        var detail = _lastTradeDetail;
-        if (history is null || detail is null || detail.Trade.AccountKey != _account?.Scope.AccountKey)
-        {
-            return;
-        }
-        var start = history.Range.ActualFromUtc ?? history.Range.RequestedFromUtc;
-        var end = history.Range.RequestedToUtc;
-        var cursor = start + TimeSpan.FromTicks((long)((end - start).Ticks * Math.Clamp(progress, 0d, 100d) / 100d));
-        var notes = detail.Document is null
-            ? Array.Empty<ReviewEvidenceStamp>()
-            : [new ReviewEvidenceStamp(ReviewEvidenceSource.UserBackfill, detail.Trade.OpenedAtUtc,
-                detail.Document.UpdatedAtUtc, ReviewTimeBasis.Local, detail.Document.SourceVersion)];
-        var frame = _reviewWorkspaceCalculator.BuildReplayFrame(
-            cursor, history.Range, history.Bars, history.Ticks, detail.Deals, detail.PnlSamples,
-            detail.Behaviors, notes, detail.Trade, detail.Plan, detail.Document,
-            review.ShowFullReplayReview);
-        await OnUiAsync(() => review.ApplyReplay(history, frame, progress));
-    }
-
     private async Task ClearReviewMarketDataCacheAsync()
     {
         var review = _viewModel.ReviewWorkspace;
@@ -4988,10 +4973,13 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
     private async Task BackupReviewAsync()
     {
         var review = _viewModel.ReviewWorkspace;
+        if (_archiveMigrationError is not null)
+        {
+            review.ExportStatus = TradePet.Core.Localization.UiText.Get("FunctionalMigrationFailed");
+            return;
+        }
         review.ExportStatus = "正在创建 SQLite 一致快照与附件备份…";
-        await using var operationLease = await _maintenance.EnterOperationAsync(
-            MaintenanceOperationKind.File,
-            _cancellation.Token);
+        await using var operationLease = await _maintenance.EnterMaintenanceAsync(_cancellation.Token);
         await _reviewSaveGate.WaitAsync(_cancellation.Token);
         try
         {
@@ -5702,6 +5690,12 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         bool deduplicateInMemory = true)
     {
         var deliveryAccountKey = _account?.Scope.AccountKey ?? "session";
+        if (_petState.Current.ActiveAlertPriority is not null && _activeAlertId != alert.Id &&
+            _activeAlertPriority >= alert.Priority)
+        {
+            _deferredAlerts[alert.Id] = CaptureAlert(alert, signal, lossZone, currentPrice, persistDelivery, deduplicateInMemory);
+            return false;
+        }
         var tradeIdentity = AlertTradeIdentity.TryExtract(alert.Id);
         var isolationKey = tradeIdentity is null ? null : $"{deliveryAccountKey}|{tradeIdentity}";
         if (isolationKey is not null && _mutedTradeAlerts.Contains(isolationKey)) return false;
@@ -5714,6 +5708,8 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
                 _petState.Current.ActiveAlertPriority,
                 deduplicateInMemory))
         {
+            if (_petState.Current.ActiveAlertPriority is not null && _activeAlertId != alert.Id)
+                _deferredAlerts[alert.Id] = CaptureAlert(alert, signal, lossZone, currentPrice, persistDelivery, deduplicateInMemory);
             return false;
         }
 
@@ -5751,7 +5747,11 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         var version = Interlocked.Increment(ref _alertVersion);
         _activeAlertId = alert.Id;
         _activeAlertPriority = alert.Priority;
+        _activeAlertContext = CaptureAlert(alert, signal, lossZone, currentPrice, persistDelivery, deduplicateInMemory);
+        if (alert.Facts.Any(fact => fact.Kind == RuleFactKind.MissingStopLoss) &&
+            long.TryParse(alert.Id.Split(':')[^1], out var missingStopId)) _missingStopLossAlerted.Add(missingStopId);
         _petState = _petBehavior.ApplySignal(_petState, signal, alert.OccurredAtUtc);
+        _petState = _petState with { Current = _petState.Current with { ActiveAlertPriority = alert.Priority } };
         var hasLossZoneCard = lossZone is not null && alert.Facts.Any(fact => fact.Kind == RuleFactKind.LossZoneHistory);
         var bubbleHeadline = hasLossZoneCard && alert.Headline == "又是这里。"
             ? "又进亏损区了。别急着证明自己。"
@@ -5786,13 +5786,23 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
 
     private void SnoozeAlert()
     {
-        var headline = _viewModel.BubbleHeadline;
-        var details = _viewModel.BubbleDetails;
+        var context = _activeAlertContext;
         DismissActiveAlert();
-        _ = Task.Run(async () =>
+        if (context is null) return;
+        _snoozedAlertTask = Task.Run(async () =>
         {
-            try { await _scheduler.DelayAsync(TimeSpan.FromMinutes(5), _cancellation.Token); await ShowSpeechAsync(headline, $"稍后提醒：{details}", TimeSpan.FromSeconds(10)); }
+            try
+            {
+                await _scheduler.DelayAsync(TimeSpan.FromMinutes(5), _cancellation.Token);
+                await WithStateGateAsync(async () =>
+                {
+                    if (IsAlertRelevant(context) && RefreshPendingAlert(context) is { } currentAlert)
+                        await ShowAlertAsync(currentAlert, context.Signal, context.Zone, context.Price,
+                            persistDelivery: false, deduplicateInMemory: false);
+                });
+            }
             catch (OperationCanceledException) { }
+            catch (Exception exception) { AppLog.Write($"Deferred reminder failed: {exception}"); }
         });
     }
 
@@ -5814,6 +5824,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
     {
         Interlocked.Increment(ref _alertVersion);
         _activeAlertId = null;
+        _activeAlertContext = null;
         _petState = _petBehavior.CompleteInterruption(_petState, _timeProvider.GetUtcNow());
         _ = OnUiAsync(() => { _viewModel.IsBubbleVisible = false; _viewModel.IsAlertActionVisible = false; _viewModel.CanMuteCurrentAlert = false; _viewModel.SetBubbleLossZone(null); });
     }
@@ -5823,7 +5834,8 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         string details,
         TimeSpan duration,
         LossZoneState? lossZone = null,
-        decimal? currentPrice = null)
+        decimal? currentPrice = null,
+        PetActivity? activity = null)
     {
         if (_petState.Current.ActiveAlertPriority is not null)
         {
@@ -5843,7 +5855,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
             _viewModel.IsBubbleVisible = true;
             _viewModel.IsAlertActionVisible = false;
             _viewModel.CanMuteCurrentAlert = false;
-            _viewModel.PetActivity = _petState.Current.Activity;
+            _viewModel.PetActivity = activity ?? _petState.Current.Activity;
         });
         _ = HideBubbleLaterAsync(version, duration);
     }
@@ -5884,11 +5896,15 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         while (!cancellationToken.IsCancellationRequested)
         {
             await _scheduler.DelayAsync(TimeSpan.FromSeconds(8), cancellationToken);
-            if (_petState.Current.ActiveAlertPriority is null)
+            await WithStateGateAsync(DrainDeferredAlertsAsync);
+            await WithStateGateAsync(UpdateDataHealthAsync);
+            if (_petState.Current.ActiveAlertPriority is null && !_viewModel.IsBubbleVisible &&
+                _viewModel.PetIdleAnimationsEnabled && !_viewModel.IsFocusMode)
             {
                 _petState = _petBehavior.Advance(_petState, _timeProvider.GetUtcNow());
                 await OnUiAsync(() => _viewModel.PetActivity = _petState.Current.Activity);
             }
+            await RequestCompanionReactionAsync(CompanionTrigger.Idle);
             if (!_viewModel.IsFocusMode && _timeProvider.GetUtcNow() >= nextSpeech && !_viewModel.IsBubbleVisible)
             {
                 var consecutiveWins = PetAdviceCatalog.CountConsecutiveWins(_trades.Values, _serverDate);
@@ -5972,6 +5988,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         {
             await _scheduler.DelayAsync(TimeSpan.FromSeconds(15), cancellationToken);
             var now = _timeProvider.GetUtcNow();
+            if (_petState.Current.ActiveAlertPriority is not null) continue;
             var upcoming = _economicCalendarEvents
                 .Where(item => item.Importance == EconomicEventImportance.High &&
                                item.ActualValue is null && item.ScheduledAtUtc >= now &&
@@ -6055,7 +6072,8 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
                     continue;
                 }
                 IMarketHistorySource client = _activePlatform == TradingPlatform.Mt4
-                    ? new TradePet.Infrastructure.Mt4.Mt4MarketHistoryClient(terminal.TerminalPath, terminal.DataDirectory!, serverUtcOffsetSeconds)
+                    ? new TradePet.Infrastructure.Mt4.Mt4MarketHistoryClient(terminal.TerminalPath, terminal.DataDirectory!, serverUtcOffsetSeconds,
+                        TradePetPaths.GetCollectorDataDirectory())
                     : new Mt5HistoryClient(new Mt5HistoryOptions(paths.PythonExecutable, paths.HistoryWorkerScript,
                         terminal.TerminalPath, terminal.TerminalId));
                 using var timeout = CancellationTokenSource.CreateLinkedTokenSource(_cancellation.Token);
@@ -6108,7 +6126,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         }
         if (_account is null || !_serverDateAuthoritative)
         {
-            await ShowSpeechAsync("日报还不能生成。", "等待交易账户和服务器时间连接完成。", TimeSpan.FromSeconds(7));
+            if (!automatic) await ShowSpeechAsync("日报还不能生成。", "等待交易账户和服务器时间连接完成。", TimeSpan.FromSeconds(7));
             return;
         }
 
@@ -6208,6 +6226,11 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
             report = report with { Analysis = DailyReportAnalyzer.Analyze(data with { Currency = report.Currency }, facts, report.IsLive) };
             var markdown = BuildDailyReportMarkdown(data, facts, report);
             var archivePath = await ArchiveDailyReportAsync(report, markdown);
+            if (automatic && archivePath is null)
+            {
+                await OnUiAsync(() => _viewModel.DiagnosticText = "日报归档未完成，将稍后重试。");
+                return;
+            }
             report = report with { Markdown = markdown, ArchivePath = archivePath };
 
             var displayed = false;
@@ -6216,7 +6239,8 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
                 if (!_accountSessions.IsCurrent(accountKey, session.Generation)) return;
                 if (refreshWindow is null)
                 {
-                    ShowDailyReportWindow(report, activate: !automatic);
+                    if (!automatic || _viewModel.DailyReportPopupEnabled && !_viewModel.IsFocusMode)
+                        ShowDailyReportWindow(report, activate: !automatic);
                     displayed = true;
                 }
                 else if (ReferenceEquals(_dailyReportWindow, refreshWindow) && refreshWindow.Report.AccountKey == report.AccountKey)
@@ -6235,7 +6259,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
                         DailyReportLastShownSettingKey,
                         date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                         _cancellation.Token),
-                    "记录交易日报弹出日期");
+                    "记录交易日报归档日期");
             }
         }
         catch (OperationCanceledException) when (_cancellation.IsCancellationRequested)
@@ -6333,7 +6357,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         try
         {
             var accountFolder = SanitizePathPart(report.AccountKey);
-            var directory = Path.Combine(TradePetPaths.GetDataDirectory(), "reports", accountFolder);
+            var directory = Path.Combine(TradePetPaths.GetReportDirectory(), accountFolder);
             Directory.CreateDirectory(directory);
             var path = Path.Combine(directory, $"{report.ServerDate:yyyy-MM-dd}-trading-report.md");
             await File.WriteAllTextAsync(path, markdown, Encoding.UTF8, _cancellation.Token);
@@ -6702,9 +6726,9 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
 
     private static string FormatCompliance(PlanComplianceStatus? status) => status switch
     {
-        PlanComplianceStatus.Matched => "自动匹配计划内",
+        PlanComplianceStatus.Matched => "自动匹配入场区（止损与退出另行核验）",
         PlanComplianceStatus.ManualInside => "人工标记计划内",
-        PlanComplianceStatus.OutsidePlan => "自动判断计划外",
+        PlanComplianceStatus.OutsidePlan => "自动判断入场区外",
         PlanComplianceStatus.ManualOutside => "人工标记计划外",
         _ => "未分类",
     };
@@ -6881,8 +6905,21 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
 
     private async Task LoadDesktopSettingsAsync()
     {
-        var settings = await _database.LoadSettingAsync<DesktopSettings>(GlobalScope, DesktopSettingKey, _cancellation.Token)
-            ?? new DesktopSettings(false, true, false, false, 1.0, 0.70, 200m, null, 1);
+        var storedSettings = await _database.LoadSettingAsync<DesktopSettings>(GlobalScope, DesktopSettingKey, _cancellation.Token);
+        var settings = storedSettings ?? new DesktopSettings(false, true, false, false, 1.0, 0.70, 200m, null, 1);
+        if (settings.CompanionSettingsVersion < 1)
+        {
+            settings = settings with
+            {
+                QuickReviewPromptEnabled = false,
+                EntryReasonPromptEnabled = false,
+                DailyReportPopupEnabled = false,
+                CompanionSettingsVersion = 1,
+            };
+            if (storedSettings is not null)
+                await TryPersistLiveAsync(() => _database.SaveSettingAsync(GlobalScope, DesktopSettingKey,
+                    settings, _cancellation.Token), "保存陪伴偏好");
+        }
         var guideCompleted = await _database.LoadSettingAsync<bool?>(GlobalScope, ConsoleGuideSettingKey, _cancellation.Token)
             ?? false;
         var tolerancePoints = settings.PriceDistanceVersion >= 1
@@ -6909,9 +6946,16 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
             _viewModel.MiniPositionVisible = settings.MiniPositionVisible;
             _viewModel.MiniPositionPinned = settings.MiniPositionPinned;
             _viewModel.DailyReportEnabled = settings.DailyReportEnabled;
+            _viewModel.DailyReportPopupEnabled = settings.DailyReportPopupEnabled;
             _viewModel.QuickReviewPromptEnabled = settings.QuickReviewPromptEnabled;
             _viewModel.EntryReasonPromptEnabled = settings.EntryReasonPromptEnabled;
+            _viewModel.PetTapResponseEnabled = settings.PetTapResponseEnabled;
+            _viewModel.PetCompletionFeedbackEnabled = settings.PetCompletionFeedbackEnabled;
+            _viewModel.PetIdleAnimationsEnabled = settings.PetIdleAnimationsEnabled;
+            _viewModel.PetSoundEnabled = settings.PetSoundEnabled;
+            _viewModel.PetSoundVolume = settings.PetSoundVolume;
             _viewModel.UpdateNotificationsEnabled = settings.UpdateNotificationsEnabled;
+            _viewModel.AutomaticBackupEnabled = settings.AutomaticBackupEnabled;
             _viewModel.UiLanguage = settings.UiLanguage;
             _viewModel.DailyReportTimeText = NormalizeDailyReportTime(settings.DailyReportTime);
             _viewModel.StartWithWindows = StartupRegistration.IsEnabled();
@@ -6984,7 +7028,7 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         return _analyticsRealizedPnl ??= deals.Sum(deal => deal.NetPnl);
     }
 
-    private bool SupportsCompleteTradeProjection => _account is not null &&
+    private bool SupportsCompleteTradeProjection => _offlineReviewOnly || _account is not null &&
         (_account.MarginMode == 2 || (_activePlatform == TradingPlatform.Mt4 && _mt4HistoryAvailable));
 
     private decimal ResolveLossZoneTolerance(TradeRecord trade)
@@ -7243,10 +7287,18 @@ public sealed partial class TradePetRuntime : IAsyncDisposable
         string DailyReportTime = "23:55",
         TradingPlatform Platform = TradingPlatform.Mt5,
         int SetupVersion = 0,
-        bool QuickReviewPromptEnabled = true,
-        bool EntryReasonPromptEnabled = true,
+        bool QuickReviewPromptEnabled = false,
+        bool EntryReasonPromptEnabled = false,
         bool UpdateNotificationsEnabled = true,
-        string UiLanguage = "zh-CN");
+        string UiLanguage = "zh-CN",
+        bool AutomaticBackupEnabled = true,
+        bool DailyReportPopupEnabled = false,
+        int CompanionSettingsVersion = 0,
+        bool PetTapResponseEnabled = true,
+        bool PetCompletionFeedbackEnabled = true,
+        bool PetIdleAnimationsEnabled = true,
+        bool PetSoundEnabled = false,
+        double PetSoundVolume = 0.25);
 
     private sealed record BehaviorReviewEditCommand(
         string AccountKey,

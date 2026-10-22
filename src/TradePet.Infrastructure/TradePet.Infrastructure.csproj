@@ -6,6 +6,8 @@
     <ProjectReference Include="..\TradePet.Application\TradePet.Application.csproj" />
     <ProjectReference Include="..\TradePet.Core\TradePet.Core.csproj" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.20" />
+    <!-- Override the legacy native SQLite dependency with the WAL-reset corruption fix. -->
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="TradePet.Infrastructure.Tests" />
